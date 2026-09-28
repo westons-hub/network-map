@@ -1,177 +1,230 @@
 # Network Map v2: build spec for Claude Code
 
-Read this whole file, then read the README and the code (`build_map.py`, `network_map/`).
-**Start in plan mode:** propose a plan and ask me about anything unclear before writing code.
-Build in the phases at the bottom, run the tests, and commit after each phase.
-**Commit locally only. Don't push until I say so.**
+This is the single spec. V2_ADDITIONS.md (and the change to its section B) has been merged in here.
+Build in the phases at the bottom, run the tests, and **commit locally after each phase. Don't push until I say so.**
+After each phase, show me screenshots of what changed. Ask me about anything unclear before building it.
 
 ## Goal
 
 This is a portfolio project for job applications. A recruiter should be able to **click one link and use it
 instantly**, with nothing to install and no sign-up.
 
-## The big change: static page → browser-only app on GitHub Pages
+## Ground rules
 
-Right now `build_map.py` generates a static HTML file, so the map can't be edited. v2 is a
-**browser-only web app** hosted on **GitHub Pages**. It uses plain HTML/CSS/JS, has **no Python server** and no backend.
+- **Browser-only** web app on **GitHub Pages**: plain HTML/CSS/JS ES modules in `site/`, no server, no backend, no build step.
+- **All data stays in the browser. Nothing is uploaded**, and there are no analytics or trackers. Say so on the page.
+  The only outside requests are company logos (the logo service sees a domain) and opt-in Gravatar (it sees an email hash).
+  Section H adds optional calendar sign-in, which sends only the events I create.
+- **No LinkedIn scraping:** only my own data exports plus manual entry.
+- **Never commit real data.** `.gitignore` blocks `.xlsx`, `.csv`, `.html` exports and intro reports, except the demo
+  (`site/demo/`), the blank template and test fixtures. Demo **people** are fictional.
+- Vendor third-party JS into `site/vendor/` (vis-network, SheetJS, DiceBear) so the site has no CDN dependency.
+  `site/vendor/ATTRIBUTION.md` lists each one with its license.
+- Tests: `node --test` over the DOM-free logic in `site/js/core/`. Nothing needs `npm install` to *run* the site;
+  dev-only packages (DiceBear) are used just to vendor files.
+- **Deploy:** `.github/workflows/pages.yml` publishes `site/` to Pages on push to `main`; tests run first and block the deploy.
 
-- Opening the link shows the map right away with the **fictional demo data** (from `examples/`).
-- A **"Use my own data"** button opens my Excel workbook or a LinkedIn `Connections.csv`.
-- The page edits data live: add people, add targets, drag nodes. It saves changes to the Excel workbook.
-- **All data stays in the browser. Nothing is uploaded**, and there are no analytics or trackers. Say so clearly on the page.
-- Keep a way to export a static offline HTML snapshot (the current behavior), as an "Export offline map" button.
-- Keep vis-network as the map engine. Vendor third-party JS (vis-network, SheetJS) into the repo so the site
-  doesn't depend on a CDN and works from a local copy.
-- No build step is required: ES modules served as static files, so the repo root (or a `site/` folder) deploys as-is.
-- The Streamlit `app.py` and `requirements-app.txt` are removed. Before starting, **commit the current
-  uncommitted work** (targets, status, report.py, tests) so v2 starts from a clean point. *(Done: f3d4e74.)*
-- **Deploy:** add a GitHub Actions workflow (`.github/workflows/pages.yml`) that publishes the site to GitHub
-  Pages on push to `main` (`actions/upload-pages-artifact` + `actions/deploy-pages`). Tests run first, and a failure blocks the deploy.
+## 1. Excel is the database (read and written in the browser) ✅
 
-## 1. Connect to Excel (Excel is the database, read and written in the browser)
+- SheetJS reads and writes `.xlsx`. Chrome/Edge save in place (File System Access API); Safari/Firefox download the updated file.
+- Before writing: back up the previous version in IndexedDB (last 10, downloadable/restorable). If the file changed on
+  disk (edited in Excel), reload it and replay my pending edits instead of overwriting.
+- Unsaved changes: a dot on Save, a warning on leaving, and autosave to browser storage.
+- Migrate old files automatically. Demo edits only touch an in-browser copy; "Reset demo" restores it.
+- Sheets (see E and F for the final People layout and the new sheets):
+  **People**, **Targets** (Company, Priority, Stage, Notes), **Companies** (Company, Website, Logo),
+  **LinkedIn Pool**, **Meetings**, **Tasks**, **Settings**, **Layout** (hidden).
 
-- Read and write `.xlsx` in the browser with **SheetJS**.
-- **Chrome/Edge:** use the **File System Access API** (`showOpenFilePicker`, `createWritable`) so "Save"
-  writes straight back to the same file.
-- **Safari/Firefox fallback:** open with a normal file input; "Save" downloads the updated workbook.
-- One workbook, e.g. `my_network.xlsx` (never committed), with these sheets:
-  - **People**: Name, Company, School, Role, Email, LinkedIn URL, Photo, Connected Through, Connected On, Status, Tags, Notes
-  - **Targets**: Company, Priority, Stage, Notes
-  - **Companies**: Company, Website (used for logos, see #4)
-  - **LinkedIn Pool**: the imported LinkedIn connections (see #2)
-  - **Layout**: saved node positions (see #7). Can be hidden.
-- Before writing, keep a backup of the previous version in the browser (IndexedDB, the last ~10), with a way to
-  download or restore one.
-- If the file changed on disk since it was opened (for example I edited it in Excel), reload it instead of overwriting, then re-apply my pending change.
-- Unsaved changes are obvious (a "Save" button with a dot, plus a warning on leaving the page). They're also autosaved to
-  browser storage so a refresh doesn't lose them.
-- Update `template/contacts_template.xlsx` to match (with a "Download blank template" button in the app), and migrate
-  old-format files automatically (a `Contacts` sheet becomes People; old Targets gain Priority/Stage).
-- Demo mode edits only an in-browser copy. A "Reset demo" button restores it. The committed examples never change.
+## 2. Add people with a lookup (so it isn't overwhelming)
 
-## 2. Add people manually with a lookup (so it isn't overwhelming)
+- The map starts small: **me + my targets + only the people I've added.** LinkedIn connections never flood the map.
+- **Import LinkedIn:** choose `Connections.csv` → it goes into the LinkedIn Pool sheet, not onto the map.
+  - Use every column: First Name, Last Name, URL, Email Address, Company, Position, Connected On (a date).
+  - Skip the "Notes:" lines above the header. Re-importing never duplicates (dedupe by profile URL, then name).
+  - If someone's company changed since the last import, move the old company and position into their Past Companies (see D).
+- **Add person:** type-ahead over the pool (name, company, title) → a form prefilled from LinkedIn; or add someone not on LinkedIn.
+  The form edits all fields (see F). My manual edits always beat LinkedIn data.
+- Edit or remove a person from the details panel.
 
-- The map starts small: **me + my targets + only the people I've added.** Don't dump all my LinkedIn connections onto the map.
-- **Import LinkedIn:** a button to choose my `Connections.csv`. It goes into the LinkedIn Pool sheet, not onto the map.
-  - Use **every column**: First Name, Last Name, URL, Email Address, Company, Position, Connected On (parse as a date).
-  - The file has "Notes:" lines above the header (skip to the "First Name" line, as the current loader does).
-    Re-importing must not create duplicates (dedupe by profile URL, then by name).
-- **Add person:** a search box with type-ahead over the pool (matches name, company and title).
-  - Pick a result → a short form prefilled from LinkedIn. I add School, Connected Through (type-ahead over people already on
-    the map), Status, Tags, Notes, Email, Photo → Save.
-  - Also allow adding someone who isn't in LinkedIn at all.
-- Edit or remove a person from the details panel. My manual edits always beat LinkedIn data.
+## 3. Targets are core ✅ (alumni and pool pieces pending)
 
-## 3. Targets are core
-
-- **Targets** is the top section of the sidebar, not an afterthought.
-- "+ Add target" button at the top of the Targets section opens a small form: company name with type-ahead (companies
-  from my people, LinkedIn pool and existing groups, plus free text), Priority (P1/P2/P3), Stage
-  (Researching / Networking / Applied / Interviewing / Offer), Notes. It saves to the Targets sheet.
-- Edit and remove targets from the target's card. A "Make this a target" button on any company group's details panel.
-- Works in demo mode too (edits the in-browser demo copy; "Reset demo" restores it).
-- For each target show:
-  - how many people I know there
-  - my best path in (direct, or through whom for 2nd-degree, with the full chain: Me → Liam → Zoe → Sam)
-  - a clear "no connections yet" state
-  - who in my LinkedIn Pool works there but isn't on the map yet, with one click to add them
-- Clicking a target focuses and zooms the map on it.
-- Every target is **always its own node** (bigger, distinct red ring, logo). Anyone I know there attaches to it,
-  even below the group threshold. Optional fields: Priority and Stage (e.g. Researching / Networking / Applied / Interviewing).
-- This absorbs the old "who can intro me to X?" report. Port its logic (org-name normalization and aliases,
-  "Connected Through" chains) to JS, and offer "Download intro report (.md)".
+- **Targets** is the top section of the sidebar. "+ Add target" (type-ahead over my people, pool and groups, plus free
+  text; Priority P1/P2/P3; Stage Researching / Networking / Applied / Interviewing / Offer; Notes). Edit/remove from the
+  card; "Make this a target" on company groups. Works in demo mode.
+- Every target is always its own node (red ring, logo); anyone I know there attaches to it.
+- For each target: how many people I know there, **alumni** (see D, ranked below current employees), my best path in
+  (full chain, warmest contact first), a clear "no connections yet" state, and who in my LinkedIn Pool works there
+  but isn't on the map, with one click to add them.
+- Clicking a target focuses the map and draws the best path in red. Offer "Download intro report (.md)".
 
 ## 4. Company and school logos
 
-- Company, school and target bubbles show a logo with vis-network `shape: "circularImage"`.
-- **Demo data (fictional):** no real logos. Each fictional company/school gets a generated logo (colored rounded
-  shape + a simple icon or initials) as inline SVG, stored in the demo workbook's Companies sheet (Logo column).
-- **Real data:** guess the domain from the name (reusing the name normalization and aliases, e.g. BYU → byu.edu),
-  overridable with the Website (or Logo) column in the Companies sheet. Logo source: Google's favicon service
-  `https://www.google.com/s2/favicons?domain=<domain>&sz=128`, loaded directly by the browser (cached by the browser;
-  domains with no logo are remembered so they aren't re-checked). Keep the source swappable (logo.dev / Brandfetch need
-  API keys). This sends only company domains, never contact data, and never happens in demo mode.
-  - Google returns a 16px globe (HTTP 404) for unknown domains, so anything ≤16px counts as "no logo".
-  - Google sends no CORS headers, so favicons can't be embedded in the offline export; there, use the generated logo.
-- Fallback everywhere: a generated initials logo.
+- Company, school and target bubbles use `shape: "circularImage"`.
+- **Logo source:** Google's favicon service `https://www.google.com/s2/favicons?domain=<domain>&sz=128`, loaded at
+  runtime by the browser (browser-cached; domains with no logo are remembered). Swappable later (logo.dev / Brandfetch need keys).
+  - Google returns a 16px globe for unknown domains, so ≤16px counts as "no logo".
+  - No CORS headers, so favicons can't be embedded in the offline export; use the initials logo there.
+- **Domain:** the Companies sheet's Website wins; otherwise guess it from the name with aliases (BYU → byu.edu).
+- **Demo:** uses **real, well-known companies and schools** with their real logos, via **explicit domains in the demo
+  Companies sheet** (no logo files committed). Fallback: a generated initials logo.
+- Footer note (demo): **"Company names and logos are trademarks of their owners; demo people are fictional."**
 
 ## 5. Profile pictures
 
-- LinkedIn's export does **not** include photos, and we don't scrape LinkedIn.
-- **Demo data:** illustrated avatars generated in code (simple SVG faces in varied colors), not downloaded photos.
-- **Real data:** each person has a Photo field. In the details panel, "Add photo" lets me pick an image file (resized in
-  the browser to ~96×96 and stored as a data URI in the workbook's Photo cell) or paste an image URL.
-- Optional, **off by default**: Gravatar by email (SHA-256 hash via Web Crypto). It sends a hash of the email to Gravatar, so it's opt-in.
-- Fallback: an initials avatar. People render as circular images; their **status shows as the colored border ring**.
+- LinkedIn's export has **no photos**, and we don't scrape. **No photos of real people in the demo.**
+- **Demo people:** illustrated **DiceBear avatars in the CC0 "Notionists" style**, generated locally in the browser
+  (vendored library, seeded by name). Attribution in `site/vendor/ATTRIBUTION.md`. Controlled by a Settings value
+  "Avatar style" (the demo workbook sets it; my own data defaults to initials, and I can turn it on too).
+- **My own data:** the Photo field. "Add photo" picks an image file (resized in the browser to ~96×96, stored as a data
+  URI in the Photo cell) or pastes an image URL. Real uploaded photos are only for my own data.
+- Optional, **off by default**: Gravatar by email (SHA-256 via Web Crypto).
+- Fallback: an initials avatar. A person's **status shows as the colored border ring**.
 
-## 6. Emails in the info panel
+## 6. Details panel ✅
 
-- The details panel shows the email as a `mailto:` link plus a copy button.
-- It also shows role, company, school, Connected On date, status, tags, notes and the LinkedIn link.
+- Email as a `mailto:` link plus a copy button; role, company, schools, Connected On, status, tags, notes, LinkedIn link.
 
 ## 7. Dragging the map
 
-- Pan and zoom the canvas, and drag nodes.
-- Dragged positions are **saved** in the workbook's Layout sheet (and in browser storage for the demo), so the layout stays put next time.
-- Add a "Re-arrange" button to rerun the auto layout and a "Lock layout" toggle (physics off).
+- Pan, zoom and drag nodes. Dragged positions are **saved** in the Layout sheet (browser storage for the demo).
+- "Re-arrange" reruns the auto layout; "Lock layout" turns physics off.
 
-## 8. Layout and look
+## 8. Layout and look ✅
 
-- **Full screen, with no page scrolling.** Set `html, body { height: 100%; overflow: hidden; }`.
-- Left sidebar, about 340px wide, scrolls internally: Targets on top, then Add person, then details.
-- **The map fills the entire right side.** You must not be able to scroll past it.
-- **Map background:** light, like math or graph paper. Use a near-white fill with thin light-blue/gray grid lines every ~20px and slightly darker lines every ~100px.
-  - Draw the grid in vis-network's `beforeDrawing` hook so it pans and zooms with the map, not as a fixed CSS background.
-- Keep the details panel, search and legend, but move them into the sidebar or a small overlay so they don't cover the map.
-- It should be usable on a phone for a quick look: the sidebar becomes a bottom sheet.
-- A small banner in demo mode: "You're viewing fictional demo data. Use my own data →".
-- The sidebar header stays fixed above a scrolling body, so nothing (like the Targets heading) is ever clipped under it.
+- Full screen, no page scrolling (`html, body { height: 100%; overflow: hidden; }`). A 340px left sidebar with a fixed
+  header over a scrolling body; the map fills the right side. Graph-paper grid drawn in `beforeDrawing`.
+- Phone: the sidebar becomes a bottom sheet. Demo banner: "You're viewing fictional demo data. Use my own data →".
+- **Readability:** highlight on click (others fade to ~15%; hover = lighter preview; Esc / empty click clears);
+  groups spread far apart; people link only to their primary group; no-connection targets on the outer edge;
+  **Free | Ring** switch (animated, remembered, "Fit" in both); slower eased zoom; labels with a white halo that hide
+  when zoomed out; red ring only on targets.
+- **Edge styles**, all darker than the grid: solid dark gray = I know them; dashed gray = through someone;
+  **faint dotted = alumni link** (past company or shared school, see D; a toggle shows/hides them);
+  red = only a highlighted path to a target.
+- View tabs at the top of the right pane: **Map | People | Calendar | To-Do** (see F). The sidebar stays.
 
-## 8b. Readability
+## D. Work history and schools
 
-- **Highlight on click:** clicking a person, group or target highlights it plus its direct connections; everything
-  else fades to ~15% opacity (nodes, edges, labels). Clicking a target also highlights my **best path** to it
-  (e.g. Me → Liam → Zoe → Sam) in bold red, and the sidebar shows that path. Click empty space or press Esc to clear.
-  Hovering shows a lighter preview of the same thing.
-- **Spacing:** groups spread far apart so each cluster is clearly separate (longer springs, stronger repulsion between
-  group nodes, avoidOverlap on). Members stay tight around their own group. People link only to their primary group
-  (secondary memberships appear only when highlighted). Targets with no connections sit on the outer edge.
-- **Layout switch** (top-right of the map, next to "Fit"): a segmented control "Free | Ring".
-  - Ring: me at the center, groups evenly spaced on a circle, members fanned around their group, 2nd-degree people just
-    outside the person who connects them, and no-connection targets on an outer ring.
-  - Free: the physics layout (with the extra spacing).
-  - Animate between them; remember the choice (localStorage). "Fit" works in both.
-- **Edges, only 3 styles**, all darker than the grid: solid dark gray = I know them (direct/group membership);
-  dashed gray = through someone (2nd-degree); red = only a highlighted path to a target. The grid is lighter so edges stand out.
-- **Zoom:** slower and smoother (eased, anchored under the cursor), including trackpad pinch.
-- **Nodes:** a person's color = status only (legend shows the status colors). The red ring is only on target company
-  nodes, never on people. Slightly larger labels with a white halo; person names hide when zoomed far out.
+LinkedIn's `Connections.csv` only has the **current** company and title and **no school**. The full archive's
+`Positions.csv` and `Education.csv` are **my own** history only.
+
+1. **Past Companies** (multiple, e.g. "Northwind Consulting (2019–2021); Summit Airlines"), edited with type-ahead
+   and optional years. Past employers link to that company's node with the faint dotted alumni edge.
+   Target cards and best-path logic count alumni: "Alumni: Liam Walsh (2019–21)", ranked below current employees.
+2. **Schools** (multiple, with years, e.g. "BYU (2022–2026); Lakeview High"). Replaces the single School column
+   (migrated automatically). Everyone sharing a school joins that school's group (using org aliases).
+3. **LinkedIn re-import:** a changed company moves the old company/position into Past Companies.
+4. **Optional import of my own `Positions.csv` and `Education.csv`:** sets MY past employers and schools. People who
+   share them get a "Former coworker" / "Same school" badge and count as a warm path into targets.
+5. In-app tip: "Find classmates on LinkedIn: People search → School filter → 1st connections."
+6. Demo people get past companies and multiple schools.
+
+## E. Networking tracker format + Excel import/export
+
+My tracker's columns, in order. ⚠️ **To confirm with me before Phase 4** (especially the three date columns):
+
+Name | Company | Role / Background | How We're Connected | LinkedIn | Meeting Type | Method | Status |
+Date Reached Out | Meeting Date | Follow-Up Date | Referral? | Relevant Opportunities | Next Steps | Relationship Plan
+
+Example: Jamie Ortega | Northwind / Contoso | Strategy Analyst at Northwind; Contoso Growth Strategy Intern (summer),
+returning as Growth Associate | BYU; 11 mutual connections (Casey, Morgan) | Profile | Coffee Chat | Phone | Met |
+| | | No | Contoso APM; Northwind | Send thank-you within 24 hrs; ask for resume review | Keep In contact
+
+- The **People sheet uses this layout** (so my workbook stays familiar). Extra fields follow: Email, Photo,
+  Past Companies, Schools, Tags, Connected On, Connected Through. Old v2 People sheets are migrated.
+- **LinkedIn** is a hyperlink with the text "Profile".
+- **Company** may hold several ("Northwind / Contoso"): the first is current; the others count as past/next employers for groups and targets.
+- **How We're Connected** combines schools, the mutual count and mutual names. Mutual names that match exactly one
+  person on my map (full name, or a unique first name) create Connected Through links; otherwise they stay text.
+- **Dates:** Date Reached Out = first outreach. **Meeting Date = the next scheduled meeting, or the most recent one if
+  none is scheduled.** Follow-Up Date = when the next follow-up is due (the Next Steps task's due date).
+- **Dropdowns** (Excel data validation): Meeting Type: Coffee Chat, Informational, Networking Event, Class/Club,
+  Interview, Other · Method: Phone, Zoom, Google Meet, Teams, In Person, Email, LinkedIn ·
+  **Status: To Reach Out, Contacted, Scheduled, Met, Follow Up, Referral** (Scheduled is new) · Referral?: Yes/No ·
+  Relationship Plan: Keep In Contact, Follow Up Later, One-Time. Values match case-insensitively.
+- **Import** an existing tracker in this format, matching columns by header name (ignoring case/punctuation).
+- **"Export to Excel":** all people or only the current filter/highlight; frozen header, auto widths, wrapped text;
+  plus Meetings and To-Do sheets.
+
+## F. Full person editing, Meetings log, and views
+
+1. The details panel and "Add person" edit **all** fields in sections: Basics (name, company, role, LinkedIn, email,
+   photo) · Connection (schools, past companies, mutuals, connected through) · Outreach (meeting type, method, status,
+   dates, referral) · Notes & Next Steps.
+2. **Meetings log** per person (date/time, type, method, notes, next step). Logging a meeting sets Status to Met and
+   fills Meeting Date. The latest meeting shows at the top of the person's panel.
+3. **View tabs** (right pane): **Map | People | Calendar | To-Do**.
+   - **People:** spreadsheet-style table in tracker order; sort, filters (status, company, school, target), search,
+     inline edit; clicking a row opens the person.
+   - **Calendar:** month and week views of meetings, follow-ups and task due dates, color-coded. Click a day to add a
+     meeting or task; click an event to open the person.
+   - **To-Do:** tasks with due dates, linked to a person and/or target; grouped Overdue / Today / This Week / Later /
+     Done; check off to complete. Automatic tasks: Next Steps → task due on the Follow-Up Date; after a meeting,
+     "Send thank-you within 24 hrs"; Keep In Contact people get a check-in every 60 days (configurable). The tab shows
+     a badge with the overdue + today count.
+4. New sheets: **Meetings** (Person, Date, Start, End, Type, Method, Notes, Next Step, Calendar Event ID) ·
+   **Tasks** (Task, Person, Company, Due, Done, Created) · **Settings** (my name, my email, default meeting length,
+   Zoom link, avatar style).
+
+## G. Meeting invites (no Zoom API)
+
+1. Settings: my name, email, default length (30 min), my Zoom link (personal room or scheduling link).
+2. **"Schedule meeting"** from a calendar day, an event or a person's panel: person (type-ahead, pulls their email),
+   date/time, length, type; method: Zoom (prefilled with my link), Google Meet, Teams, Phone or In Person.
+3. **"Send invite"** — **the app never sends anything itself; I always click send or save:**
+   Google Calendar prefilled event URL (`calendar.google.com/calendar/render?action=TEMPLATE`, with text, dates,
+   details incl. the link, `add=<their email>`) · Outlook compose-event deeplink (outlook.live.com / outlook.office.com) ·
+   email draft (Gmail compose URL, `mailto:` fallback) from an editable template
+   ("Hi {first name}, looking forward to our chat on {date} at {time}. {link}") · download `.ics`
+   (ATTENDEE, ORGANIZER, link in LOCATION and DESCRIPTION).
+4. Scheduling adds the meeting to Meetings, sets Status to Scheduled, fills Meeting Date, and creates a "Send thank-you"
+   task for the next day.
+5. If the person has no email, warn me and let me type one; save it to their row.
+
+## H. Calendar connections (optional sign-in, still no server)
+
+1. The prefilled links in G stay the default (no sign-in).
+2. **"Connect Google Calendar"** (Google Identity Services token client, `calendar.events` scope, Calendar API from the
+   browser): create events with the person as attendee (`sendUpdates=all`), optional auto Google Meet link
+   (conferenceData); show my next 60 days of events read-only in a muted color; edits/cancels in the app update the
+   Google event (event ID stored in Meetings).
+3. **"Connect Outlook"**: the same with MSAL.js (SPA, auth code + PKCE) and Microsoft Graph (`Calendars.ReadWrite`),
+   with an optional Teams link.
+4. Client IDs in `site/config.js` as placeholders — **never secrets**. `docs/CALENDAR_SETUP.md` explains Google Cloud and
+   Azure setup. Authorized origins: localhost and `https://westons-hub.github.io`.
+5. Tokens in memory/sessionStorage only, with a clear "Disconnect". Only the event details I create are sent.
+6. Demo mode: the buttons say "Connect your own calendar"; the fallback links still work.
+7. **Zoom API** (auto-created Zoom meetings) needs a server secret, so it's **not built**; list it under Roadmap in the README.
+
+## I. Demo data shows everything off
+
+Realistic tracker rows; real company/school logos and DiceBear avatars; past companies and schools with alumni links;
+6 targets (some with no connections: Apple, Nike); meetings spread across this month and next; open, overdue and done
+tasks. Every view should look alive for a recruiter.
+
+**Demo company mapping** (people stay fictional; all relationships, statuses, meetings and tasks stay the same):
+Northwind Consulting → **Deloitte** (P1 target) · Summit Airlines → **Delta Air Lines** (P1 target) ·
+Brightline Bank → **Goldman Sachs** (target) · Pinecrest Labs → **Qualtrics** (target, reached through Liam → Zoe) ·
+Contoso Games → **Microsoft** · Fieldstone Capital → **Google** · Keystone Health and Harbor Ventures → **Adobe** ·
+Riverbend University → **BYU** · Lakeview State University and Harbor Tech Institute → **University of Utah** ·
+new no-connection targets **Apple** and **Nike** (replacing Granite Peak Partners and Harborview Media).
 
 ## 9. README (portfolio-first)
 
-- Lead with the **live demo link** and an animated **GIF** of the app (made from the demo data), then
-  "Why I built this", features, privacy, and how it works.
-- The Python CLI (`build_map.py`, `network_map/`, pytest) is removed. The browser app does everything it did; the Python version stays in git history (f3d4e74).
+Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
+and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e74).
 
-## Rules
+## Phases (commit locally after each; screenshots after each)
 
-- **Privacy:** everything stays in the browser. Never commit real data: `.gitignore` blocks `.xlsx`, `.csv`, `.html`
-  exports and intro reports, except the fictional demo (`site/demo/`), the blank template and test fixtures.
-- **No LinkedIn scraping:** only my own data export plus manual entry.
-- Tests: unit-test the JS logic (parsing the LinkedIn CSV, merging, org normalization and domain guessing, graph building,
-  targets and intro paths, and the workbook round-trip with SheetJS) with `node --test`, with no npm install required to run the site.
-  CI runs them before deploying.
-- **Local commits only. No push until I say.**
-
-## Phases (commit after each)
-
-1. ✅ Static app skeleton: full-screen layout, graph-paper background, demo data loads by default; SheetJS open/save
-   (File System Access + download fallback), backups, conflict reload, migration; JS tests; remove Streamlit *(8a6afe5)*
-1b. ✅ Readability + visuals pass (moved earlier): highlight on click/hover with best path in red, more space between groups, slower/smoother zoom,
-   Free | Ring layout switch, 3 edge styles, status-only person colors, labels with halo; **logos and photos**
-   (generated demo art, favicons + Photo/Gravatar for real data); **Add/Edit/Remove target** + always-on target nodes;
-   fix the clipped Targets heading
-2. LinkedIn import (all columns) + lookup-based Add/Edit/Remove person
-3. Targets, the rest: LinkedIn-pool suggestions with one-click add, intro report download
-4. Draggable map with saved positions (Layout sheet), Re-arrange / Lock layout
-5. Offline HTML export, GitHub Pages workflow, README with live link + GIF
+1. ✅ App skeleton: full-screen layout, graph paper, demo by default, SheetJS open/save, backups, conflict reload,
+   migration, JS tests *(8a6afe5)*
+1b. ✅ Map readability (A) + Add target (C) + first pictures pass *(f9b85e2)*
+2. **Pictures (B, revised):** real companies/schools with real logos in the demo (explicit domains), DiceBear Notionists
+   avatars (vendored, CC0, attribution), "Avatar style" setting, trademark footer note
+3. **LinkedIn import + lookup Add/Edit/Remove person** (original Phase 2) **+ work history and schools (D)**, including
+   alumni edges, alumni on target cards, pool suggestions with one-click add, and the intro report download
+4. **Tracker format + Excel import/export (E) + full person editing, Meetings log, People/Calendar/To-Do views (F)**
+   — confirm the tracker headers first
+5. **Meeting invites (G) + calendar connections (H)**
+6. **Saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with live link + GIF,
+   demo polish (I)**

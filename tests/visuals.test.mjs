@@ -3,7 +3,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { demoFace, demoLogo, hash, initials, initialsAvatar, initialsLogo } from "../site/js/core/avatars.js";
+import { readdirSync } from "node:fs";
+import { hash, initials, initialsAvatar, initialsLogo } from "../site/js/core/avatars.js";
+import { createAvatar } from "../site/vendor/dicebear/core/index.js";
+import * as notionists from "../site/vendor/dicebear/notionists/index.js";
 import { buildGraph } from "../site/js/core/graph.js";
 import { ringLayout } from "../site/js/core/layout.js";
 import { domainFrom, guessDomain, isRealLogo, logoUrl } from "../site/js/core/logos.js";
@@ -17,38 +20,38 @@ const target = name => graph.targets.find(t => t.label === name);
 // ---- best path ----------------------------------------------------------------
 
 test("best path to a target reachable only through a chain", () => {
-  const p = bestPath(graph, demo.people, target("Pinecrest Labs"), demo.me);
+  const p = bestPath(graph, demo.people, target("Qualtrics"), demo.me);
   assert.deepEqual(p.names, ["Alex Rivera", "Liam Walsh", "Zoe Adams"]);
   assert.equal(p.ask, "Liam Walsh");
-  assert.deepEqual(p.nodes, ["me", "p:liam walsh", "p:zoe adams", "target:pinecrest labs"]);
-  assert.deepEqual(p.edges, ["me>p:liam walsh>direct", "p:liam walsh>p:zoe adams>intro", "target:pinecrest labs>p:zoe adams>also"]);
+  assert.deepEqual(p.nodes, ["me", "p:liam walsh", "p:zoe adams", "target:qualtrics"]);
+  assert.deepEqual(p.edges, ["me>p:liam walsh>direct", "p:liam walsh>p:zoe adams>intro", "target:qualtrics>p:zoe adams>also"]);
 });
 
 test("best path through a group bubble goes me -> group -> person", () => {
-  const p = bestPath(graph, demo.people, target("Brightline Bank"), demo.me);
+  const p = bestPath(graph, demo.people, target("Goldman Sachs"), demo.me);
   assert.deepEqual(p.names, ["Alex Rivera", "Daniel Ortiz"]);
-  assert.deepEqual(p.nodes, ["me", "target:brightline bank", "p:daniel ortiz"]);
-  assert.deepEqual(p.edges, ["me>target:brightline bank>group", "target:brightline bank>p:daniel ortiz>member"]);
+  assert.deepEqual(p.nodes, ["me", "target:goldman sachs", "p:daniel ortiz"]);
+  assert.deepEqual(p.edges, ["me>target:goldman sachs>group", "target:goldman sachs>p:daniel ortiz>member"]);
 });
 
 test("among equally short paths, the warmest contact wins", () => {
-  const g2 = buildGraph(demo.people, { me: demo.me, targets: [...demo.targets, { company: "Contoso Games" }] });
-  const p = bestPath(g2, demo.people, g2.targets.find(t => t.label === "Contoso Games"), demo.me);
+  const g2 = buildGraph(demo.people, { me: demo.me, targets: [...demo.targets, { company: "Microsoft" }] });
+  const p = bestPath(g2, demo.people, g2.targets.find(t => t.label === "Microsoft"), demo.me);
   assert.equal(p.ask, "Sofia Alvarez"); // Met beats Ethan Brooks (Follow Up) and Lena Novak (To Reach Out)
 });
 
 test("a target reached through someone sits next to them in the ring", () => {
   const pos = ringLayout(graph);
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
-  assert.ok(d("target:pinecrest labs", "p:liam walsh") < d("target:pinecrest labs", "target:summit airlines"));
+  assert.ok(d("target:qualtrics", "p:liam walsh") < d("target:qualtrics", "target:delta air lines"));
 });
 
 test("no path to a target with no one there", () => {
-  assert.equal(bestPath(graph, demo.people, target("Harborview Media"), demo.me), null);
+  assert.equal(bestPath(graph, demo.people, target("Nike"), demo.me), null);
 });
 
 test("neighborhood includes secondary links", () => {
-  const n = neighborhood(graph, "school:riverbend university");
+  const n = neighborhood(graph, "school:brigham young university");
   for (const id of ["me", "p:jordan lee", "p:noah carter", "p:sofia alvarez"]) assert.ok(n.nodes.has(id), id);
 });
 
@@ -59,12 +62,12 @@ test("ring layout: you at the center, everyone placed, gap targets outermost, me
   assert.deepEqual(pos.me, { x: 0, y: 0 });
   for (const n of graph.nodes) assert.ok(Number.isFinite(pos[n.id]?.x) && Number.isFinite(pos[n.id]?.y), n.id);
   const r = id => Math.hypot(pos[id].x, pos[id].y);
-  const gaps = ["target:granite peak partners", "target:harborview media"];
+  const gaps = ["target:apple", "target:nike"];
   const inner = graph.nodes.filter(n => !gaps.includes(n.id)).map(n => r(n.id));
   for (const g of gaps) assert.ok(r(g) > Math.max(...inner), g);
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
-  assert.ok(d("company:northwind consulting", "p:jordan lee") < 120);
-  assert.ok(d("p:sofia alvarez", "p:tom nguyen") < 90); // 2nd-degree next to their connector
+  assert.ok(d("company:deloitte", "p:jordan lee") < 140);
+  assert.ok(d("p:sofia alvarez", "p:tom nguyen") < 100); // 2nd-degree next to their connector
   // Hubs sit on one circle.
   const hubs = graph.edges.filter(e => e.from === "me" && e.kind !== "gap").map(e => r(e.to));
   assert.ok(Math.max(...hubs) - Math.min(...hubs) < 1);
@@ -89,17 +92,37 @@ test("initials", () => {
 });
 
 test("generated pictures are deterministic SVG data URIs and escape names", () => {
-  for (const make of [initialsAvatar, initialsLogo, demoLogo, demoFace]) {
+  for (const make of [initialsAvatar, initialsLogo]) {
     const a = make("Jordan Lee");
     assert.equal(a, make("Jordan Lee"));
     assert.match(a, /^data:image\/svg\+xml;charset=utf-8,/);
     const svg = decodeURIComponent(a.split(",")[1]);
     assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="96" height="96"/);
   }
-  assert.notEqual(demoFace("Jordan Lee"), demoFace("Priya Shah"));
+  assert.notEqual(initialsAvatar("Jordan Lee"), initialsAvatar("Priya Shah"));
   const evil = decodeURIComponent(initialsLogo("<script>&").split(",")[1]);
   assert.ok(!evil.includes("<script>"));
   assert.equal(hash("x"), hash("x"));
+});
+
+test("vendored DiceBear Notionists avatars work without npm install and are seeded by name", () => {
+  const make = seed => createAvatar(notionists, { seed, size: 96 }).toDataUri();
+  assert.equal(make("Jordan Lee"), make("Jordan Lee"));
+  assert.notEqual(make("Jordan Lee"), make("Priya Shah"));
+  assert.match(make("Jordan Lee"), /^data:image\/svg\+xml/);
+  const license = readFileSync(new URL("../site/vendor/dicebear/notionists/LICENSE", import.meta.url), "utf8");
+  assert.match(license, /CC0 1\.0/);
+  const attribution = readFileSync(new URL("../site/vendor/ATTRIBUTION.md", import.meta.url), "utf8");
+  assert.match(attribution, /Notionists/);
+  assert.match(attribution, /trademarks of their owners/);
+});
+
+test("the demo names an explicit logo domain for every organization on the map", () => {
+  const withSite = new Set(demo.companies.filter(c => c.website).map(c => c.company));
+  const orgs = graph.nodes.filter(n => ["company", "school", "target"].includes(n.kind)).map(n => n.label);
+  for (const o of orgs) assert.ok(withSite.has(o), o);
+  assert.ok(demo.companies.every(c => !c.logo)); // logos load at runtime; none stored
+  assert.ok(!readdirSync(new URL("../site/demo/", import.meta.url)).some(f => /\.(png|jpe?g|svg|ico|webp)$/i.test(f)));
 });
 
 // ---- logos --------------------------------------------------------------------------

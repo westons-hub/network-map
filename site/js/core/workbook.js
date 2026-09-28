@@ -2,7 +2,7 @@
 // bytes and a plain model, and back. It uses SheetJS, so it runs the same in the
 // browser and in Node tests.
 //
-// Model: { me, people, targets, companies, pool, layout, notices }
+// Model: { me, avatarStyle, people, targets, companies, pool, layout, notices }
 //
 // Sheets you add yourself (and extra columns on ours) are kept when saving.
 // Old files (a "Contacts" sheet, Targets with only Company/Notes) are migrated.
@@ -26,8 +26,10 @@ export const COMPANY_COLUMNS = [["Company", "company"], ["Website", "website"], 
 export const STAGES = ["Researching", "Networking", "Applied", "Interviewing", "Offer"];
 export const PRIORITIES = ["1", "2", "3"];
 
+export const AVATAR_STYLES = ["initials", "notionists"];
+
 export function emptyModel(me = "") {
-  return { me, people: [], targets: [], companies: [], pool: [], layout: {}, notices: [] };
+  return { me, avatarStyle: "initials", people: [], targets: [], companies: [], pool: [], layout: {}, notices: [] };
 }
 
 const lower = s => clean(s).toLowerCase();
@@ -114,6 +116,7 @@ export function readWorkbook(bytes) {
   // ---- Settings ----
   for (const rec of findSheet(wb, SHEETS.settings)?.rows ?? []) {
     if (lower(rec.Setting) === "your name") model.me = text(rec.Value);
+    if (lower(rec.Setting) === "avatar style" && AVATAR_STYLES.includes(lower(rec.Value))) model.avatarStyle = lower(rec.Value);
   }
   return model;
 }
@@ -161,7 +164,8 @@ export function writeWorkbook(model, base) {
     [SHEETS.pool]: sheetFrom([POOL_COLUMNS, ...model.pool.map(e =>
       [e.firstName, e.lastName, e.url, e.email, e.company, e.position, dateCell(e.connectedOn)])],
       [14, 16, 40, 28, 28, 30, 14]),
-    [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""]], [16, 30]),
+    [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],
+                                  ["Avatar style", model.avatarStyle ?? "initials"]], [16, 30]),
     [SHEETS.layout]: sheetFrom([["Node", "X", "Y"], ...Object.entries(model.layout ?? {}).map(([id, p]) =>
       [id, Math.round(p.x), Math.round(p.y)])], [36, 8, 8]),
   };

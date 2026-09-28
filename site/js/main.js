@@ -52,8 +52,8 @@ function render() {
   state.graph = buildGraph(model.people, { me, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) state.selected = null;
-  images.configure({ companies: model.companies, allowNetwork: state.mode !== "demo",
-                     gravatar: pref(PREFS.gravatar, "off") === "on" });
+  images.configure({ companies: model.companies, guessDomains: state.mode !== "demo",
+                     gravatar: pref(PREFS.gravatar, "off") === "on", avatarStyle: model.avatarStyle });
   map.render(state.graph, model.layout);
   renderSidebar();
   renderChrome();
@@ -88,6 +88,7 @@ function unsaved() {
 
 function renderChrome() {
   const { model } = state.doc;
+  $("illustrated").checked = model.avatarStyle === "notionists";
   const first = model.me ? model.me.split(" ")[0] : "";
   $("title").textContent = first ? `${first}'s Network` : "Network Map";
   document.title = first ? `${first}'s Network · Network Map` : "Network Map";
@@ -120,6 +121,8 @@ function renderChrome() {
     }
     banner.hidden = false;
   } else banner.hidden = true;
+
+  $("demo-note").hidden = state.mode !== "demo";
 
   const reopenItem = document.querySelector('[data-action="reopen"]');
   reopenItem.hidden = !state.lastHandle || state.mode === "file";
@@ -415,6 +418,7 @@ $("show2").addEventListener("change", e => map.set({ showSecond: e.target.checke
 $("gravatar").checked = pref(PREFS.gravatar, "off") === "on";
 $("gravatar").addEventListener("change", e => { setPref(PREFS.gravatar, e.target.checked ? "on" : "off"); render(); });
 $("fit").addEventListener("click", () => map.fit());
+$("illustrated").addEventListener("change", e => edit({ type: "setAvatarStyle", style: e.target.checked ? "notionists" : "initials" }));
 
 // Free | Ring layout switch (remembered in this browser).
 const layoutButtons = [...document.querySelectorAll("[data-layout]")];

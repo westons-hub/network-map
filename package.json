@@ -10,5 +10,11 @@
     "start": "python3 -m http.server 8000 --bind 127.0.0.1 -d site",
     "demo-data": "node scripts/make_demo.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@dicebear/core": "9.4.3",
+    "@dicebear/notionists": "9.4.2"
+  }
 }

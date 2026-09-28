@@ -18,7 +18,7 @@ const strip = m => ({ ...m, notices: [], people: m.people.map(p => ({ ...p, sour
 
 function fullModel() {
   return {
-    ...emptyModel("Weston Jackson"),
+    ...emptyModel("Weston Jackson"), avatarStyle: "notionists",
     people: [makePerson({ name: "Ana Díaz", company: "Acme", school: "BYU", role: "PM", email: "ana@example.com",
                           linkedinUrl: "https://example.com/in/ana", photo: "data:image/jpeg;base64,AAAA",
                           connectedThrough: "", connectedOn: "2026-03-12", status: "Met", tags: "a, b",

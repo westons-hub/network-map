@@ -1,12 +1,13 @@
-// Regenerate the fictional demo workbook and the blank template.
+// Regenerate the demo workbook and the blank template.
 //   node scripts/make_demo.mjs
-// All names, companies and emails here are made up.
+// The people (names, emails, relationships) are fictional. The companies and schools are real, well-known
+// organizations so the demo shows real logos; logos are loaded at runtime from each organization's
+// domain (listed below), never stored in the repo.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "../site/vendor/xlsx.mjs";
-import { demoFace, demoLogo } from "../site/js/core/avatars.js";
 import { makePerson, mergePeople, parseLinkedInCsv, personFromPool } from "../site/js/core/people.js";
 import { emptyModel, writeWorkbook } from "../site/js/core/workbook.js";
 
@@ -14,38 +15,46 @@ const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
 
 // Name, Company, School, Role, Connected Through, Status, Tags, Notes
 const PEOPLE = [
-  ["Jordan Lee", "Northwind Consulting", "Riverbend University", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
-  ["Priya Shah", "Northwind Consulting", "Lakeview State University", "Manager", "", "Contacted", "", ""],
-  ["Marcus Bell", "Northwind Consulting", "Riverbend University", "Analyst", "", "Met", "Consulting club", ""],
-  ["Hana Kim", "Northwind Consulting, Inc.", "", "Partner", "", "To Reach Out", "", "Leads the strategy practice"],
-  ["Sofia Alvarez", "Contoso Games", "Riverbend University", "Product Manager", "", "Met", "Gaming", "Owns the marketplace roadmap"],
-  ["Ethan Brooks", "Contoso Games", "", "Data Analyst", "", "Follow Up", "Gaming", ""],
-  ["Lena Novak", "Contoso Games", "Harbor Tech Institute", "Producer", "", "To Reach Out", "Gaming", ""],
-  ["Noah Carter", "Summit Airlines", "Riverbend University", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
-  ["Grace Owens", "Summit Airlines", "", "Recruiter", "", "Contacted", "", ""],
-  ["Daniel Ortiz", "Brightline Bank", "Riverbend University", "Strategy Associate", "", "Met", "", ""],
-  ["Mia Chen", "Fieldstone Capital", "Lakeview State University", "Partner", "", "Met", "", ""],
-  ["Owen Price", "Fieldstone Capital", "Lakeview State University", "Associate", "", "To Reach Out", "", ""],
-  ["Ava Thompson", "Keystone Health", "Lakeview State University", "Operations Lead", "", "Met", "", ""],
+  ["Jordan Lee", "Deloitte", "BYU", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
+  ["Priya Shah", "Deloitte", "University of Utah", "Manager", "", "Contacted", "", ""],
+  ["Marcus Bell", "Deloitte", "Brigham Young University", "Analyst", "", "Met", "Consulting club", ""],
+  ["Hana Kim", "Deloitte LLP", "", "Partner", "", "To Reach Out", "", "Leads the strategy practice"],
+  ["Sofia Alvarez", "Microsoft", "BYU", "Product Manager", "", "Met", "Product", "Owns the marketplace roadmap"],
+  ["Ethan Brooks", "Microsoft", "", "Data Analyst", "", "Follow Up", "Product", ""],
+  ["Lena Novak", "Microsoft", "University of Utah", "Program Manager", "", "To Reach Out", "Product", ""],
+  ["Noah Carter", "Delta Air Lines", "BYU", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
+  ["Grace Owens", "Delta Air Lines", "", "Recruiter", "", "Contacted", "", ""],
+  ["Daniel Ortiz", "Goldman Sachs", "BYU", "Strategy Associate", "", "Met", "", ""],
+  ["Mia Chen", "Google", "University of Utah", "Product Lead", "", "Met", "", ""],
+  ["Owen Price", "Google", "University of Utah", "Associate Product Manager", "", "To Reach Out", "", ""],
+  ["Ava Thompson", "Adobe", "University of Utah", "Operations Lead", "", "Met", "", ""],
   ["Liam Walsh", "Independent", "", "Founder", "", "Met", "", "Old roommate"],
-  ["Rachel Green", "Northwind Consulting", "", "Principal", "Jordan Lee", "To Reach Out", "", "Jordan offered an intro"],
-  ["Tom Nguyen", "Contoso Games", "", "Director of Product", "Sofia Alvarez", "To Reach Out", "Gaming", ""],
-  ["Isla Moore", "Contoso Games", "", "UX Researcher", "Sofia Alvarez", "", "Gaming", ""],
-  ["Victor Hale", "Summit Airlines", "", "VP Network Planning", "Noah Carter", "", "", ""],
-  ["Chloe Park", "Harbor Ventures", "", "Investor", "Mia Chen", "", "", ""],
-  ["Ben Foster", "Riverbend University", "", "Career Coach", "Daniel Ortiz", "", "", ""],
-  ["Zoe Adams", "Pinecrest Labs", "", "CEO", "Liam Walsh", "", "", ""],
-  ["Sam Rivera", "Pinecrest Labs", "", "Head of Growth", "Zoe Adams", "", "", "3rd-degree example"],
+  ["Rachel Green", "Deloitte", "", "Principal", "Jordan Lee", "To Reach Out", "", "Jordan offered an intro"],
+  ["Tom Nguyen", "Microsoft", "", "Director of Product", "Sofia Alvarez", "To Reach Out", "Product", ""],
+  ["Isla Moore", "Microsoft", "", "UX Researcher", "Sofia Alvarez", "", "Product", ""],
+  ["Victor Hale", "Delta Air Lines", "", "VP Network Planning", "Noah Carter", "", "", ""],
+  ["Chloe Park", "Adobe", "", "Design Manager", "Mia Chen", "", "", ""],
+  ["Ben Foster", "BYU", "", "Career Coach", "Daniel Ortiz", "", "", ""],
+  ["Zoe Adams", "Qualtrics", "", "Director of Strategy", "Liam Walsh", "", "", ""],
+  ["Sam Rivera", "Qualtrics", "", "Head of Growth", "Zoe Adams", "", "", "3rd-degree example"],
 ];
 
 // Company, Priority, Stage, Notes
 const TARGETS = [
-  ["Northwind Consulting", "1", "Networking", "Strategy practice"],
-  ["Summit Airlines", "1", "Applied", ""],
-  ["Brightline Bank", "2", "Researching", "Three pool contacts there aren't on the map yet"],
-  ["Pinecrest Labs", "2", "Researching", "Reachable only through Liam"],
-  ["Granite Peak Partners", "3", "Researching", "No one yet"],
-  ["Harborview Media", "3", "Researching", "No one yet"],
+  ["Deloitte", "1", "Networking", "Strategy practice"],
+  ["Delta Air Lines", "1", "Applied", ""],
+  ["Goldman Sachs", "2", "Researching", "Three pool contacts there aren't on the map yet"],
+  ["Qualtrics", "2", "Researching", "Reachable only through Liam"],
+  ["Apple", "3", "Researching", "No one yet"],
+  ["Nike", "3", "Researching", "No one yet"],
+];
+
+// Explicit logo domains for every organization in the demo (the demo never guesses domains).
+const COMPANIES = [
+  ["Deloitte", "deloitte.com"], ["Delta Air Lines", "delta.com"], ["Goldman Sachs", "goldmansachs.com"],
+  ["Qualtrics", "qualtrics.com"], ["Microsoft", "microsoft.com"], ["Google", "google.com"], ["Adobe", "adobe.com"],
+  ["Apple", "apple.com"], ["Nike", "nike.com"], ["BYU", "byu.edu"],
+  ["University of Utah", "admissions.utah.edu"], // utah.edu itself has no favicon
 ];
 
 const HOW_TO = [
@@ -63,7 +72,8 @@ const HOW_TO = [
   ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer) are optional."],
   ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong, or put an image link in Logo."],
   ["LinkedIn Pool", "Filled by 'Import LinkedIn' from your Connections.csv. These people are NOT on the map until you add them."],
-  ["Layout / Settings", "Managed by the app (saved node positions, your name)."],
+  ["Settings", "Your name, and Avatar style: initials, or notionists for illustrated avatars drawn in your browser."],
+  ["Layout", "Managed by the app (saved node positions)."],
   ["Privacy", "Network Map runs entirely in your browser. This file is never uploaded anywhere."],
 ];
 
@@ -84,11 +94,9 @@ const people = PEOPLE.map(([name, company, school, role, connectedThrough, statu
 // LinkedIn data fills gaps (URL, Connected On) for people who are in the pool; your rows win.
 const onMap = new Set(people.map(p => p.name));
 const fromPool = pool.map(personFromPool).filter(p => onMap.has(p.name));
-// Fictional people get illustrated faces and fictional organizations get made-up logos, all drawn in code.
-const orgs = [...new Set([...PEOPLE.flatMap(r => [r[1], r[2]]), ...TARGETS.map(t => t[0])].filter(Boolean))].sort();
-const demo = { ...emptyModel("Alex Rivera"),
-  people: mergePeople(fromPool, people).map(p => ({ ...p, photo: demoFace(p.name), source: "" })),
-  companies: orgs.map(company => ({ company, website: "", logo: demoLogo(company), extra: {} })),
+const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists",
+  people: mergePeople(fromPool, people).map(p => ({ ...p, source: "" })),
+  companies: COMPANIES.map(([company, website]) => ({ company, website, logo: "", extra: {} })),
   targets: TARGETS.map(([company, priority, stage, notes]) => ({ company, priority, stage, notes, extra: {} })),
   pool };
 writeFileSync(join(SITE, "demo", "demo_network.xlsx"), withHowTo(writeWorkbook(demo)));

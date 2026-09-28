@@ -14,6 +14,9 @@ export function applyOp(model, op) {
     case "setMe":
       m.me = op.name;
       break;
+    case "setAvatarStyle":
+      m.avatarStyle = op.style;
+      break;
     case "upsertPerson": { // op.key = the person's key before the edit (absent when adding)
       const person = makePerson(op.person);
       const key = op.key ?? personKey(person);

@@ -7,7 +7,7 @@ import { normalizeOrg } from "./org.js";
 // or set a Website on the Companies sheet.
 export const DOMAINS = {
   "brigham young university": "byu.edu",
-  "university of utah": "utah.edu",
+  "university of utah": "admissions.utah.edu", // utah.edu itself has no favicon
   "utah state university": "usu.edu",
   "utah valley university": "uvu.edu",
   "church of jesus christ": "churchofjesuschrist.org",

@@ -35,7 +35,7 @@ test("LinkedIn export skips the Notes header and keeps every column", () => {
   const pool = parseLinkedInCsv(readFileSync(new URL("sample_linkedin_connections.csv", DEMO), "utf8"));
   assert.equal(pool.length, 7);
   assert.deepEqual(pool[0], { firstName: "Jordan", lastName: "Lee", url: "https://example.com/in/jordan-lee",
-    email: "", company: "Northwind Consulting", position: "Senior Consultant", connectedOn: "2026-03-12" });
+    email: "", company: "Deloitte", position: "Senior Consultant", connectedOn: "2026-03-12" });
 });
 
 test("LinkedIn export with quotes, commas, CRLF and a BOM", () => {
@@ -125,10 +125,11 @@ test("demo workbook builds: only the people you added are on the map", () => {
   assert.equal(m.me, "Alex Rivera");
   const g = buildGraph(m.people, { me: m.me, targets: m.targets });
   assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 4, targets: 6, gaps: 2 });
-  // Northwind is a group; the other five targets are their own nodes.
+  // Deloitte is a group; the other five targets are their own nodes.
   assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(),
-    ["company:northwind consulting", "target:brightline bank", "target:granite peak partners", "target:harborview media",
-     "target:pinecrest labs", "target:summit airlines"]);
+    ["company:deloitte", "target:apple", "target:delta air lines", "target:goldman sachs", "target:nike", "target:qualtrics"]);
+  assert.equal(m.avatarStyle, "notionists");
+  assert.equal(g.nodes.find(n => n.id === "school:brigham young university").label, "BYU");
   assert.equal(m.pool.length, 7); // LinkedIn connections stay in the pool, off the map
 });
 
@@ -179,7 +180,7 @@ test("a target reachable only through someone links to you with a dashed (gap) e
 
 test("whoCanIntro walks the chain and sorts shortest first", () => {
   const m = demo();
-  const paths = whoCanIntro(m.people, "Pinecrest Labs", m.me);
+  const paths = whoCanIntro(m.people, "Qualtrics", m.me);
   assert.deepEqual(paths.map(p => [p.person.name, p.chain]), [
     ["Zoe Adams", ["Liam Walsh", "Zoe Adams"]],
     ["Sam Rivera", ["Liam Walsh", "Zoe Adams", "Sam Rivera"]],
@@ -200,8 +201,8 @@ test("whoCanIntro survives cycles", () => {
 
 test("intro report lists who to ask and the gaps", () => {
   const m = demo();
-  const text = introReport(m.people, ["Summit Airlines", "Harborview Media"], m.me);
+  const text = introReport(m.people, ["Delta Air Lines", "Nike"], m.me);
   assert.match(text, /ask \*\*Noah Carter\*\* \(your status with them: Met\)/);
-  assert.match(text, /Noah Carter, Commercial Strategy Analyst at Summit Airlines\*\* \[Met\]: you know them directly\./);
-  assert.match(text, /Targets with no one on your map: Harborview Media/);
+  assert.match(text, /Noah Carter, Commercial Strategy Analyst at Delta Air Lines\*\* \[Met\]: you know them directly\./);
+  assert.match(text, /Targets with no one on your map: Nike/);
 });
