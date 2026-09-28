@@ -20,7 +20,7 @@ HEADER_FILL = PatternFill("solid", fgColor="1F3A5F")
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 
 
-def styled_sheet(wb: Workbook, rows: list[list[str]]):
+def styled_sheet(wb: Workbook, rows: list[list[str]], targets: list[list[str]] = ()):
     ws = wb.active
     ws.title = "Contacts"
     ws.append(COLUMNS)
@@ -56,6 +56,9 @@ def styled_sheet(wb: Workbook, rows: list[list[str]]):
                  "Group by tags with: --group-by company,school,tags"),
         ("Notes", "Anything you want to remember."),
         ("", ""),
+        ("Targets tab", "List companies you want to work at (one per row). Targets are outlined in "
+                        "red on the map; ones with no connections show as hollow red bubbles, and "
+                        "build_map.py writes a 'who can intro me?' report for each."),
         ("LinkedIn export", "LinkedIn > Settings > Data privacy > Get a copy of your data > "
                             "Connections. Pass the Connections.csv with --linkedin. Rows here "
                             "with the same name override the export (so you can add schools)."),
@@ -64,6 +67,16 @@ def styled_sheet(wb: Workbook, rows: list[list[str]]):
         help_ws.append([k, v])
         help_ws.cell(help_ws.max_row, 1).font = Font(bold=True)
         help_ws.cell(help_ws.max_row, 2).alignment = Alignment(wrap_text=True)
+
+    target_ws = wb.create_sheet("Targets", 1)
+    target_ws.append(["Company", "Notes"])
+    for cell in target_ws[1]:
+        cell.fill, cell.font = HEADER_FILL, HEADER_FONT
+    target_ws.column_dimensions["A"].width = 30
+    target_ws.column_dimensions["B"].width = 50
+    target_ws.freeze_panes = "A2"
+    for r in targets:
+        target_ws.append(r)
     return wb
 
 
@@ -94,6 +107,14 @@ SAMPLE = [
     ["Sam Rivera", "Pinecrest Labs", "", "Head of Growth", "Zoe Adams", "", "", "", "3rd-degree example"],
 ]
 
+TARGETS = [
+    ["Northwind Consulting", "Strategy practice"],
+    ["Summit Airlines", ""],
+    ["Pinecrest Labs", "Reachable only through Liam"],
+    ["Granite Peak Partners", "No one yet"],
+    ["Harborview Media", "No one yet"],
+]
+
 LINKEDIN = """Notes:
 "When exporting your connection data, you may notice that some of the email addresses are missing."
 
@@ -112,7 +133,7 @@ def main():
     (ROOT / "template").mkdir(exist_ok=True)
     (ROOT / "examples").mkdir(exist_ok=True)
     styled_sheet(Workbook(), []).save(ROOT / "template" / "contacts_template.xlsx")
-    styled_sheet(Workbook(), SAMPLE).save(ROOT / "examples" / "sample_contacts.xlsx")
+    styled_sheet(Workbook(), SAMPLE, TARGETS).save(ROOT / "examples" / "sample_contacts.xlsx")
     (ROOT / "examples" / "sample_linkedin_connections.csv").write_text(LINKEDIN, encoding="utf-8")
     print("Wrote template/contacts_template.xlsx and examples/")
 

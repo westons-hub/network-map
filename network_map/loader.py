@@ -65,10 +65,24 @@ def _split_tags(value) -> list[str]:
     return [t.strip() for t in text.replace(";", ",").split(",") if t.strip()]
 
 
-def load_excel(path: str | Path) -> list[Person]:
-    """Read contacts from the Excel template (first sheet) or a CSV with the same columns."""
-    path = Path(path)
-    if path.suffix.lower() == ".csv":
+def _source_name(src) -> str:
+    """File name for a path or an uploaded file object (e.g. from Streamlit)."""
+    return Path(getattr(src, "name", str(src))).name
+
+
+def _rewind(src) -> None:
+    if hasattr(src, "seek"):
+        src.seek(0)
+
+
+def load_excel(path) -> list[Person]:
+    """Read contacts from the Excel template (first sheet) or a CSV with the same columns.
+
+    ``path`` can be a file path or an open file object with a ``.name``.
+    """
+    name = _source_name(path)
+    _rewind(path)
+    if name.lower().endswith(".csv"):
         df = pd.read_csv(path, dtype=str)
     else:
         df = pd.read_excel(path, dtype=str)
@@ -79,7 +93,7 @@ def load_excel(path: str | Path) -> list[Person]:
         return _clean(row[real]) if real is not None else ""
 
     if "name" not in columns:
-        raise ValueError(f"{path.name} needs a 'Name' column. Found: {list(df.columns)}")
+        raise ValueError(f"{name} needs a 'Name' column. Found: {list(df.columns)}")
 
     people = []
     for _, row in df.iterrows():
@@ -103,19 +117,48 @@ def load_excel(path: str | Path) -> list[Person]:
     return people
 
 
-def load_linkedin_export(path: str | Path) -> list[Person]:
+def load_targets(path) -> list[str]:
+    """Read target companies from the workbook's "Targets" sheet ("Company" column).
+
+    Returns [] for CSV files or workbooks without a Targets sheet.
+    """
+    if _source_name(path).lower().endswith(".csv"):
+        return []
+    _rewind(path)
+    sheets = pd.read_excel(path, sheet_name=None, dtype=str)
+    sheet = next((df for s, df in sheets.items() if s.strip().casefold() == "targets"), None)
+    if sheet is None:
+        return []
+    columns = {c.strip().casefold(): c for c in sheet.columns}
+    real = columns.get("company") or next(iter(sheet.columns), None)
+    if real is None:
+        return []
+    return [t for t in (_clean(v) for v in sheet[real]) if t]
+
+
+def parse_target_list(text: str) -> list[str]:
+    """'Delta, Google; Bain' -> ['Delta', 'Google', 'Bain'] (also accepts newlines)."""
+    return [t.strip() for t in str(text).replace(";", ",").replace("\n", ",").split(",") if t.strip()]
+
+
+def load_linkedin_export(path) -> list[Person]:
     """Read LinkedIn's Connections.csv (Settings > Data privacy > Get a copy of your data).
 
     The export starts with a few "Notes:" lines before the real header, so we
     skip ahead to the line that begins with "First Name".
     """
-    text = Path(path).read_text(encoding="utf-8-sig")
+    if hasattr(path, "read"):
+        _rewind(path)
+        raw = path.read()
+        text = raw.decode("utf-8-sig") if isinstance(raw, bytes) else raw.lstrip("﻿")
+    else:
+        text = Path(path).read_text(encoding="utf-8-sig")
     lines = text.splitlines()
     start = next(
         (i for i, line in enumerate(lines) if line.lower().startswith("first name")), None
     )
     if start is None:
-        raise ValueError(f"{Path(path).name} doesn't look like a LinkedIn Connections export.")
+        raise ValueError(f"{_source_name(path)} doesn't look like a LinkedIn Connections export.")
 
     reader = csv.DictReader(io.StringIO("\n".join(lines[start:])))
     people = []

@@ -9,6 +9,9 @@ Rules:
   they collapse into a group bubble: you -> group -> each member.
   Someone who belongs to two groups gets a solid line to one and a dashed line
   to the other.
+* Target companies: groups and people at a target are flagged. A target with
+  nobody on the map becomes a hollow "gap" node linked to you, so it's easy to
+  see where you still need a first contact.
 """
 
 from __future__ import annotations
@@ -58,6 +61,8 @@ class Graph:
     nodes: list[dict] = field(default_factory=list)
     edges: list[dict] = field(default_factory=list)
     groups: dict[str, list[str]] = field(default_factory=dict)  # group node id -> member names
+    # One entry per target company: label, node to focus, and who you know there.
+    targets: list[dict] = field(default_factory=list)
 
     def stats(self) -> dict:
         kinds = Counter(n["kind"] for n in self.nodes)
@@ -66,6 +71,8 @@ class Graph:
             "direct": kinds["person"],
             "second_degree": kinds["second"],
             "groups": kinds["company"] + kinds["school"] + kinds["tag"],
+            "targets": len(self.targets),
+            "gaps": kinds["gap"],
         }
 
 
@@ -84,6 +91,7 @@ def build_graph(
     me: str = "Me",
     min_group_size: int = MIN_GROUP_SIZE,
     group_by: tuple[str, ...] = ("company", "school"),
+    targets: list[str] | tuple[str, ...] = (),
 ) -> Graph:
     g = Graph()
     me_key = normalize_name(me)
@@ -175,5 +183,30 @@ def build_graph(
                         "to": f"p:{p.key}", "kind": "intro"})
         for gid in memberships(p):  # show overlap with your existing groups
             g.edges.append({"from": gid, "to": f"p:{p.key}", "kind": "also"})
+
+    # ---- target companies ---------------------------------------------------
+    nodes_by_id = {n["id"]: n for n in g.nodes}
+    seen: set[str] = set()
+    for label in targets:
+        key = normalize_org(label)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        at = [p for p in by_key.values() if p.company and normalize_org(p.company) == key]
+        direct_at = sorted(p.name for p in at if is_direct(p))
+        second_at = sorted(p.name for p in at if not is_direct(p))
+        for p in at:
+            nodes_by_id[f"p:{p.key}"]["target"] = True
+        gid = group_ids.get(("company", key))
+        if gid:
+            nodes_by_id[gid]["target"] = True
+            focus = gid
+        elif at:
+            focus = f"p:{sorted(at, key=lambda p: (not is_direct(p), p.name))[0].key}"
+        else:
+            focus = f"target:{key}"
+            g.nodes.append({"id": focus, "label": label, "kind": "gap", "target": True})
+            g.edges.append({"from": "me", "to": focus, "kind": "gap"})
+        g.targets.append({"label": label, "focus": focus, "direct": direct_at, "second": second_at})
 
     return g

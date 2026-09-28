@@ -3,7 +3,11 @@
 Examples:
     python build_map.py --me "Weston Jackson" --contacts my_contacts.xlsx
     python build_map.py --me "Weston Jackson" --contacts my_contacts.xlsx --linkedin Connections.csv
+    python build_map.py --me "Weston Jackson" --contacts my_contacts.xlsx --targets "Delta, Bain"
     python build_map.py --demo            # try it with the fictional sample data
+
+Target companies come from --targets and/or the "Targets" sheet in your workbook.
+With targets, a "who can intro me?" report is saved next to the map (see --report).
 """
 
 from __future__ import annotations
@@ -13,7 +17,8 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from network_map import build_graph, load_excel, load_linkedin_export, merge_people, render_html
+from network_map import (build_graph, intro_report, load_excel, load_linkedin_export, load_targets,
+                         merge_people, parse_target_list, render_html)
 
 HERE = Path(__file__).parent
 
@@ -27,6 +32,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-group", type=int, default=3, help="People needed to form a group (default: 3).")
     ap.add_argument("--group-by", default="company,school",
                     help="Comma list from: company, school, tags (default: company,school).")
+    ap.add_argument("--targets", default="",
+                    help='Target companies, comma-separated (added to the workbook\'s "Targets" sheet).')
+    ap.add_argument("--report", default="intro_report.md",
+                    help="Where to save the 'who can intro me?' report when you have targets "
+                         "(default: intro_report.md; use '' to skip).")
+    ap.add_argument("--intro", action="append", default=[], metavar="X",
+                    help="Print who can introduce you to X (company or person). Repeatable.")
     ap.add_argument("--title", default=None, help="Title shown at the top of the page.")
     ap.add_argument("--demo", action="store_true", help="Use the fictional sample data in examples/.")
     ap.add_argument("--no-open", action="store_true", help="Don't open the map in your browser.")
@@ -47,14 +59,29 @@ def main(argv: list[str] | None = None) -> int:
         sources.append(load_excel(args.contacts))
     people = merge_people(*sources)
 
+    targets = (load_targets(args.contacts) if args.contacts else []) + parse_target_list(args.targets)
+
     group_by = tuple(g.strip() for g in args.group_by.split(",") if g.strip())
-    graph = build_graph(people, me=args.me, min_group_size=args.min_group, group_by=group_by)
+    graph = build_graph(people, me=args.me, min_group_size=args.min_group, group_by=group_by,
+                        targets=targets)
     title = args.title or (f"{args.me.split()[0]}'s Network" if args.me != "Me" else "My Network")
     out = render_html(graph, args.out, title=title, min_group_size=args.min_group)
 
     s = graph.stats()
     print(f"Mapped {s['people']} people ({s['direct']} direct, {s['second_degree']} 2nd-degree) "
           f"into {s['groups']} groups -> {out.resolve()}")
+    if graph.targets:
+        gaps = [t["label"] for t in graph.targets if not (t["direct"] or t["second"])]
+        print(f"Targets: {len(graph.targets) - len(gaps)}/{len(graph.targets)} have someone on your map."
+              + (f" No one yet at: {', '.join(gaps)}" if gaps else ""))
+        if args.report:
+            report = Path(args.report)
+            report.write_text(intro_report(people, [t["label"] for t in graph.targets], me=args.me),
+                              encoding="utf-8")
+            print(f"Intro report -> {report.resolve()}")
+    if args.intro:
+        print()
+        print(intro_report(people, args.intro, me=args.me))
     if not args.no_open:
         webbrowser.open(out.resolve().as_uri())
     return 0

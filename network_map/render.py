@@ -20,11 +20,12 @@ PAGE = """<!doctype html>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #d0d5dd;
     --me: #1f3a5f; --company: #2e6fd8; --school: #1f9d6b; --tag: #8b5cf6;
-    --person: #ffffff; --second: #eef0f3;
+    --person: #ffffff; --second: #eef0f3; --target: #d92d20;
+    --met: #16a34a; --contacted: #0ba5ec; --reach: #f79009; --follow: #ee46bc; --referral: #7a5af8;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #11151c; --panel: #1a2029; --text: #e6e9ef; --muted: #98a2b3; --line: #344054;
-            --person: #232b36; --second: #1a2029; }
+            --person: #232b36; --second: #1a2029; --target: #f97066; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -52,6 +53,10 @@ PAGE = """<!doctype html>
   .btn { display: inline-block; margin-top: 14px; padding: 7px 12px; border-radius: 8px;
          background: var(--company); color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 18px; }
+  .targets li { display: flex; justify-content: space-between; gap: 8px; }
+  .targets .count { color: var(--muted); white-space: nowrap; }
+  .targets .none { color: var(--target); font-weight: 600; }
+  h3 { font-size: 13px; margin: 18px 0 0; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px;
          vertical-align: -1px; border: 1px solid var(--line); }
   @media (max-width: 720px) {
@@ -67,6 +72,7 @@ PAGE = """<!doctype html>
   <div class="controls">
     <input type="search" id="search" placeholder="Find a person, company or school">
     <label><input type="checkbox" id="show2" checked> 2nd-degree</label>
+    <label><input type="checkbox" id="status" checked> Status colors</label>
     <label><input type="checkbox" id="physics" checked> Motion</label>
   </div>
 </header>
@@ -82,7 +88,17 @@ PAGE = """<!doctype html>
       <span><span class="dot" style="background:var(--tag)"></span>Tag group</span>
       <span><span class="dot" style="background:var(--person)"></span>Direct connection</span>
       <span><span class="dot" style="background:var(--second)"></span>2nd-degree</span>
+      <span><span class="dot" style="background:var(--bg);border:2px solid var(--target)"></span>Target company</span>
     </div>
+    <h3>Status</h3>
+    <div class="legend" style="margin-top:8px">
+      <span><span class="dot" style="background:var(--met)"></span>Met</span>
+      <span><span class="dot" style="background:var(--contacted)"></span>Contacted</span>
+      <span><span class="dot" style="background:var(--reach)"></span>To Reach Out</span>
+      <span><span class="dot" style="background:var(--follow)"></span>Follow Up</span>
+      <span><span class="dot" style="background:var(--referral)"></span>Referral</span>
+    </div>
+    <div id="targets"></div>
     <p class="sub" style="margin-top:18px">Generated __DATE__. Groups form when __MIN__+ people share a company or school.</p>
   </aside>
 </main>
@@ -111,8 +127,34 @@ const nodes = new vis.DataSet(DATA.nodes.map(n => {
     node.font = { color: text, size: 15, bold: true };
   }
   if (n.kind === "me") { node.fixed = true; node.x = 0; node.y = 0; }
+  if (n.target && ["company", "school", "tag"].includes(n.kind)) {
+    node.color = { background: c(n.kind), border: c("target") }; node.borderWidth = 5;
+  }
+  if (n.kind === "gap") {
+    Object.assign(node, { shape: "dot", size: 18, borderWidth: 3, shapeProperties: { borderDashes: [5, 4] },
+      color: { background: c("bg"), border: c("target") },
+      font: { color: c("target"), size: 14, bold: true }, title: "Target company: no connections yet" });
+  }
+  node.baseColor = node.color;
   return node;
 }));
+
+// Color people by status (Met / Contacted / To Reach Out / Follow Up / Referral).
+const STATUS = { "met": "met", "contacted": "contacted", "to reach out": "reach",
+                 "follow up": "follow", "referral": "referral" };
+function statusColor(n) {
+  const v = STATUS[(n.status || "").trim().toLowerCase()];
+  return v && c(v);
+}
+function applyStatusColors(on) {
+  nodes.update(nodes.get({ filter: n => n.kind === "person" || n.kind === "second" }).map(n => {
+    const fill = on && statusColor(n);
+    const base = n.baseColor;
+    const border = n.target ? c("target") : base.border;
+    return { id: n.id, borderWidth: n.target ? 4 : 2,
+             color: { background: fill || base.background, border } };
+  }));
+}
 
 const EDGE = {
   group:  { width: 2.5, color: line },
@@ -120,11 +162,13 @@ const EDGE = {
   direct: { width: 1.2, color: line },
   intro:  { width: 1, color: line, dashes: [2, 4] },
   also:   { width: 1, color: line, dashes: [6, 6] },
+  gap:    { width: 1.5, color: c("target"), dashes: [4, 6] },
 };
 const edges = new vis.DataSet(DATA.edges.map((e, i) => ({ id: i, ...e, ...EDGE[e.kind] })));
 
 document.getElementById("stats").textContent =
-  `${DATA.stats.people} people · ${DATA.stats.direct} direct · ${DATA.stats.second_degree} 2nd-degree · ${DATA.stats.groups} groups`;
+  `${DATA.stats.people} people · ${DATA.stats.direct} direct · ${DATA.stats.second_degree} 2nd-degree · ${DATA.stats.groups} groups` +
+  (DATA.stats.targets ? ` · ${DATA.stats.targets - DATA.stats.gaps}/${DATA.stats.targets} targets covered` : "");
 
 const network = new vis.Network(document.getElementById("map"), { nodes, edges }, {
   physics: { solver: "forceAtlas2Based", forceAtlas2Based: { gravitationalConstant: -60, springLength: 90 },
@@ -132,6 +176,9 @@ const network = new vis.Network(document.getElementById("map"), { nodes, edges }
   interaction: { hover: true, tooltipDelay: 150 },
   edges: { smooth: { type: "continuous" } },
 });
+
+// Center everything once the layout settles (embedded frames can start with a stale size).
+network.once("stabilizationIterationsDone", () => network.fit({ animation: false }));
 
 const panel = document.getElementById("panel");
 const defaultPanel = panel.innerHTML;
@@ -143,11 +190,36 @@ function el(tag, txt, attrs = {}) {
   return e;
 }
 
+function showDefault() {
+  panel.innerHTML = defaultPanel;
+  if (!DATA.targets.length) return;
+  const box = document.getElementById("targets");
+  box.append(el("h3", "Targets"));
+  const ul = el("ul", undefined, { className: "targets" });
+  DATA.targets.forEach(t => {
+    const li = el("li");
+    li.append(el("span", t.label));
+    const n = t.direct.length + t.second.length;
+    li.append(n ? el("span", `${t.direct.length} direct · ${t.second.length} via`, { className: "count" })
+                : el("span", "no one yet", { className: "none" }));
+    li.onclick = () => focus(t.focus);
+    ul.append(li);
+  });
+  box.append(ul);
+}
+
 function showNode(id) {
   const n = nodes.get(id);
   if (!n) return;
   panel.innerHTML = "";
-  if (n.kind === "me") { panel.innerHTML = defaultPanel; return; }
+  if (n.kind === "me") { showDefault(); return; }
+  if (n.kind === "gap") {
+    panel.append(el("h2", n.label));
+    panel.append(el("div", "Target company · no connections yet", { className: "sub" }));
+    panel.append(el("p", "No one on your map works here. Add a contact (even a 2nd-degree one) " +
+                         "or ask the people in your biggest groups who they know."));
+    return;
+  }
   if (["company", "school", "tag"].includes(n.kind)) {
     panel.append(el("h2", DATA.nodes.find(x => x.id === id).label));
     panel.append(el("div", `${n.kind[0].toUpperCase() + n.kind.slice(1)} group · ${n.count} direct connections`, { className: "sub" }));
@@ -167,7 +239,7 @@ function showNode(id) {
   panel.append(el("h2", n.label));
   panel.append(el("div", [n.role, n.company].filter(Boolean).join(" at ") || (n.kind === "second" ? "2nd-degree connection" : "Direct connection"), { className: "sub" }));
   const dl = el("dl");
-  const rows = [["School", n.school], ["Status", n.status], ["Met via", n.via],
+  const rows = [["Target", n.target ? "Yes" : ""], ["School", n.school], ["Status", n.status], ["Met via", n.via],
                 ["Tags", (n.tags || []).join(", ")], ["Notes", n.notes]];
   rows.filter(r => r[1]).forEach(([k, v]) => { dl.append(el("dt", k)); dl.append(el("dd", v)); });
   panel.append(dl);
@@ -182,7 +254,7 @@ function focus(id) {
   showNode(id);
 }
 
-network.on("click", p => p.nodes.length ? showNode(p.nodes[0]) : (panel.innerHTML = defaultPanel));
+network.on("click", p => p.nodes.length ? showNode(p.nodes[0]) : showDefault());
 network.on("doubleClick", p => {
   const n = p.nodes.length && nodes.get(p.nodes[0]);
   if (n && n.url && /^https?:\\/\\//.test(n.url)) window.open(n.url, "_blank", "noopener");
@@ -199,6 +271,9 @@ document.getElementById("search").addEventListener("keydown", e => {
 document.getElementById("show2").addEventListener("change", e => {
   nodes.update(nodes.get({ filter: n => n.kind === "second" }).map(n => ({ id: n.id, hidden: !e.target.checked })));
 });
+document.getElementById("status").addEventListener("change", e => applyStatusColors(e.target.checked));
+applyStatusColors(true);
+showDefault();
 document.getElementById("physics").addEventListener("change", e => network.setOptions({ physics: { enabled: e.target.checked } }));
 </script>
 </body>
@@ -206,9 +281,10 @@ document.getElementById("physics").addEventListener("change", e => network.setOp
 """
 
 
-def render_html(graph: Graph, out_path: str | Path, title: str = "My Network Map",
-                min_group_size: int = 3) -> Path:
-    data = {"nodes": graph.nodes, "edges": graph.edges, "stats": graph.stats()}
+def render_page(graph: Graph, title: str = "My Network Map", min_group_size: int = 3) -> str:
+    """The full, self-contained HTML page as a string."""
+    data = {"nodes": graph.nodes, "edges": graph.edges, "stats": graph.stats(),
+            "targets": graph.targets}
     # Escape "</" so names can never close the <script> tag early.
     data_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     vis_js = (STATIC / "vis-network.min.js").read_text(encoding="utf-8")
@@ -217,6 +293,12 @@ def render_html(graph: Graph, out_path: str | Path, title: str = "My Network Map
                 .replace("__MIN__", str(min_group_size))
                 .replace("__DATA__", data_json)
                 .replace("__VIS__", vis_js))
+    return html
+
+
+def render_html(graph: Graph, out_path: str | Path, title: str = "My Network Map",
+                min_group_size: int = 3) -> Path:
+    html = render_page(graph, title=title, min_group_size=min_group_size)
     out = Path(out_path)
     out.write_text(html, encoding="utf-8")
     return out

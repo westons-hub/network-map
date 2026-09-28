@@ -8,11 +8,12 @@
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #d0d5dd;
     --me: #1f3a5f; --company: #2e6fd8; --school: #1f9d6b; --tag: #8b5cf6;
-    --person: #ffffff; --second: #eef0f3;
+    --person: #ffffff; --second: #eef0f3; --target: #d92d20;
+    --met: #16a34a; --contacted: #0ba5ec; --reach: #f79009; --follow: #ee46bc; --referral: #7a5af8;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #11151c; --panel: #1a2029; --text: #e6e9ef; --muted: #98a2b3; --line: #344054;
-            --person: #232b36; --second: #1a2029; }
+            --person: #232b36; --second: #1a2029; --target: #f97066; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -40,6 +41,10 @@
   .btn { display: inline-block; margin-top: 14px; padding: 7px 12px; border-radius: 8px;
          background: var(--company); color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 18px; }
+  .targets li { display: flex; justify-content: space-between; gap: 8px; }
+  .targets .count { color: var(--muted); white-space: nowrap; }
+  .targets .none { color: var(--target); font-weight: 600; }
+  h3 { font-size: 13px; margin: 18px 0 0; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px;
          vertical-align: -1px; border: 1px solid var(--line); }
   @media (max-width: 720px) {
@@ -55,6 +60,7 @@
   <div class="controls">
     <input type="search" id="search" placeholder="Find a person, company or school">
     <label><input type="checkbox" id="show2" checked> 2nd-degree</label>
+    <label><input type="checkbox" id="status" checked> Status colors</label>
     <label><input type="checkbox" id="physics" checked> Motion</label>
   </div>
 </header>
@@ -70,7 +76,17 @@
       <span><span class="dot" style="background:var(--tag)"></span>Tag group</span>
       <span><span class="dot" style="background:var(--person)"></span>Direct connection</span>
       <span><span class="dot" style="background:var(--second)"></span>2nd-degree</span>
+      <span><span class="dot" style="background:var(--bg);border:2px solid var(--target)"></span>Target company</span>
     </div>
+    <h3>Status</h3>
+    <div class="legend" style="margin-top:8px">
+      <span><span class="dot" style="background:var(--met)"></span>Met</span>
+      <span><span class="dot" style="background:var(--contacted)"></span>Contacted</span>
+      <span><span class="dot" style="background:var(--reach)"></span>To Reach Out</span>
+      <span><span class="dot" style="background:var(--follow)"></span>Follow Up</span>
+      <span><span class="dot" style="background:var(--referral)"></span>Referral</span>
+    </div>
+    <div id="targets"></div>
     <p class="sub" style="margin-top:18px">Generated Sep 28, 2026. Groups form when 3+ people share a company or school.</p>
   </aside>
 </main>
@@ -110,7 +126,7 @@ function zu(){return zu=Object.assign||function(g){for(var t=1;t<arguments.lengt
 //# sourceMappingURL=vis-network.min.js.map
 </script>
 <script>
-const DATA = {"nodes": [{"id": "me", "label": "Alex Rivera", "kind": "me"}, {"id": "school:riverbend university", "label": "Riverbend University", "kind": "school", "count": 5}, {"id": "company:brightline bank", "label": "Brightline Bank", "kind": "company", "count": 4}, {"id": "company:northwind consulting", "label": "Northwind Consulting", "kind": "company", "count": 4}, {"id": "school:lakeview state university", "label": "Lakeview State University", "kind": "school", "count": 4}, {"id": "company:contoso games", "label": "Contoso Games", "kind": "company", "count": 3}, {"id": "p:ava thompson", "label": "Ava Thompson", "kind": "person", "company": "Keystone Health", "school": "Lakeview State University", "role": "Operations Lead", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:daniel ortiz", "label": "Daniel Ortiz", "kind": "person", "company": "Brightline Bank", "school": "Riverbend University", "role": "Strategy Associate", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:elena rossi", "label": "Elena Rossi", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Risk Associate", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/elena-rossi", "via": "", "source": "linkedin"}, {"id": "p:ethan brooks", "label": "Ethan Brooks", "kind": "person", "company": "Contoso Games", "school": "", "role": "Data Analyst", "status": "Follow Up", "tags": ["Gaming"], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:grace owens", "label": "Grace Owens", "kind": "person", "company": "Summit Airlines", "school": "", "role": "Recruiter", "status": "Contacted", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:hana kim", "label": "Hana Kim", "kind": "person", "company": "Northwind Consulting, Inc.", "school": "", "role": "Partner", "status": "To Reach Out", "tags": [], "notes": "Leads the strategy practice", "url": "", "via": "", "source": "excel"}, {"id": "p:jordan lee", "label": "Jordan Lee", "kind": "person", "company": "Northwind Consulting", "school": "Riverbend University", "role": "Senior Consultant", "status": "Met", "tags": ["Consulting club"], "notes": "Case interview tips", "url": "https://example.com/in/jordan-lee", "via": "", "source": "linkedin+excel"}, {"id": "p:kai morgan", "label": "Kai Morgan", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Analyst", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/kai-morgan", "via": "", "source": "linkedin"}, {"id": "p:lena novak", "label": "Lena Novak", "kind": "person", "company": "Contoso Games", "school": "Harbor Tech Institute", "role": "Producer", "status": "To Reach Out", "tags": ["Gaming"], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:liam walsh", "label": "Liam Walsh", "kind": "person", "company": "Independent", "school": "", "role": "Founder", "status": "Met", "tags": [], "notes": "Old roommate", "url": "", "via": "", "source": "excel"}, {"id": "p:marcus bell", "label": "Marcus Bell", "kind": "person", "company": "Northwind Consulting", "school": "Riverbend University", "role": "Analyst", "status": "Met", "tags": ["Consulting club"], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:mia chen", "label": "Mia Chen", "kind": "person", "company": "Fieldstone Capital", "school": "Lakeview State University", "role": "Partner", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:noah carter", "label": "Noah Carter", "kind": "person", "company": "Summit Airlines", "school": "Riverbend University", "role": "Commercial Strategy Analyst", "status": "Met", "tags": [], "notes": "Info session speaker", "url": "", "via": "", "source": "excel"}, {"id": "p:nora singh", "label": "Nora Singh", "kind": "person", "company": "Keystone Health", "school": "", "role": "Strategy Manager", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/nora-singh", "via": "", "source": "linkedin"}, {"id": "p:owen price", "label": "Owen Price", "kind": "person", "company": "Fieldstone Capital", "school": "Lakeview State University", "role": "Associate", "status": "To Reach Out", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:priya shah", "label": "Priya Shah", "kind": "person", "company": "Northwind Consulting", "school": "Lakeview State University", "role": "Manager", "status": "Contacted", "tags": [], "notes": "", "url": "https://example.com/in/priya-shah", "via": "", "source": "linkedin+excel"}, {"id": "p:sofia alvarez", "label": "Sofia Alvarez", "kind": "person", "company": "Contoso Games", "school": "Riverbend University", "role": "Product Manager", "status": "Met", "tags": ["Gaming"], "notes": "Owns the marketplace roadmap", "url": "https://example.com/in/sofia-alvarez", "via": "", "source": "linkedin+excel"}, {"id": "p:theo grant", "label": "Theo Grant", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Product Owner", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/theo-grant", "via": "", "source": "linkedin"}, {"id": "p:ben foster", "label": "Ben Foster", "kind": "second", "company": "Riverbend University", "school": "", "role": "Career Coach", "status": "", "tags": [], "notes": "", "url": "", "via": "Daniel Ortiz", "source": "excel"}, {"id": "p:chloe park", "label": "Chloe Park", "kind": "second", "company": "Harbor Ventures", "school": "", "role": "Investor", "status": "", "tags": [], "notes": "", "url": "", "via": "Mia Chen", "source": "excel"}, {"id": "p:isla moore", "label": "Isla Moore", "kind": "second", "company": "Contoso Games", "school": "", "role": "UX Researcher", "status": "", "tags": ["Gaming"], "notes": "", "url": "", "via": "Sofia Alvarez", "source": "excel"}, {"id": "p:rachel green", "label": "Rachel Green", "kind": "second", "company": "Northwind Consulting", "school": "", "role": "Principal", "status": "To Reach Out", "tags": [], "notes": "Jordan offered an intro", "url": "", "via": "Jordan Lee", "source": "excel"}, {"id": "p:sam rivera", "label": "Sam Rivera", "kind": "second", "company": "Pinecrest Labs", "school": "", "role": "Head of Growth", "status": "", "tags": [], "notes": "3rd-degree example", "url": "", "via": "Zoe Adams", "source": "excel"}, {"id": "p:tom nguyen", "label": "Tom Nguyen", "kind": "second", "company": "Contoso Games", "school": "", "role": "Director of Product", "status": "To Reach Out", "tags": ["Gaming"], "notes": "", "url": "", "via": "Sofia Alvarez", "source": "excel"}, {"id": "p:victor hale", "label": "Victor Hale", "kind": "second", "company": "Summit Airlines", "school": "", "role": "VP Network Planning", "status": "", "tags": [], "notes": "", "url": "", "via": "Noah Carter", "source": "excel"}, {"id": "p:zoe adams", "label": "Zoe Adams", "kind": "second", "company": "Pinecrest Labs", "school": "", "role": "CEO", "status": "", "tags": [], "notes": "", "url": "", "via": "Liam Walsh", "source": "excel"}], "edges": [{"from": "me", "to": "school:riverbend university", "kind": "group"}, {"from": "me", "to": "company:brightline bank", "kind": "group"}, {"from": "me", "to": "company:northwind consulting", "kind": "group"}, {"from": "me", "to": "school:lakeview state university", "kind": "group"}, {"from": "me", "to": "company:contoso games", "kind": "group"}, {"from": "school:lakeview state university", "to": "p:ava thompson", "kind": "member"}, {"from": "company:brightline bank", "to": "p:daniel ortiz", "kind": "member"}, {"from": "school:riverbend university", "to": "p:daniel ortiz", "kind": "also"}, {"from": "company:brightline bank", "to": "p:elena rossi", "kind": "member"}, {"from": "company:contoso games", "to": "p:ethan brooks", "kind": "member"}, {"from": "me", "to": "p:grace owens", "kind": "direct"}, {"from": "company:northwind consulting", "to": "p:hana kim", "kind": "member"}, {"from": "company:northwind consulting", "to": "p:jordan lee", "kind": "member"}, {"from": "school:riverbend university", "to": "p:jordan lee", "kind": "also"}, {"from": "company:brightline bank", "to": "p:kai morgan", "kind": "member"}, {"from": "company:contoso games", "to": "p:lena novak", "kind": "member"}, {"from": "me", "to": "p:liam walsh", "kind": "direct"}, {"from": "company:northwind consulting", "to": "p:marcus bell", "kind": "member"}, {"from": "school:riverbend university", "to": "p:marcus bell", "kind": "also"}, {"from": "school:lakeview state university", "to": "p:mia chen", "kind": "member"}, {"from": "school:riverbend university", "to": "p:noah carter", "kind": "member"}, {"from": "me", "to": "p:nora singh", "kind": "direct"}, {"from": "school:lakeview state university", "to": "p:owen price", "kind": "member"}, {"from": "company:northwind consulting", "to": "p:priya shah", "kind": "member"}, {"from": "school:lakeview state university", "to": "p:priya shah", "kind": "also"}, {"from": "company:contoso games", "to": "p:sofia alvarez", "kind": "member"}, {"from": "school:riverbend university", "to": "p:sofia alvarez", "kind": "also"}, {"from": "company:brightline bank", "to": "p:theo grant", "kind": "member"}, {"from": "p:daniel ortiz", "to": "p:ben foster", "kind": "intro"}, {"from": "p:mia chen", "to": "p:chloe park", "kind": "intro"}, {"from": "p:sofia alvarez", "to": "p:isla moore", "kind": "intro"}, {"from": "company:contoso games", "to": "p:isla moore", "kind": "also"}, {"from": "p:jordan lee", "to": "p:rachel green", "kind": "intro"}, {"from": "company:northwind consulting", "to": "p:rachel green", "kind": "also"}, {"from": "p:zoe adams", "to": "p:sam rivera", "kind": "intro"}, {"from": "p:sofia alvarez", "to": "p:tom nguyen", "kind": "intro"}, {"from": "company:contoso games", "to": "p:tom nguyen", "kind": "also"}, {"from": "p:noah carter", "to": "p:victor hale", "kind": "intro"}, {"from": "p:liam walsh", "to": "p:zoe adams", "kind": "intro"}], "stats": {"people": 26, "direct": 18, "second_degree": 8, "groups": 5}};
+const DATA = {"nodes": [{"id": "me", "label": "Alex Rivera", "kind": "me"}, {"id": "school:riverbend university", "label": "Riverbend University", "kind": "school", "count": 5}, {"id": "company:brightline bank", "label": "Brightline Bank", "kind": "company", "count": 4}, {"id": "company:northwind consulting", "label": "Northwind Consulting", "kind": "company", "count": 4, "target": true}, {"id": "school:lakeview state university", "label": "Lakeview State University", "kind": "school", "count": 4}, {"id": "company:contoso games", "label": "Contoso Games", "kind": "company", "count": 3}, {"id": "p:ava thompson", "label": "Ava Thompson", "kind": "person", "company": "Keystone Health", "school": "Lakeview State University", "role": "Operations Lead", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:daniel ortiz", "label": "Daniel Ortiz", "kind": "person", "company": "Brightline Bank", "school": "Riverbend University", "role": "Strategy Associate", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:elena rossi", "label": "Elena Rossi", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Risk Associate", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/elena-rossi", "via": "", "source": "linkedin"}, {"id": "p:ethan brooks", "label": "Ethan Brooks", "kind": "person", "company": "Contoso Games", "school": "", "role": "Data Analyst", "status": "Follow Up", "tags": ["Gaming"], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:grace owens", "label": "Grace Owens", "kind": "person", "company": "Summit Airlines", "school": "", "role": "Recruiter", "status": "Contacted", "tags": [], "notes": "", "url": "", "via": "", "source": "excel", "target": true}, {"id": "p:hana kim", "label": "Hana Kim", "kind": "person", "company": "Northwind Consulting, Inc.", "school": "", "role": "Partner", "status": "To Reach Out", "tags": [], "notes": "Leads the strategy practice", "url": "", "via": "", "source": "excel", "target": true}, {"id": "p:jordan lee", "label": "Jordan Lee", "kind": "person", "company": "Northwind Consulting", "school": "Riverbend University", "role": "Senior Consultant", "status": "Met", "tags": ["Consulting club"], "notes": "Case interview tips", "url": "https://example.com/in/jordan-lee", "via": "", "source": "linkedin+excel", "target": true}, {"id": "p:kai morgan", "label": "Kai Morgan", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Analyst", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/kai-morgan", "via": "", "source": "linkedin"}, {"id": "p:lena novak", "label": "Lena Novak", "kind": "person", "company": "Contoso Games", "school": "Harbor Tech Institute", "role": "Producer", "status": "To Reach Out", "tags": ["Gaming"], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:liam walsh", "label": "Liam Walsh", "kind": "person", "company": "Independent", "school": "", "role": "Founder", "status": "Met", "tags": [], "notes": "Old roommate", "url": "", "via": "", "source": "excel"}, {"id": "p:marcus bell", "label": "Marcus Bell", "kind": "person", "company": "Northwind Consulting", "school": "Riverbend University", "role": "Analyst", "status": "Met", "tags": ["Consulting club"], "notes": "", "url": "", "via": "", "source": "excel", "target": true}, {"id": "p:mia chen", "label": "Mia Chen", "kind": "person", "company": "Fieldstone Capital", "school": "Lakeview State University", "role": "Partner", "status": "Met", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:noah carter", "label": "Noah Carter", "kind": "person", "company": "Summit Airlines", "school": "Riverbend University", "role": "Commercial Strategy Analyst", "status": "Met", "tags": [], "notes": "Info session speaker", "url": "", "via": "", "source": "excel", "target": true}, {"id": "p:nora singh", "label": "Nora Singh", "kind": "person", "company": "Keystone Health", "school": "", "role": "Strategy Manager", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/nora-singh", "via": "", "source": "linkedin"}, {"id": "p:owen price", "label": "Owen Price", "kind": "person", "company": "Fieldstone Capital", "school": "Lakeview State University", "role": "Associate", "status": "To Reach Out", "tags": [], "notes": "", "url": "", "via": "", "source": "excel"}, {"id": "p:priya shah", "label": "Priya Shah", "kind": "person", "company": "Northwind Consulting", "school": "Lakeview State University", "role": "Manager", "status": "Contacted", "tags": [], "notes": "", "url": "https://example.com/in/priya-shah", "via": "", "source": "linkedin+excel", "target": true}, {"id": "p:sofia alvarez", "label": "Sofia Alvarez", "kind": "person", "company": "Contoso Games", "school": "Riverbend University", "role": "Product Manager", "status": "Met", "tags": ["Gaming"], "notes": "Owns the marketplace roadmap", "url": "https://example.com/in/sofia-alvarez", "via": "", "source": "linkedin+excel"}, {"id": "p:theo grant", "label": "Theo Grant", "kind": "person", "company": "Brightline Bank", "school": "", "role": "Product Owner", "status": "", "tags": [], "notes": "", "url": "https://example.com/in/theo-grant", "via": "", "source": "linkedin"}, {"id": "p:ben foster", "label": "Ben Foster", "kind": "second", "company": "Riverbend University", "school": "", "role": "Career Coach", "status": "", "tags": [], "notes": "", "url": "", "via": "Daniel Ortiz", "source": "excel"}, {"id": "p:chloe park", "label": "Chloe Park", "kind": "second", "company": "Harbor Ventures", "school": "", "role": "Investor", "status": "", "tags": [], "notes": "", "url": "", "via": "Mia Chen", "source": "excel"}, {"id": "p:isla moore", "label": "Isla Moore", "kind": "second", "company": "Contoso Games", "school": "", "role": "UX Researcher", "status": "", "tags": ["Gaming"], "notes": "", "url": "", "via": "Sofia Alvarez", "source": "excel"}, {"id": "p:rachel green", "label": "Rachel Green", "kind": "second", "company": "Northwind Consulting", "school": "", "role": "Principal", "status": "To Reach Out", "tags": [], "notes": "Jordan offered an intro", "url": "", "via": "Jordan Lee", "source": "excel", "target": true}, {"id": "p:sam rivera", "label": "Sam Rivera", "kind": "second", "company": "Pinecrest Labs", "school": "", "role": "Head of Growth", "status": "", "tags": [], "notes": "3rd-degree example", "url": "", "via": "Zoe Adams", "source": "excel", "target": true}, {"id": "p:tom nguyen", "label": "Tom Nguyen", "kind": "second", "company": "Contoso Games", "school": "", "role": "Director of Product", "status": "To Reach Out", "tags": ["Gaming"], "notes": "", "url": "", "via": "Sofia Alvarez", "source": "excel"}, {"id": "p:victor hale", "label": "Victor Hale", "kind": "second", "company": "Summit Airlines", "school": "", "role": "VP Network Planning", "status": "", "tags": [], "notes": "", "url": "", "via": "Noah Carter", "source": "excel", "target": true}, {"id": "p:zoe adams", "label": "Zoe Adams", "kind": "second", "company": "Pinecrest Labs", "school": "", "role": "CEO", "status": "", "tags": [], "notes": "", "url": "", "via": "Liam Walsh", "source": "excel", "target": true}, {"id": "target:granite peak partners", "label": "Granite Peak Partners", "kind": "gap", "target": true}, {"id": "target:harborview media", "label": "Harborview Media", "kind": "gap", "target": true}], "edges": [{"from": "me", "to": "school:riverbend university", "kind": "group"}, {"from": "me", "to": "company:brightline bank", "kind": "group"}, {"from": "me", "to": "company:northwind consulting", "kind": "group"}, {"from": "me", "to": "school:lakeview state university", "kind": "group"}, {"from": "me", "to": "company:contoso games", "kind": "group"}, {"from": "school:lakeview state university", "to": "p:ava thompson", "kind": "member"}, {"from": "company:brightline bank", "to": "p:daniel ortiz", "kind": "member"}, {"from": "school:riverbend university", "to": "p:daniel ortiz", "kind": "also"}, {"from": "company:brightline bank", "to": "p:elena rossi", "kind": "member"}, {"from": "company:contoso games", "to": "p:ethan brooks", "kind": "member"}, {"from": "me", "to": "p:grace owens", "kind": "direct"}, {"from": "company:northwind consulting", "to": "p:hana kim", "kind": "member"}, {"from": "company:northwind consulting", "to": "p:jordan lee", "kind": "member"}, {"from": "school:riverbend university", "to": "p:jordan lee", "kind": "also"}, {"from": "company:brightline bank", "to": "p:kai morgan", "kind": "member"}, {"from": "company:contoso games", "to": "p:lena novak", "kind": "member"}, {"from": "me", "to": "p:liam walsh", "kind": "direct"}, {"from": "company:northwind consulting", "to": "p:marcus bell", "kind": "member"}, {"from": "school:riverbend university", "to": "p:marcus bell", "kind": "also"}, {"from": "school:lakeview state university", "to": "p:mia chen", "kind": "member"}, {"from": "school:riverbend university", "to": "p:noah carter", "kind": "member"}, {"from": "me", "to": "p:nora singh", "kind": "direct"}, {"from": "school:lakeview state university", "to": "p:owen price", "kind": "member"}, {"from": "company:northwind consulting", "to": "p:priya shah", "kind": "member"}, {"from": "school:lakeview state university", "to": "p:priya shah", "kind": "also"}, {"from": "company:contoso games", "to": "p:sofia alvarez", "kind": "member"}, {"from": "school:riverbend university", "to": "p:sofia alvarez", "kind": "also"}, {"from": "company:brightline bank", "to": "p:theo grant", "kind": "member"}, {"from": "p:daniel ortiz", "to": "p:ben foster", "kind": "intro"}, {"from": "p:mia chen", "to": "p:chloe park", "kind": "intro"}, {"from": "p:sofia alvarez", "to": "p:isla moore", "kind": "intro"}, {"from": "company:contoso games", "to": "p:isla moore", "kind": "also"}, {"from": "p:jordan lee", "to": "p:rachel green", "kind": "intro"}, {"from": "company:northwind consulting", "to": "p:rachel green", "kind": "also"}, {"from": "p:zoe adams", "to": "p:sam rivera", "kind": "intro"}, {"from": "p:sofia alvarez", "to": "p:tom nguyen", "kind": "intro"}, {"from": "company:contoso games", "to": "p:tom nguyen", "kind": "also"}, {"from": "p:noah carter", "to": "p:victor hale", "kind": "intro"}, {"from": "p:liam walsh", "to": "p:zoe adams", "kind": "intro"}, {"from": "me", "to": "target:granite peak partners", "kind": "gap"}, {"from": "me", "to": "target:harborview media", "kind": "gap"}], "stats": {"people": 26, "direct": 18, "second_degree": 8, "groups": 5, "targets": 5, "gaps": 2}, "targets": [{"label": "Northwind Consulting", "focus": "company:northwind consulting", "direct": ["Hana Kim", "Jordan Lee", "Marcus Bell", "Priya Shah"], "second": ["Rachel Green"]}, {"label": "Summit Airlines", "focus": "p:grace owens", "direct": ["Grace Owens", "Noah Carter"], "second": ["Victor Hale"]}, {"label": "Pinecrest Labs", "focus": "p:sam rivera", "direct": [], "second": ["Sam Rivera", "Zoe Adams"]}, {"label": "Granite Peak Partners", "focus": "target:granite peak partners", "direct": [], "second": []}, {"label": "Harborview Media", "focus": "target:harborview media", "direct": [], "second": []}]};
 const css = getComputedStyle(document.documentElement);
 const c = n => css.getPropertyValue("--" + n).trim();
 const text = c("text"), line = c("line");
@@ -133,8 +149,34 @@ const nodes = new vis.DataSet(DATA.nodes.map(n => {
     node.font = { color: text, size: 15, bold: true };
   }
   if (n.kind === "me") { node.fixed = true; node.x = 0; node.y = 0; }
+  if (n.target && ["company", "school", "tag"].includes(n.kind)) {
+    node.color = { background: c(n.kind), border: c("target") }; node.borderWidth = 5;
+  }
+  if (n.kind === "gap") {
+    Object.assign(node, { shape: "dot", size: 18, borderWidth: 3, shapeProperties: { borderDashes: [5, 4] },
+      color: { background: c("bg"), border: c("target") },
+      font: { color: c("target"), size: 14, bold: true }, title: "Target company: no connections yet" });
+  }
+  node.baseColor = node.color;
   return node;
 }));
+
+// Color people by status (Met / Contacted / To Reach Out / Follow Up / Referral).
+const STATUS = { "met": "met", "contacted": "contacted", "to reach out": "reach",
+                 "follow up": "follow", "referral": "referral" };
+function statusColor(n) {
+  const v = STATUS[(n.status || "").trim().toLowerCase()];
+  return v && c(v);
+}
+function applyStatusColors(on) {
+  nodes.update(nodes.get({ filter: n => n.kind === "person" || n.kind === "second" }).map(n => {
+    const fill = on && statusColor(n);
+    const base = n.baseColor;
+    const border = n.target ? c("target") : base.border;
+    return { id: n.id, borderWidth: n.target ? 4 : 2,
+             color: { background: fill || base.background, border } };
+  }));
+}
 
 const EDGE = {
   group:  { width: 2.5, color: line },
@@ -142,11 +184,13 @@ const EDGE = {
   direct: { width: 1.2, color: line },
   intro:  { width: 1, color: line, dashes: [2, 4] },
   also:   { width: 1, color: line, dashes: [6, 6] },
+  gap:    { width: 1.5, color: c("target"), dashes: [4, 6] },
 };
 const edges = new vis.DataSet(DATA.edges.map((e, i) => ({ id: i, ...e, ...EDGE[e.kind] })));
 
 document.getElementById("stats").textContent =
-  `${DATA.stats.people} people · ${DATA.stats.direct} direct · ${DATA.stats.second_degree} 2nd-degree · ${DATA.stats.groups} groups`;
+  `${DATA.stats.people} people · ${DATA.stats.direct} direct · ${DATA.stats.second_degree} 2nd-degree · ${DATA.stats.groups} groups` +
+  (DATA.stats.targets ? ` · ${DATA.stats.targets - DATA.stats.gaps}/${DATA.stats.targets} targets covered` : "");
 
 const network = new vis.Network(document.getElementById("map"), { nodes, edges }, {
   physics: { solver: "forceAtlas2Based", forceAtlas2Based: { gravitationalConstant: -60, springLength: 90 },
@@ -154,6 +198,9 @@ const network = new vis.Network(document.getElementById("map"), { nodes, edges }
   interaction: { hover: true, tooltipDelay: 150 },
   edges: { smooth: { type: "continuous" } },
 });
+
+// Center everything once the layout settles (embedded frames can start with a stale size).
+network.once("stabilizationIterationsDone", () => network.fit({ animation: false }));
 
 const panel = document.getElementById("panel");
 const defaultPanel = panel.innerHTML;
@@ -165,11 +212,36 @@ function el(tag, txt, attrs = {}) {
   return e;
 }
 
+function showDefault() {
+  panel.innerHTML = defaultPanel;
+  if (!DATA.targets.length) return;
+  const box = document.getElementById("targets");
+  box.append(el("h3", "Targets"));
+  const ul = el("ul", undefined, { className: "targets" });
+  DATA.targets.forEach(t => {
+    const li = el("li");
+    li.append(el("span", t.label));
+    const n = t.direct.length + t.second.length;
+    li.append(n ? el("span", `${t.direct.length} direct · ${t.second.length} via`, { className: "count" })
+                : el("span", "no one yet", { className: "none" }));
+    li.onclick = () => focus(t.focus);
+    ul.append(li);
+  });
+  box.append(ul);
+}
+
 function showNode(id) {
   const n = nodes.get(id);
   if (!n) return;
   panel.innerHTML = "";
-  if (n.kind === "me") { panel.innerHTML = defaultPanel; return; }
+  if (n.kind === "me") { showDefault(); return; }
+  if (n.kind === "gap") {
+    panel.append(el("h2", n.label));
+    panel.append(el("div", "Target company · no connections yet", { className: "sub" }));
+    panel.append(el("p", "No one on your map works here. Add a contact (even a 2nd-degree one) " +
+                         "or ask the people in your biggest groups who they know."));
+    return;
+  }
   if (["company", "school", "tag"].includes(n.kind)) {
     panel.append(el("h2", DATA.nodes.find(x => x.id === id).label));
     panel.append(el("div", `${n.kind[0].toUpperCase() + n.kind.slice(1)} group · ${n.count} direct connections`, { className: "sub" }));
@@ -189,7 +261,7 @@ function showNode(id) {
   panel.append(el("h2", n.label));
   panel.append(el("div", [n.role, n.company].filter(Boolean).join(" at ") || (n.kind === "second" ? "2nd-degree connection" : "Direct connection"), { className: "sub" }));
   const dl = el("dl");
-  const rows = [["School", n.school], ["Status", n.status], ["Met via", n.via],
+  const rows = [["Target", n.target ? "Yes" : ""], ["School", n.school], ["Status", n.status], ["Met via", n.via],
                 ["Tags", (n.tags || []).join(", ")], ["Notes", n.notes]];
   rows.filter(r => r[1]).forEach(([k, v]) => { dl.append(el("dt", k)); dl.append(el("dd", v)); });
   panel.append(dl);
@@ -204,7 +276,7 @@ function focus(id) {
   showNode(id);
 }
 
-network.on("click", p => p.nodes.length ? showNode(p.nodes[0]) : (panel.innerHTML = defaultPanel));
+network.on("click", p => p.nodes.length ? showNode(p.nodes[0]) : showDefault());
 network.on("doubleClick", p => {
   const n = p.nodes.length && nodes.get(p.nodes[0]);
   if (n && n.url && /^https?:\/\//.test(n.url)) window.open(n.url, "_blank", "noopener");
@@ -221,6 +293,9 @@ document.getElementById("search").addEventListener("keydown", e => {
 document.getElementById("show2").addEventListener("change", e => {
   nodes.update(nodes.get({ filter: n => n.kind === "second" }).map(n => ({ id: n.id, hidden: !e.target.checked })));
 });
+document.getElementById("status").addEventListener("change", e => applyStatusColors(e.target.checked));
+applyStatusColors(true);
+showDefault();
 document.getElementById("physics").addEventListener("change", e => network.setOptions({ physics: { enabled: e.target.checked } }));
 </script>
 </body>

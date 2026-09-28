@@ -17,3 +17,7 @@ venv/
 .DS_Store
 .vscode/
 !docs/demo.html
+
+# Intro reports name real people too
+intro_report*.md
+*_report.md
