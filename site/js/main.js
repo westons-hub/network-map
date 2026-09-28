@@ -2,13 +2,17 @@
 // workbook or a LinkedIn CSV. Everything happens in this browser tab.
 
 import { buildGraph } from "./core/graph.js";
-import { normalizeOrg } from "./core/org.js";
 import { applyOp, replay } from "./core/ops.js";
-import { parseCsv, parseLinkedInCsv } from "./core/people.js";
+import { normalizeOrg } from "./core/org.js";
+import { bestPath } from "./core/paths.js";
+import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
 import { saveDoc } from "./core/sync.js";
 import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./core/workbook.js";
 import * as files from "./store/files.js";
 import { addBackup, kvDelete, kvGet, kvSet, listBackups } from "./store/local.js";
+import { ask, toast } from "./ui/dialog.js";
+import { companySuggestions, photoForm, targetForm } from "./ui/forms.js";
+import { createImages } from "./ui/images.js";
 import { createMap } from "./ui/map.js";
 import { el, renderDetails, renderTargets } from "./ui/panels.js";
 
@@ -16,38 +20,65 @@ const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
 const TEMPLATE_URL = "template/contacts_template.xlsx";
 const DEFAULT_NAME = "my_network.xlsx";
+const PREFS = { layout: "network-map:layout", gravatar: "network-map:gravatar" };
+
+const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
+const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 
 // doc = { model, base (bytes last read/written), lastModified, pending (unsaved edits) }
-const state = { mode: "demo", fileName: "", handle: null, doc: null, graph: null, selected: null,
+const state = { mode: "demo", fileName: "", handle: null, doc: null, graph: null, paths: new Map(), selected: null,
                 neverSaved: false, lastHandle: null };
 
 // ---- rendering ---------------------------------------------------------------
 
+const images = createImages({ onChange: () => { map.refresh(); renderSidebar(); } });
+
+/** Best path to the target a node stands for (null for anything else). */
+function pathFor(id) {
+  const t = state.graph?.targets.find(x => x.focus === id);
+  return t ? state.paths.get(t.key) ?? null : null;
+}
+
 const map = createMap($("map"), {
+  images,
+  pathFor,
   onSelect: id => { state.selected = id; renderSidebar(); },
   onDeselect: () => { state.selected = null; renderSidebar(); },
 });
 
 function render() {
   const { model } = state.doc;
-  state.graph = buildGraph(model.people, { me: model.me || "You", targets: model.targets });
+  const me = model.me || "You";
+  state.graph = buildGraph(model.people, { me, targets: model.targets });
+  state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) state.selected = null;
+  images.configure({ companies: model.companies, allowNetwork: state.mode !== "demo",
+                     gravatar: pref(PREFS.gravatar, "off") === "on" });
   map.render(state.graph, model.layout);
   renderSidebar();
   renderChrome();
 }
 
 function renderSidebar() {
+  if (!state.graph) return;
   const ctx = { graph: state.graph, model: state.doc.model, mode: state.mode, selected: state.selected,
-                connected: id => map.connected(id) };
-  const handlers = { onFocus: focus, onRename: name => edit({ type: "setMe", name }) };
+                paths: state.paths, images };
+  const handlers = { onFocus: focus, onRename: name => edit({ type: "setMe", name }), onEditTarget: editTarget,
+                     onMakeTarget: company => addTarget(company), onPhoto: editPhoto };
   renderTargets($("targets"), ctx, handlers);
   renderDetails($("details"), ctx, handlers);
 }
 
 function focus(id) {
   state.selected = id;
-  map.focus(id);
+  map.select(id);
+  renderSidebar();
+  $("details-section").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function clearSelection() {
+  state.selected = null;
+  map.clear();
   renderSidebar();
 }
 
@@ -78,7 +109,8 @@ function renderChrome() {
   banner.replaceChildren();
   if (state.mode === "demo") {
     banner.append("You're viewing fictional demo data. ");
-    banner.append(el("button", "Use my own data →", { class: "linklike", type: "button", onclick: e => { e.stopPropagation(); openMenu(); } }));
+    banner.append(el("button", "Use my own data →", { class: "linklike", type: "button",
+                                                      onclick: e => { e.stopPropagation(); openMenu(); } }));
     if (state.doc.pending.length) {
       banner.append(" · ", el("button", "Reset demo", { class: "linklike", type: "button", onclick: resetDemo }));
     }
@@ -110,31 +142,48 @@ function persistDraft() {
   return kvSet("draft", { fileName: state.fileName, pending: state.doc.pending, time: Date.now() });
 }
 
-// ---- toast & dialogs -----------------------------------------------------------
-
-let toastTimer;
-function toast(message, ms = 4500) {
-  const t = $("toast");
-  t.textContent = message;
-  t.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+async function addTarget(company = "") {
+  const existing = state.doc.model.targets.find(t => company && normalizeOrg(t.company) === normalizeOrg(company));
+  if (existing) return editTarget(normalizeOrg(existing.company));
+  const result = await targetForm({ suggestions: companySuggestions(state.doc.model, state.graph), company });
+  if (!result) return;
+  const key = normalizeOrg(result.target.company);
+  const dup = state.doc.model.targets.find(t => normalizeOrg(t.company) === key);
+  edit({ type: "upsertTarget", key: dup ? key : undefined, target: dup ? { ...dup, ...result.target } : result.target });
+  const t = state.graph.targets.find(x => x.key === key);
+  if (t) focus(t.focus);
+  toast(`${result.target.company} is now a target.`);
 }
 
-/** A small modal. buttons: [{ label, value, primary }]. Resolves with the clicked value. */
-function ask(title, body, buttons) {
-  const dialog = $("dialog");
-  const form = $("dialog-body");
-  form.replaceChildren(el("h3", title));
-  if (body instanceof Node) form.append(body); else if (body) form.append(el("p", body));
-  const actions = el("div", undefined, { class: "actions" });
-  for (const b of buttons) actions.append(el("button", b.label, { class: `btn${b.primary ? " primary" : ""}`, value: b.value }));
-  form.append(actions);
-  return new Promise(resolve => {
-    dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true });
-    dialog.returnValue = "";
-    dialog.showModal();
-  });
+async function editTarget(key) {
+  const target = state.doc.model.targets.find(t => normalizeOrg(t.company) === key);
+  if (!target) return;
+  const result = await targetForm({ target, suggestions: companySuggestions(state.doc.model, state.graph) });
+  if (!result) return;
+  if (result.action === "remove") {
+    edit({ type: "removeTarget", key });
+    clearSelection();
+    toast(`Removed ${target.company} from your targets.`);
+    return;
+  }
+  edit({ type: "upsertTarget", key, target: result.target });
+  const t = state.graph.targets.find(x => x.key === normalizeOrg(result.target.company));
+  if (t) focus(t.focus);
+}
+
+async function editPhoto(node) {
+  const key = node.id.slice(2);
+  const person = state.doc.model.people.find(p => personKey(p) === key);
+  if (!person) return;
+  try {
+    const result = await photoForm({ name: person.name, current: person.photo });
+    if (!result) return;
+    edit({ type: "upsertPerson", key, person: { ...person, photo: result.photo } });
+    toast(result.photo ? `Photo saved for ${person.name}.` : `Photo removed for ${person.name}.`);
+  } catch (e) {
+    console.error(e);
+    toast(`Couldn't use that image: ${e.message}`);
+  }
 }
 
 // ---- loading -----------------------------------------------------------------
@@ -149,9 +198,10 @@ async function loadDemo() {
   const base = await fetchBytes(DEMO_URL);
   const edits = (await kvGet("demo-edits")) ?? [];
   let model = readWorkbook(base);
-  try { model = replay(model, edits); } catch { await kvDelete("demo-edits"); }
+  let pending = edits;
+  try { model = replay(model, edits); } catch { pending = []; await kvDelete("demo-edits"); }
   Object.assign(state, { mode: "demo", fileName: "", handle: null, neverSaved: false, selected: null,
-                         doc: { model, base, lastModified: null, pending: edits } });
+                         doc: { model, base, lastModified: null, pending } });
   render();
 }
 
@@ -231,7 +281,7 @@ async function newWorkbook() {
   Object.assign(state, { mode: "file", fileName: DEFAULT_NAME, handle: null, neverSaved: true, selected: null,
                          doc: { model: emptyModel(input.value.trim()), base: null, lastModified: null, pending: [] } });
   render();
-  toast("New workbook ready. Add your target companies and people, then Save.");
+  toast("New workbook ready. Add your target companies, then Save.");
 }
 
 // ---- saving ------------------------------------------------------------------
@@ -326,7 +376,6 @@ function closeMenu() {
 }
 menuBtn.addEventListener("click", e => { e.stopPropagation(); menu.hidden ? openMenu() : closeMenu(); });
 document.addEventListener("click", e => { if (!menu.contains(e.target)) closeMenu(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
 
 const ACTIONS = { open: openFile, reopen, new: newWorkbook, template: downloadTemplate, download: downloadCopy,
                   backups: showBackups, demo: loadDemo };
@@ -343,8 +392,13 @@ menu.addEventListener("click", async e => {
 });
 
 $("save").addEventListener("click", save);
+$("add-target").addEventListener("click", () => addTarget());
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && state.mode === "file") { e.preventDefault(); save(); }
+  if (e.key === "Escape" && !$("dialog").open) {
+    if (!menu.hidden) closeMenu();
+    else if (state.selected) clearSelection();
+  }
 });
 
 $("search").addEventListener("keydown", e => {
@@ -358,9 +412,18 @@ $("search").addEventListener("keydown", e => {
 });
 
 $("show2").addEventListener("change", e => map.set({ showSecond: e.target.checked }));
-$("status").addEventListener("change", e => map.set({ statusColors: e.target.checked }));
-$("physics").addEventListener("change", e => map.setPhysics(e.target.checked));
+$("gravatar").checked = pref(PREFS.gravatar, "off") === "on";
+$("gravatar").addEventListener("change", e => { setPref(PREFS.gravatar, e.target.checked ? "on" : "off"); render(); });
 $("fit").addEventListener("click", () => map.fit());
+
+// Free | Ring layout switch (remembered in this browser).
+const layoutButtons = [...document.querySelectorAll("[data-layout]")];
+function setLayout(mode, animate = true) {
+  layoutButtons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === mode)));
+  setPref(PREFS.layout, mode);
+  map.setLayout(mode, animate);
+}
+layoutButtons.forEach(b => b.addEventListener("click", () => setLayout(b.dataset.layout)));
 
 window.addEventListener("beforeunload", e => {
   if (unsaved()) { e.preventDefault(); e.returnValue = ""; }
@@ -369,6 +432,9 @@ window.addEventListener("beforeunload", e => {
 // ---- start ---------------------------------------------------------------------
 
 (async () => {
+  const layout = pref(PREFS.layout, "free") === "ring" ? "ring" : "free";
+  layoutButtons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
+  map.set({ layout });
   try {
     await loadDemo();
   } catch (e) {

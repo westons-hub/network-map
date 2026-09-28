@@ -34,59 +34,74 @@
       </div>
     </header>
 
-    <div id="banner" class="banner" hidden></div>
+    <div class="sidebar-scroll">
+      <div id="banner" class="banner" hidden></div>
 
-    <div class="search">
-      <input type="search" id="search" placeholder="Find a person, company or school" autocomplete="off"
-             aria-label="Find on the map">
+      <div class="search">
+        <input type="search" id="search" placeholder="Find a person, company or school" autocomplete="off"
+               aria-label="Find on the map">
+      </div>
+
+      <section id="targets-section" aria-labelledby="targets-heading">
+        <div class="section-head">
+          <h2 id="targets-heading">Targets</h2>
+          <button id="add-target" class="btn small" type="button">+ Add target</button>
+        </div>
+        <div id="targets"></div>
+      </section>
+
+      <section id="details-section" aria-live="polite">
+        <div id="details"></div>
+      </section>
+
+      <details id="legend-section">
+        <summary>Legend &amp; view</summary>
+        <div class="legend-title">People (ring = status)</div>
+        <div class="legend">
+          <span><i class="dot status-met"></i>Met</span>
+          <span><i class="dot status-contacted"></i>Contacted</span>
+          <span><i class="dot status-to-reach-out"></i>To Reach Out</span>
+          <span><i class="dot status-follow-up"></i>Follow Up</span>
+          <span><i class="dot status-referral"></i>Referral</span>
+          <span><i class="dot status-none"></i>No status</span>
+        </div>
+        <div class="legend-title">Bubbles</div>
+        <div class="legend">
+          <span><i class="dot ring-company"></i>Company group</span>
+          <span><i class="dot ring-school"></i>School group</span>
+          <span><i class="dot ring-target"></i>Target company</span>
+          <span><i class="dot ring-gap"></i>Target, no one yet</span>
+        </div>
+        <div class="legend-title">Lines</div>
+        <div class="legend lines">
+          <span><i class="line solid"></i>You know them</span>
+          <span><i class="line dashed"></i>Through someone</span>
+          <span><i class="line path"></i>Best path to a target</span>
+        </div>
+        <div class="toggles">
+          <label><input type="checkbox" id="show2" checked> Show 2nd-degree connections</label>
+          <label><input type="checkbox" id="gravatar"> Gravatar photos
+            <span class="muted small">(sends a hash of each email to gravatar.com)</span></label>
+        </div>
+        <p class="muted small">Groups form when 3+ people you know directly share a company or school.
+          Double-click a person to open their LinkedIn.</p>
+      </details>
+
+      <footer class="privacy muted small">
+        🔒 Runs entirely in your browser. Your files are never uploaded, and there are no trackers.
+        <a href="https://github.com/westons-hub/network-map" target="_blank" rel="noopener">Source on GitHub</a>
+      </footer>
     </div>
-
-    <section id="targets-section">
-      <h2>Targets</h2>
-      <div id="targets"></div>
-    </section>
-
-    <section id="details-section">
-      <div id="details"></div>
-    </section>
-
-    <details id="legend-section">
-      <summary>Legend &amp; view</summary>
-      <div class="toggles">
-        <label><input type="checkbox" id="show2" checked> 2nd-degree connections</label>
-        <label><input type="checkbox" id="status" checked> Color people by status</label>
-        <label><input type="checkbox" id="physics" checked> Motion</label>
-      </div>
-      <div class="legend">
-        <span><i class="dot" style="background:var(--me)"></i>You</span>
-        <span><i class="dot" style="background:var(--company)"></i>Company group</span>
-        <span><i class="dot" style="background:var(--school)"></i>School group</span>
-        <span><i class="dot" style="background:var(--tag)"></i>Tag group</span>
-        <span><i class="dot" style="background:var(--person);border-color:var(--company)"></i>Direct</span>
-        <span><i class="dot" style="background:var(--second)"></i>2nd-degree</span>
-        <span><i class="dot ring"></i>Target company</span>
-      </div>
-      <div class="legend">
-        <span><i class="dot" style="background:var(--met)"></i>Met</span>
-        <span><i class="dot" style="background:var(--contacted)"></i>Contacted</span>
-        <span><i class="dot" style="background:var(--reach)"></i>To Reach Out</span>
-        <span><i class="dot" style="background:var(--follow)"></i>Follow Up</span>
-        <span><i class="dot" style="background:var(--referral)"></i>Referral</span>
-      </div>
-      <p class="muted small">Groups form when 3+ people you know directly share a company or school.
-        Double-click a person to open their LinkedIn.</p>
-    </details>
-
-    <footer class="privacy muted small">
-      🔒 Runs entirely in your browser. Your files are never uploaded, and there are no trackers.
-      <a href="https://github.com/westons-hub/network-map" target="_blank" rel="noopener">Source on GitHub</a>
-    </footer>
   </aside>
 
   <main id="map-wrap">
     <div id="map" aria-label="Network map"></div>
     <div class="map-tools">
-      <button id="fit" class="btn small" title="Show everything">Fit</button>
+      <div class="segmented" role="group" aria-label="Layout">
+        <button type="button" data-layout="free" aria-pressed="true" title="Physics layout">Free</button>
+        <button type="button" data-layout="ring" aria-pressed="false" title="Groups on a circle around you">Ring</button>
+      </div>
+      <button id="fit" class="btn small" type="button" title="Show everything">Fit</button>
     </div>
   </main>
 </div>

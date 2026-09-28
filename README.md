@@ -23,10 +23,13 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Safe saving:** the previous version is backed up in your browser before every save. If you edited the file in Excel meanwhile, it's reloaded and your changes are applied on top instead of overwriting. Unsaved changes survive a refresh.
 - **Automatic grouping:** 3+ direct connections at the same company or school form a group. "BYU" and "Brigham Young University", or "Acme" and "Acme, Inc.", count as the same.
 - **2nd-degree connections:** fill in "Connected Through" and the person attaches to whoever connects you.
-- **Target companies** are outlined in red, and targets with no one on your map show up as hollow "gap" bubbles.
-- **Status colors:** Met, Contacted, To Reach Out, Follow Up and Referral.
+- **Target companies:** add them with "+ Add target" (type-ahead over your companies, plus Priority and Stage). Every target is its own red-ringed node. Click one to see **your best way in** (for example Me → Liam → Zoe) drawn in red on the map, preferring the contacts you're warmest with.
+- **Highlight on click:** a person, group or target lights up with its connections while everything else fades. Hovering previews the same thing.
+- **Free or Ring layout:** physics with well-separated clusters, or a tidy ring with groups around you and no-connection targets on the outer edge.
+- **Logos and photos:** real companies get their logo from their website's icon (only the domain is sent, never contact data). People get an "Add photo" (resized in your browser and saved in your workbook), with Gravatar as an opt-in. The demo uses generated art, not real logos or photos.
+- **Status colors:** each person's ring shows Met, Contacted, To Reach Out, Follow Up or Referral.
 - **Details panel:** email (click to write, or copy), role, school, Connected On date, tags, notes and LinkedIn link.
-- **Full-screen map** on a graph-paper background that pans and zooms with you.
+- **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
 ## Use it
@@ -61,7 +64,7 @@ your .xlsx / Connections.csv
         └── core/sync.js: back up, check the file didn't change on disk, replay edits, write
 ```
 
-- `site/js/core/`: pure logic with no DOM, unit-tested in Node. It covers name normalization and aliases (`org.js`), people and LinkedIn CSV parsing (`people.js`), grouping and targets (`graph.js`), "who can intro me?" chains (`intro.js`), and the workbook format and migration (`workbook.js`).
+- `site/js/core/`: pure logic with no DOM, unit-tested in Node. It covers name normalization and aliases (`org.js`), people and LinkedIn CSV parsing (`people.js`), grouping and targets (`graph.js`), "who can intro me?" chains and best paths (`intro.js`, `paths.js`), the Ring layout (`layout.js`), generated avatars and logos (`avatars.js`), domain guessing (`logos.js`), and the workbook format and migration (`workbook.js`).
 - `site/js/store/`: file access (File System Access API or download) and browser storage (IndexedDB backups and drafts).
 - `site/js/ui/`: the map and sidebar.
 - `site/vendor/`: vis-network and SheetJS, vendored so the site has no CDN dependency.
@@ -76,7 +79,7 @@ npm test             # node --test, no install needed (Node 22+)
 
 ## Privacy
 
-Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
+Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos (Google's favicon service sees the company's domain) and, only if you turn it on, Gravatar (it sees a hash of each email). Neither happens in the demo. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
 
 ## License
 

@@ -65,7 +65,11 @@ Right now `build_map.py` generates a static HTML file, so the map can't be edite
 ## 3. Targets are core
 
 - **Targets** is the top section of the sidebar, not an afterthought.
-- Add a target with a company lookup: type-ahead over companies in my pool and people, plus free text.
+- "+ Add target" button at the top of the Targets section opens a small form: company name with type-ahead (companies
+  from my people, LinkedIn pool and existing groups, plus free text), Priority (P1/P2/P3), Stage
+  (Researching / Networking / Applied / Interviewing / Offer), Notes. It saves to the Targets sheet.
+- Edit and remove targets from the target's card. A "Make this a target" button on any company group's details panel.
+- Works in demo mode too (edits the in-browser demo copy; "Reset demo" restores it).
 - For each target show:
   - how many people I know there
   - my best path in (direct, or through whom for 2nd-degree, with the full chain: Me → Liam → Zoe → Sam)
@@ -77,22 +81,28 @@ Right now `build_map.py` generates a static HTML file, so the map can't be edite
 - This absorbs the old "who can intro me to X?" report. Port its logic (org-name normalization and aliases,
   "Connected Through" chains) to JS, and offer "Download intro report (.md)".
 
-## 4. Company icons
+## 4. Company and school logos
 
-- Company, school and target bubbles show the logo with vis-network `shape: "circularImage"`.
-- Domain: guess it from the name, overridable in the Companies sheet (reuse the name normalization and aliases, e.g. BYU → byu.edu).
-- Logo source: Google's favicon service `https://www.google.com/s2/favicons?domain=<domain>&sz=128`, loaded
-  directly by the browser. Keep the source swappable (logo.dev / Brandfetch need API keys). This sends only company domains, never contact data.
-- Cache logos in the browser. In the offline export, embed them as data URIs when the browser allows it (CORS);
-  otherwise fall back to the colored bubble. If there's no logo, use the current colored bubble.
+- Company, school and target bubbles show a logo with vis-network `shape: "circularImage"`.
+- **Demo data (fictional):** no real logos. Each fictional company/school gets a generated logo (colored rounded
+  shape + a simple icon or initials) as inline SVG, stored in the demo workbook's Companies sheet (Logo column).
+- **Real data:** guess the domain from the name (reusing the name normalization and aliases, e.g. BYU → byu.edu),
+  overridable with the Website (or Logo) column in the Companies sheet. Logo source: Google's favicon service
+  `https://www.google.com/s2/favicons?domain=<domain>&sz=128`, loaded directly by the browser (cached by the browser;
+  domains with no logo are remembered so they aren't re-checked). Keep the source swappable (logo.dev / Brandfetch need
+  API keys). This sends only company domains, never contact data, and never happens in demo mode.
+  - Google returns a 16px globe (HTTP 404) for unknown domains, so anything ≤16px counts as "no logo".
+  - Google sends no CORS headers, so favicons can't be embedded in the offline export; there, use the generated logo.
+- Fallback everywhere: a generated initials logo.
 
 ## 5. Profile pictures
 
 - LinkedIn's export does **not** include photos, and we don't scrape LinkedIn.
-- Each person gets a Photo field: choose an image file or paste an image URL. Uploaded images are resized in the browser
-  (e.g. 96×96 JPEG) and stored as a small data URI, so they fit in the workbook's Photo cell and travel with the file.
-- Optional, **off by default**: Gravatar using the email (SHA-256 hash via Web Crypto). It sends a hash of the email to Gravatar, so it's opt-in.
-- Fallback: an initials avatar colored by status. Render people as circular images.
+- **Demo data:** illustrated avatars generated in code (simple SVG faces in varied colors), not downloaded photos.
+- **Real data:** each person has a Photo field. In the details panel, "Add photo" lets me pick an image file (resized in
+  the browser to ~96×96 and stored as a data URI in the workbook's Photo cell) or paste an image URL.
+- Optional, **off by default**: Gravatar by email (SHA-256 hash via Web Crypto). It sends a hash of the email to Gravatar, so it's opt-in.
+- Fallback: an initials avatar. People render as circular images; their **status shows as the colored border ring**.
 
 ## 6. Emails in the info panel
 
@@ -115,6 +125,27 @@ Right now `build_map.py` generates a static HTML file, so the map can't be edite
 - Keep the details panel, search and legend, but move them into the sidebar or a small overlay so they don't cover the map.
 - It should be usable on a phone for a quick look: the sidebar becomes a bottom sheet.
 - A small banner in demo mode: "You're viewing fictional demo data. Use my own data →".
+- The sidebar header stays fixed above a scrolling body, so nothing (like the Targets heading) is ever clipped under it.
+
+## 8b. Readability
+
+- **Highlight on click:** clicking a person, group or target highlights it plus its direct connections; everything
+  else fades to ~15% opacity (nodes, edges, labels). Clicking a target also highlights my **best path** to it
+  (e.g. Me → Liam → Zoe → Sam) in bold red, and the sidebar shows that path. Click empty space or press Esc to clear.
+  Hovering shows a lighter preview of the same thing.
+- **Spacing:** groups spread far apart so each cluster is clearly separate (longer springs, stronger repulsion between
+  group nodes, avoidOverlap on). Members stay tight around their own group. People link only to their primary group
+  (secondary memberships appear only when highlighted). Targets with no connections sit on the outer edge.
+- **Layout switch** (top-right of the map, next to "Fit"): a segmented control "Free | Ring".
+  - Ring: me at the center, groups evenly spaced on a circle, members fanned around their group, 2nd-degree people just
+    outside the person who connects them, and no-connection targets on an outer ring.
+  - Free: the physics layout (with the extra spacing).
+  - Animate between them; remember the choice (localStorage). "Fit" works in both.
+- **Edges, only 3 styles**, all darker than the grid: solid dark gray = I know them (direct/group membership);
+  dashed gray = through someone (2nd-degree); red = only a highlighted path to a target. The grid is lighter so edges stand out.
+- **Zoom:** slower and smoother (eased, anchored under the cursor), including trackpad pinch.
+- **Nodes:** a person's color = status only (legend shows the status colors). The red ring is only on target company
+  nodes, never on people. Slightly larger labels with a white halo; person names hide when zoomed far out.
 
 ## 9. README (portfolio-first)
 
@@ -125,7 +156,7 @@ Right now `build_map.py` generates a static HTML file, so the map can't be edite
 ## Rules
 
 - **Privacy:** everything stays in the browser. Never commit real data: `.gitignore` blocks `.xlsx`, `.csv`, `.html`
-  exports and intro reports, except the fictional `examples/` and the template.
+  exports and intro reports, except the fictional demo (`site/demo/`), the blank template and test fixtures.
 - **No LinkedIn scraping:** only my own data export plus manual entry.
 - Tests: unit-test the JS logic (parsing the LinkedIn CSV, merging, org normalization and domain guessing, graph building,
   targets and intro paths, and the workbook round-trip with SheetJS) with `node --test`, with no npm install required to run the site.
@@ -134,9 +165,13 @@ Right now `build_map.py` generates a static HTML file, so the map can't be edite
 
 ## Phases (commit after each)
 
-1. Static app skeleton: full-screen layout, graph-paper background, demo data loads by default; SheetJS open/save
-   (File System Access + download fallback), backups, conflict reload, migration; JS tests; remove Streamlit
-2. LinkedIn import (all columns) + lookup-based Add/Edit/Remove person + email in the details panel
-3. Targets as the core sidebar section (+ intro report download)
-4. Company logos + profile photos/avatars
-5. Draggable map with saved positions, offline HTML export, GitHub Pages workflow, README with live link + GIF
+1. ✅ Static app skeleton: full-screen layout, graph-paper background, demo data loads by default; SheetJS open/save
+   (File System Access + download fallback), backups, conflict reload, migration; JS tests; remove Streamlit *(8a6afe5)*
+1b. ✅ Readability + visuals pass (moved earlier): highlight on click/hover with best path in red, more space between groups, slower/smoother zoom,
+   Free | Ring layout switch, 3 edge styles, status-only person colors, labels with halo; **logos and photos**
+   (generated demo art, favicons + Photo/Gravatar for real data); **Add/Edit/Remove target** + always-on target nodes;
+   fix the clipped Targets heading
+2. LinkedIn import (all columns) + lookup-based Add/Edit/Remove person
+3. Targets, the rest: LinkedIn-pool suggestions with one-click add, intro report download
+4. Draggable map with saved positions (Layout sheet), Re-arrange / Lock layout
+5. Offline HTML export, GitHub Pages workflow, README with live link + GIF

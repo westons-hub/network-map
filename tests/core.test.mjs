@@ -125,33 +125,54 @@ test("demo workbook builds: only the people you added are on the map", () => {
   assert.equal(m.me, "Alex Rivera");
   const g = buildGraph(m.people, { me: m.me, targets: m.targets });
   assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 4, targets: 6, gaps: 2 });
+  // Northwind is a group; the other five targets are their own nodes.
+  assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(),
+    ["company:northwind consulting", "target:brightline bank", "target:granite peak partners", "target:harborview media",
+     "target:pinecrest labs", "target:summit airlines"]);
   assert.equal(m.pool.length, 7); // LinkedIn connections stay in the pool, off the map
 });
 
 // ---- targets -------------------------------------------------------------------
 
-test("a target with no connections becomes a gap node", () => {
+test("a target with no connections is a gap node linked to you", () => {
   const g = buildGraph([P("A", { company: "Acme" })], { targets: ["Nowhere Inc."] });
-  const gap = g.nodes.find(n => n.kind === "gap");
-  assert.equal(gap.label, "Nowhere Inc.");
-  assert.equal(gap.id, "target:nowhere");
+  const node = g.nodes.find(n => n.id === "target:nowhere");
+  assert.deepEqual([node.kind, node.label, node.gap, node.target], ["target", "Nowhere Inc.", true, true]);
   assert.ok(edges(g).has("me>target:nowhere>gap"));
   assert.equal(g.stats.gaps, 1);
 });
 
-test("target groups and people are flagged, aliases match, duplicates ignored", () => {
+test("target groups are flagged, aliases match, duplicates ignored, people never get the target ring", () => {
   const people = ["A", "B", "C"].map(n => P(n, { company: "Ernst & Young" }))
     .concat(P("D", { company: "EY", connectedThrough: "A" }));
   const g = buildGraph(people, { targets: ["EY", { company: "ey", priority: "1" }] });
   const byId = Object.fromEntries(g.nodes.map(n => [n.id, n]));
   assert.equal(byId["company:ernst young"].target, true);
-  assert.equal(byId["p:d"].target, true);
-  assert.deepEqual(g.targets, [{ label: "EY", focus: "company:ernst young", direct: ["A", "B", "C"], second: ["D"] }]);
+  assert.equal(byId["p:d"].target, undefined);
+  assert.equal(byId["p:d"].atTarget, true);
+  assert.deepEqual(g.targets, [{ label: "EY", key: "ernst young", focus: "company:ernst young", direct: ["A", "B", "C"],
+                                 second: ["D"], priority: "", stage: "", notes: "" }]);
+  assert.ok(!g.nodes.some(n => n.kind === "target"));
 });
 
-test("a target without a group focuses a person", () => {
-  const g = buildGraph([P("Solo", { company: "Tiny Co" })], { targets: ["Tiny Co"] });
-  assert.equal(g.targets[0].focus, "p:solo");
+test("a target below the group size is still its own node, and people there attach to it", () => {
+  const g = buildGraph([P("Solo", { company: "Tiny Co", school: "State" }), P("Via", { company: "Tiny Co", connectedThrough: "Solo" })],
+                       { targets: [{ company: "Tiny Co", priority: "2", stage: "Applied" }] });
+  const t = g.nodes.find(n => n.id === "target:tiny");
+  assert.deepEqual([t.kind, t.count, t.gap, t.priority, t.stage], ["target", 1, false, "2", "Applied"]);
+  assert.equal(g.targets[0].focus, "target:tiny");
+  assert.ok(edges(g).has("me>target:tiny>group"));
+  assert.ok(edges(g).has("target:tiny>p:solo>member"));
+  assert.ok(edges(g).has("target:tiny>p:via>also"));
+  assert.ok(!edges(g).has("me>p:solo>direct"));
+  assert.deepEqual(g.groups["target:tiny"], ["Solo"]);
+});
+
+test("a target reachable only through someone links to you with a dashed (gap) edge", () => {
+  const g = buildGraph([P("Liam"), P("Zoe", { company: "Pinecrest", connectedThrough: "Liam" })], { targets: ["Pinecrest"] });
+  assert.ok(edges(g).has("me>target:pinecrest>gap"));
+  assert.equal(g.nodes.find(n => n.id === "target:pinecrest").gap, false);
+  assert.equal(g.stats.gaps, 0);
 });
 
 // ---- intro paths ---------------------------------------------------------------

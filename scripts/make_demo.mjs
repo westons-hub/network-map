@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "../site/vendor/xlsx.mjs";
+import { demoFace, demoLogo } from "../site/js/core/avatars.js";
 import { makePerson, mergePeople, parseLinkedInCsv, personFromPool } from "../site/js/core/people.js";
 import { emptyModel, writeWorkbook } from "../site/js/core/workbook.js";
 
@@ -54,13 +55,13 @@ const HOW_TO = [
   ["  Company / School", "3+ direct connections at one company or school become a group bubble. 'BYU' and 'Brigham Young University' count as the same."],
   ["  Email", "Shown in the details panel with a copy button."],
   ["  LinkedIn URL", "Their profile link. Double-click them on the map to open it."],
-  ["  Photo", "An image link, or leave it to the app (it stores a small picture here when you add one)."],
+  ["  Photo", "An image link, or use 'Add photo' in the app (it stores a small picture here). LinkedIn exports don't include photos."],
   ["  Connected Through", "Leave BLANK if you know them directly. Otherwise put the name of the person who connects you; they appear as a 2nd-degree connection."],
   ["  Connected On", "The date you connected (filled in from LinkedIn)."],
   ["  Status", "Met / Contacted / To Reach Out / Follow Up / Referral."],
   ["  Tags, Notes", "Anything you want to remember. Tags are comma-separated."],
-  ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer / Closed) are optional."],
-  ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong."],
+  ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer) are optional."],
+  ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong, or put an image link in Logo."],
   ["LinkedIn Pool", "Filled by 'Import LinkedIn' from your Connections.csv. These people are NOT on the map until you add them."],
   ["Layout / Settings", "Managed by the app (saved node positions, your name)."],
   ["Privacy", "Network Map runs entirely in your browser. This file is never uploaded anywhere."],
@@ -83,8 +84,11 @@ const people = PEOPLE.map(([name, company, school, role, connectedThrough, statu
 // LinkedIn data fills gaps (URL, Connected On) for people who are in the pool; your rows win.
 const onMap = new Set(people.map(p => p.name));
 const fromPool = pool.map(personFromPool).filter(p => onMap.has(p.name));
+// Fictional people get illustrated faces and fictional organizations get made-up logos, all drawn in code.
+const orgs = [...new Set([...PEOPLE.flatMap(r => [r[1], r[2]]), ...TARGETS.map(t => t[0])].filter(Boolean))].sort();
 const demo = { ...emptyModel("Alex Rivera"),
-  people: mergePeople(fromPool, people).map(p => ({ ...p, source: "" })),
+  people: mergePeople(fromPool, people).map(p => ({ ...p, photo: demoFace(p.name), source: "" })),
+  companies: orgs.map(company => ({ company, website: "", logo: demoLogo(company), extra: {} })),
   targets: TARGETS.map(([company, priority, stage, notes]) => ({ company, priority, stage, notes, extra: {} })),
   pool };
 writeFileSync(join(SITE, "demo", "demo_network.xlsx"), withHowTo(writeWorkbook(demo)));

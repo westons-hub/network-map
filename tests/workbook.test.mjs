@@ -25,7 +25,7 @@ function fullModel() {
                           notes: "Line one, \"quoted\"", extra: { Birthday: "May 4" } }),
              makePerson({ name: "Bo", connectedThrough: "Ana Díaz" })],
     targets: [{ company: "Acme", priority: "1", stage: "Applied", notes: "", extra: {} }],
-    companies: [{ company: "Acme", website: "acme.example", extra: {} }],
+    companies: [{ company: "Acme", website: "acme.example", logo: "data:image/svg+xml;charset=utf-8,%3Csvg%3E", extra: {} }],
     pool: [{ firstName: "Cy", lastName: "Z", url: "u", email: "", company: "Acme", position: "Eng", connectedOn: "2025-01-02" }],
     layout: { "me": { x: 0, y: 0 }, "p:ana díaz": { x: 120, y: -40 } },
   };

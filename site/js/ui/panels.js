@@ -1,50 +1,55 @@
-// Sidebar panels. Everything is built with textContent (never innerHTML) so names
-// and notes from a spreadsheet can't inject markup.
+// Sidebar panels: the Targets list and the details view.
 
-import { normalizeName } from "../core/org.js";
+import { normalizeName, normalizeOrg } from "../core/org.js";
+import { poolName } from "../core/people.js";
+import { el } from "./dom.js";
 
-export function el(tag, text, attrs = {}) {
-  const e = document.createElement(tag);
-  if (text !== undefined && text !== null) e.textContent = text;
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") e.className = v;
-    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
-    else if (k in e) e[k] = v;
-    else e.setAttribute(k, v);
-  }
-  return e;
-}
+export { el };
 
 const isWebUrl = u => /^https?:\/\//i.test(u ?? "");
 const isEmail = e => /^[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]+$/.test(e ?? "");
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const personId = name => `p:${normalizeName(name)}`;
+
+function badges(t) {
+  const wrap = el("span", undefined, { class: "badges" });
+  if (t.priority) wrap.append(el("span", `P${t.priority}`, { class: `badge p${t.priority}` }));
+  if (t.stage) wrap.append(el("span", t.stage, { class: "badge" }));
+  return wrap;
+}
+
+/** "Ask Liam Walsh" / "You know 4 people here" / "No connections yet". */
+function pathSummary(t, path) {
+  if (!path) return { text: "No connections yet", cls: "none" };
+  if (path.names.length === 2) {
+    return { text: `You know ${t.direct.length === 1 ? "1 person" : `${t.direct.length} people`} here`, cls: "ok" };
+  }
+  return { text: `Ask ${path.ask} for an intro`, cls: "via" };
+}
 
 // ---- targets --------------------------------------------------------------
 
-export function renderTargets(box, { graph, model }, { onFocus }) {
+export function renderTargets(box, { graph, paths }, { onFocus, onEditTarget }) {
   box.replaceChildren();
   if (!graph.targets.length) {
-    box.append(el("p", "No target companies yet. Add them on the Targets sheet of your workbook.", { class: "muted small" }));
+    box.append(el("p", "No target companies yet. Add the companies you want to work at, and the map shows " +
+                       "who you know there and your best way in.", { class: "muted small" }));
     return;
   }
-  const meta = new Map(model.targets.map(t => [t.company, t]));
   const ul = el("ul", undefined, { class: "target-list" });
-  for (const t of graph.targets) {
-    const info = meta.get(t.label) ?? {};
-    const n = t.direct.length + t.second.length;
+  const order = [...graph.targets].sort((a, b) => (a.priority || "9").localeCompare(b.priority || "9"));
+  for (const t of order) {
+    const path = paths.get(t.key);
+    const summary = pathSummary(t, path);
     const li = el("li", undefined, { tabIndex: 0, onclick: () => onFocus(t.focus),
                                      onkeydown: e => e.key === "Enter" && onFocus(t.focus) });
     const row = el("div", undefined, { class: "row" });
     row.append(el("span", t.label, { class: "name" }));
-    row.append(n ? el("span", `${t.direct.length} direct · ${t.second.length} via`, { class: "count" })
-                 : el("span", "No connections yet", { class: "none" }));
-    li.append(row);
-    if (info.priority || info.stage) {
-      const badges = el("div");
-      if (info.priority) badges.append(el("span", `P${info.priority}`, { class: "badge" }));
-      if (info.stage) badges.append(el("span", info.stage, { class: "badge" }));
-      li.append(badges);
-    }
+    row.append(el("button", "Edit", { class: "btn tiny", type: "button", title: `Edit ${t.label}`,
+                                      onclick: e => { e.stopPropagation(); onEditTarget(t.key); } }));
+    const meta = el("div", undefined, { class: "row meta" });
+    meta.append(el("span", summary.text, { class: `path-summary ${summary.cls}` }), badges(t));
+    li.append(row, meta);
     ul.append(li);
   }
   box.append(ul);
@@ -53,21 +58,20 @@ export function renderTargets(box, { graph, model }, { onFocus }) {
 // ---- details --------------------------------------------------------------
 
 function overview(box, { graph, model, mode }, handlers) {
-  const me = model.me || "You";
   box.append(el("h3", model.me ? `${model.me.split(" ")[0]}'s network` : "Your network"));
   box.append(el("div", mode === "demo" ? "Fictional demo data" : "Click anyone on the map for details.", { class: "sub" }));
   const s = graph.stats;
   const stats = el("div", undefined, { class: "stats" });
   for (const [v, label] of [[s.direct, "direct"], [s.second_degree, "2nd-degree"], [s.groups, "groups"],
-                            [s.targets - s.gaps, `of ${s.targets} targets covered`], [model.pool.length, "in LinkedIn pool"]]) {
+                            [s.targets - s.gaps, `of ${s.targets} targets reachable`], [model.pool.length, "in LinkedIn pool"]]) {
     const d = el("div");
     d.append(el("b", String(v)), el("span", label));
     stats.append(d);
   }
   box.append(stats);
   if (!model.me) nameField(box, model, handlers);
-  else box.append(el("p", `${me} is in the center. Click a group to see who's in it, or a target to see your way in.`,
-                     { class: "muted small" }));
+  else box.append(el("p", "Click a target to see your best way in. Click anyone to highlight their connections; " +
+                          "click empty space or press Esc to clear.", { class: "muted small" }));
 }
 
 function nameField(box, model, { onRename }) {
@@ -78,8 +82,64 @@ function nameField(box, model, { onRename }) {
   box.append(label);
 }
 
+function nameList(box, heading, names, onFocus) {
+  if (!names.length) return;
+  box.append(el("div", heading, { class: "list-heading" }));
+  const ul = el("ul", undefined, { class: "names" });
+  for (const n of names) {
+    const li = el("li");
+    li.append(el("button", n, { class: "linklike", type: "button", onclick: () => onFocus(personId(n)) }));
+    ul.append(li);
+  }
+  box.append(ul);
+}
+
+function pathView(box, path, onFocus) {
+  box.append(el("div", "Your best way in", { class: "list-heading" }));
+  const wrap = el("div", undefined, { class: "path" });
+  path.names.forEach((name, i) => {
+    if (i) wrap.append(el("span", "→", { class: "arrow" }));
+    wrap.append(i === 0 ? el("span", name, { class: "step me" })
+      : el("button", name, { class: "step", type: "button", onclick: () => onFocus(personId(name)) }));
+  });
+  box.append(wrap);
+  box.append(el("p", path.names.length === 2 ? `You know ${path.person} directly. Reach out!`
+    : `Ask ${path.ask} for an intro${path.names.length > 3 ? ` (the chain continues to ${path.person})` : ` to ${path.person}`}.`,
+  { class: "small" }));
+}
+
+function targetView(box, n, ctx, handlers) {
+  const t = ctx.graph.targets.find(x => x.focus === n.id);
+  const path = ctx.paths.get(t.key);
+  const head = el("div", undefined, { class: "detail-head" });
+  head.append(el("img", undefined, { class: "logo", alt: "", src: ctx.images.forOrg(n).image }));
+  const titles = el("div");
+  titles.append(el("h3", t.label), el("div", "Target company", { class: "sub" }));
+  head.append(titles);
+  box.append(head, badges(t));
+  if (t.notes) box.append(el("p", t.notes, { class: "notes" }));
+  if (path) pathView(box, path, handlers.onFocus);
+  else {
+    box.append(el("p", "No connections yet. No one on your map works here. Add a contact (even a 2nd-degree one), " +
+                       "or ask the people in your biggest groups who they know.", { class: "empty-state" }));
+  }
+  nameList(box, "People you know there", t.direct, handlers.onFocus);
+  nameList(box, "Reachable through someone", t.second, handlers.onFocus);
+  const onMap = new Set(ctx.model.people.map(p => normalizeName(p.name)));
+  const inPool = ctx.model.pool.filter(e => normalizeOrg(e.company) === t.key && !onMap.has(normalizeName(poolName(e))));
+  if (inPool.length) {
+    box.append(el("div", `In your LinkedIn pool, not on the map (${inPool.length})`, { class: "list-heading" }));
+    const ul = el("ul", undefined, { class: "names plain" });
+    for (const e of inPool) ul.append(el("li", `${poolName(e)}${e.position ? ` · ${e.position}` : ""}`));
+    box.append(ul);
+  }
+  const actions = el("div", undefined, { class: "actions-row" });
+  actions.append(el("button", "Edit target", { class: "btn", type: "button", onclick: () => handlers.onEditTarget(t.key) }));
+  box.append(actions);
+}
+
 export function renderDetails(box, ctx, handlers) {
-  const { graph, model, selected, connected } = ctx;
+  const { graph, model, selected } = ctx;
   box.replaceChildren();
   const n = selected && graph.nodes.find(x => x.id === selected);
   if (!n) return overview(box, ctx, handlers);
@@ -89,35 +149,43 @@ export function renderDetails(box, ctx, handlers) {
     nameField(box, model, handlers);
     return;
   }
-  if (n.kind === "gap") {
-    box.append(el("h3", n.label), el("div", "Target company · no connections yet", { class: "sub" }));
-    box.append(el("p", "No one on your map works here yet. Add a contact (even a 2nd-degree one), " +
-                       "or ask the people in your biggest groups who they know."));
-    return;
+  if (n.target) {
+    targetView(box, n, ctx, handlers);
+    if (n.kind !== "company") return;
   }
   if (["company", "school", "tag"].includes(n.kind)) {
     const kind = n.kind[0].toUpperCase() + n.kind.slice(1);
-    box.append(el("h3", n.label));
-    box.append(el("div", `${kind} group · ${plural(n.count, "direct connection")}${n.target ? " · Target" : ""}`,
-                  { class: "sub" }));
-    const linked = connected(n.id).map(id => graph.nodes.find(x => x.id === id)).filter(Boolean)
-      .sort((a, b) => a.label.localeCompare(b.label));
-    const list = (heading, people) => {
-      if (!people.length) return;
-      box.append(el("div", heading, { class: "sub", style: "margin:12px 0 0" }));
-      const ul = el("ul");
-      for (const p of people) ul.append(el("li", p.label, { onclick: () => handlers.onFocus(p.id) }));
-      box.append(ul);
-    };
-    list("People you know", linked.filter(x => x.kind === "person"));
-    list("Reachable through your connections", linked.filter(x => x.kind === "second"));
+    if (!n.target) {
+      const head = el("div", undefined, { class: "detail-head" });
+      head.append(el("img", undefined, { class: "logo", alt: "", src: ctx.images.forOrg(n).image }));
+      const titles = el("div");
+      titles.append(el("h3", n.label), el("div", `${kind} group · ${plural(n.count, "direct connection")}`, { class: "sub" }));
+      head.append(titles);
+      box.append(head);
+    }
+    nameList(box, n.target ? "Everyone in this group" : "People you know", graph.groups[n.id] ?? [], handlers.onFocus);
+    const introduced = graph.edges.filter(e => e.from === n.id && e.kind === "also")
+      .map(e => graph.nodes.find(x => x.id === e.to)).filter(x => x?.kind === "second").map(x => x.label);
+    nameList(box, "Reachable through your connections", introduced, handlers.onFocus);
+    if (n.kind === "company" && !n.target) {
+      const actions = el("div", undefined, { class: "actions-row" });
+      actions.append(el("button", "Make this a target", { class: "btn", type: "button",
+                                                           onclick: () => handlers.onMakeTarget(n.label) }));
+      box.append(actions);
+    }
     return;
   }
 
   // A person.
-  box.append(el("h3", n.label));
-  box.append(el("div", [n.role, n.company].filter(Boolean).join(" at ")
-                       || (n.kind === "second" ? "2nd-degree connection" : "Direct connection"), { class: "sub" }));
+  const head = el("div", undefined, { class: "detail-head" });
+  head.append(el("img", undefined, { class: "avatar", alt: "", src: ctx.images.forPerson(n).image,
+                                     onerror: e => { e.target.src = ctx.images.forPerson({ ...n, photo: "" }).image; } }));
+  const titles = el("div");
+  titles.append(el("h3", n.label));
+  titles.append(el("div", [n.role, n.company].filter(Boolean).join(" at ")
+                          || (n.kind === "second" ? "2nd-degree connection" : "Direct connection"), { class: "sub" }));
+  head.append(titles);
+  box.append(head);
   const dl = el("dl");
   const row = (label, value) => {
     if (!value) return;
@@ -129,7 +197,7 @@ export function renderDetails(box, ctx, handlers) {
   if (n.email) {
     const wrap = el("span");
     wrap.append(isEmail(n.email) ? el("a", n.email, { href: `mailto:${n.email}` }) : el("span", n.email));
-    wrap.append(" ", el("button", "Copy", { class: "btn small", type: "button", onclick: async e => {
+    wrap.append(" ", el("button", "Copy", { class: "btn tiny", type: "button", onclick: async e => {
       try { await navigator.clipboard.writeText(n.email); e.target.textContent = "Copied"; }
       catch { e.target.textContent = "Couldn't copy"; }
       setTimeout(() => { e.target.textContent = "Copy"; }, 1500);
@@ -138,18 +206,24 @@ export function renderDetails(box, ctx, handlers) {
   }
   row("Company", n.company);
   row("School", n.school);
-  row("Status", n.status);
+  if (n.status) {
+    const s = el("span");
+    s.append(el("i", undefined, { class: `dot status-${n.status.toLowerCase().replace(/\s+/g, "-")}` }), n.status);
+    row("Status", s);
+  }
   row("Connected on", n.connectedOn);
   if (n.via) {
-    row("Met via", el("button", n.via, { class: "linklike", type: "button",
-                                         onclick: () => handlers.onFocus(`p:${normalizeName(n.via)}`) }));
+    row("Met via", el("button", n.via, { class: "linklike", type: "button", onclick: () => handlers.onFocus(personId(n.via)) }));
   }
   row("Tags", (n.tags ?? []).join(", "));
   row("Notes", n.notes);
-  row("Target", n.target ? "Works at a target company" : "");
+  if (n.atTarget) row("Target", "Works at one of your target companies");
   box.append(dl);
-  if (isWebUrl(n.url)) {
-    box.append(el("p", undefined, { style: "margin:12px 0 0" }));
-    box.lastChild.append(el("a", "Open LinkedIn profile ↗", { class: "btn", href: n.url, target: "_blank", rel: "noopener" }));
+  const actions = el("div", undefined, { class: "actions-row" });
+  if (n.source !== "placeholder") {
+    actions.append(el("button", n.photo ? "Change photo" : "Add photo", { class: "btn", type: "button",
+                                                                          onclick: () => handlers.onPhoto(n) }));
   }
+  if (isWebUrl(n.url)) actions.append(el("a", "LinkedIn ↗", { class: "btn", href: n.url, target: "_blank", rel: "noopener" }));
+  if (actions.children.length) box.append(actions);
 }

@@ -22,8 +22,9 @@ export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["Schoo
 const PEOPLE_ALIASES = { "email address": "email", "url": "linkedinUrl", "linkedin": "linkedinUrl",
                          "title": "role", "position": "role" };
 export const TARGET_COLUMNS = [["Company", "company"], ["Priority", "priority"], ["Stage", "stage"], ["Notes", "notes"]];
-export const COMPANY_COLUMNS = [["Company", "company"], ["Website", "website"]];
-export const STAGES = ["Researching", "Networking", "Applied", "Interviewing", "Offer", "Closed"];
+export const COMPANY_COLUMNS = [["Company", "company"], ["Website", "website"], ["Logo", "logo"]];
+export const STAGES = ["Researching", "Networking", "Applied", "Interviewing", "Offer"];
+export const PRIORITIES = ["1", "2", "3"];
 
 export function emptyModel(me = "") {
   return { me, people: [], targets: [], companies: [], pool: [], layout: {}, notices: [] };
@@ -92,7 +93,10 @@ export function readWorkbook(bytes) {
   // ---- Companies ----
   for (const rec of findSheet(wb, SHEETS.companies)?.rows ?? []) {
     const { known, extra } = pick(rec, COMPANY_COLUMNS);
-    if (text(known.company)) model.companies.push({ company: text(known.company), website: text(known.website), extra });
+    if (text(known.company)) {
+      model.companies.push({ company: text(known.company), website: text(known.website),
+                             logo: String(known.logo ?? "").trim(), extra });
+    }
   }
 
   // ---- LinkedIn Pool ----
@@ -152,7 +156,8 @@ export function writeWorkbook(model, base) {
       [22, 24, 24, 24, 28, 36, 14, 22, 14, 14, 20, 40]),
     [SHEETS.targets]: sheetFrom(tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
       [28, 10, 14, 40]),
-    [SHEETS.companies]: sheetFrom(tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website]), [28, 30]),
+    [SHEETS.companies]: sheetFrom(tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),
+      [28, 30, 30]),
     [SHEETS.pool]: sheetFrom([POOL_COLUMNS, ...model.pool.map(e =>
       [e.firstName, e.lastName, e.url, e.email, e.company, e.position, dateCell(e.connectedOn)])],
       [14, 16, 40, 28, 28, 30, 14]),

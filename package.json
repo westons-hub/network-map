@@ -2,6 +2,7 @@
   "name": "network-map",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "description": "An interactive map of who you know, running entirely in the browser.",
   "license": "MIT",
   "scripts": {

@@ -9,15 +9,17 @@
 //   they collapse into a group bubble: you -> group -> each member.
 //   Someone who belongs to two groups gets a solid line to one and a dashed line
 //   to the other.
-// * Target companies: groups and people at a target are flagged. A target with
-//   nobody on the map becomes a hollow "gap" node linked to you.
+// * Every target company is its own node (a company group that is a target just
+//   becomes that node). Anyone you know directly there attaches to it, even below
+//   minGroupSize; 2nd-degree people there get a secondary ("also") link to it.
+//   A target with nobody on the map is a "gap" node.
 
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
 
 export const MIN_GROUP_SIZE = 3;
 
-const targetLabel = t => (typeof t === "string" ? t : t.company);
+const asTarget = t => (typeof t === "string" ? { company: t } : t);
 
 /** Pick the most common original spelling as the label for each normalized org. */
 function displayNames(people, attr) {
@@ -41,7 +43,8 @@ export function graphStats(g) {
   for (const n of g.nodes) kinds[n.kind] = (kinds[n.kind] ?? 0) + 1;
   const k = x => kinds[x] ?? 0;
   return { people: k("person") + k("second"), direct: k("person"), second_degree: k("second"),
-           groups: k("company") + k("school") + k("tag"), targets: g.targets.length, gaps: k("gap") };
+           groups: k("company") + k("school") + k("tag"), targets: g.targets.length,
+           gaps: g.targets.filter(t => !t.direct.length && !t.second.length).length };
 }
 
 export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
@@ -89,8 +92,33 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
     const label = labels[kind]?.[key] ?? members[0].tags.find(t => t.toLowerCase() === key);
     groupIds.set(k, gid);
     g.groups[gid] = members.map(m => m.name);
-    g.nodes.push({ id: gid, label, kind, count: members.length });
+    g.nodes.push({ id: gid, label, kind, key, count: members.length });
     g.edges.push({ from: "me", to: gid, kind: "group" });
+  }
+
+  // ---- target companies: always their own node ------------------------------
+  const nodesById = new Map(g.nodes.map(n => [n.id, n]));
+  const seen = new Set();
+  for (const raw of targets) {
+    const t = asTarget(raw);
+    const key = normalizeOrg(t.company);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const at = [...byKey.values()].filter(p => p.company && normalizeOrg(p.company) === key);
+    const directAt = at.filter(isDirect).map(p => p.name).sort();
+    const secondAt = at.filter(p => !isDirect(p)).map(p => p.name).sort();
+    const meta = { target: true, priority: t.priority ?? "", stage: t.stage ?? "" };
+    let id = groupIds.get(`company|${key}`);
+    if (id) Object.assign(nodesById.get(id), meta);
+    else {
+      id = `target:${key}`;
+      g.nodes.push({ id, label: t.company, kind: "target", key, count: directAt.length, gap: !at.length, ...meta });
+      g.edges.push({ from: "me", to: id, kind: directAt.length ? "group" : "gap" });
+      groupIds.set(`company|${key}`, id); // people there attach to the target like a group
+      g.groups[id] = directAt;
+    }
+    g.targets.push({ label: t.company, key, focus: id, direct: directAt, second: secondAt,
+                     priority: t.priority ?? "", stage: t.stage ?? "", notes: t.notes ?? "" });
   }
 
   const memberships = p => {
@@ -106,10 +134,12 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
     return out;
   };
 
+  const targetKeys = new Set(g.targets.map(t => t.key));
   const personNode = (p, kind) => ({
     id: `p:${personKey(p)}`, label: p.name, kind, company: p.company, school: p.school, role: p.role,
     email: p.email, status: p.status, tags: p.tags, notes: p.notes, url: p.linkedinUrl, photo: p.photo,
     connectedOn: p.connectedOn, via: p.connectedThrough, source: p.source,
+    atTarget: targetKeys.has(normalizeOrg(p.company)),
   });
 
   // ---- direct connections ------------------------------------------------
@@ -129,34 +159,6 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
     g.nodes.push(personNode(p, "second"));
     g.edges.push({ from: `p:${normalizeName(p.connectedThrough)}`, to: `p:${personKey(p)}`, kind: "intro" });
     for (const gid of memberships(p)) g.edges.push({ from: gid, to: `p:${personKey(p)}`, kind: "also" });
-  }
-
-  // ---- target companies ---------------------------------------------------
-  const nodesById = new Map(g.nodes.map(n => [n.id, n]));
-  const seen = new Set();
-  for (const t of targets) {
-    const label = targetLabel(t);
-    const key = normalizeOrg(label);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    const at = [...byKey.values()].filter(p => p.company && normalizeOrg(p.company) === key);
-    const directAt = at.filter(isDirect).map(p => p.name).sort();
-    const secondAt = at.filter(p => !isDirect(p)).map(p => p.name).sort();
-    for (const p of at) nodesById.get(`p:${personKey(p)}`).target = true;
-    let focus;
-    const gid = groupIds.get(`company|${key}`);
-    if (gid) {
-      nodesById.get(gid).target = true;
-      focus = gid;
-    } else if (at.length) {
-      const first = [...at].sort((a, b) => (isDirect(b) - isDirect(a)) || byName(a, b))[0];
-      focus = `p:${personKey(first)}`;
-    } else {
-      focus = `target:${key}`;
-      g.nodes.push({ id: focus, label, kind: "gap", target: true });
-      g.edges.push({ from: "me", to: focus, kind: "gap" });
-    }
-    g.targets.push({ label, focus, direct: directAt, second: secondAt });
   }
 
   g.stats = graphStats(g);

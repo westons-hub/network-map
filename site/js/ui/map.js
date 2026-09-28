@@ -1,46 +1,33 @@
 // The map: vis-network (loaded as a global by index.html) on a graph-paper background.
+//
+// Readability rules:
+// * Three edge styles only: solid dark gray = you know them (direct / group membership),
+//   dashed gray = through someone, red = the highlighted best path to a target.
+// * People show their picture with a status-colored ring. Only target companies get a red ring.
+// * Clicking fades everything except the node and its neighbors (hover = lighter preview).
+// * Two layouts: "free" (physics, groups spread apart) and "ring" (computed, see core/layout.js).
+
+import { ringLayout } from "../core/layout.js";
+import { edgeId, neighborhood } from "../core/paths.js";
 
 const vis = globalThis.vis;
-
 const css = getComputedStyle(document.documentElement);
 const c = name => css.getPropertyValue(`--${name}`).trim();
 
-const GROUP_KINDS = ["company", "school", "tag"];
+const GROUP_KINDS = ["company", "school", "tag", "target"];
 const STATUS_VAR = { "met": "met", "contacted": "contacted", "to reach out": "reach", "follow up": "follow",
                      "referral": "referral" };
 export const statusColor = status => { const v = STATUS_VAR[String(status ?? "").trim().toLowerCase()]; return v && c(v); };
 
-const EDGE = () => ({
-  group:  { width: 2.5, color: c("edge") },
-  member: { width: 1.2, color: c("edge") },
-  direct: { width: 1.2, color: c("edge") },
-  intro:  { width: 1, color: c("edge"), dashes: [2, 4] },
-  also:   { width: 1, color: c("edge"), dashes: [6, 6] },
-  gap:    { width: 1.5, color: c("target"), dashes: [4, 6] },
-});
+const FADE = 0.15;          // opacity of everything outside a clicked node's neighborhood
+const PREVIEW_FADE = 0.45;  // ...and while just hovering
+const LABEL_MIN_SCALE = 0.55; // hide person names when zoomed out further than this
+const ZOOM = { min: 0.12, max: 2.5, wheel: 0.0011, pinch: 0.009, ease: 0.16 };
 
-/** vis-network node options for one graph node. */
-function styleNode(n, { statusColors }) {
-  const font = { color: c("text"), size: 13, face: "system-ui, -apple-system, Segoe UI, sans-serif" };
-  const base = { id: n.id, label: n.label, kind: n.kind, borderWidth: 2, font };
-  if (n.kind === "me") {
-    return { ...base, shape: "dot", size: 30, color: c("me"), font: { ...font, size: 17, bold: true } };
-  }
-  if (GROUP_KINDS.includes(n.kind)) {
-    return { ...base, shape: "dot", size: 16 + Math.min(n.count, 20) * 1.6, label: `${n.label} (${n.count})`,
-             color: { background: c(n.kind), border: n.target ? c("target") : c(n.kind) },
-             borderWidth: n.target ? 5 : 2, font: { ...font, size: 15, bold: true } };
-  }
-  if (n.kind === "gap") {
-    return { ...base, shape: "dot", size: 18, borderWidth: 3, shapeProperties: { borderDashes: [5, 4] },
-             color: { background: c("paper"), border: c("target") },
-             font: { ...font, color: c("target"), size: 14, bold: true }, title: "Target company: no connections yet" };
-  }
-  const second = n.kind === "second";
-  const fill = (statusColors && statusColor(n.status)) || (second ? c("second") : c("person"));
-  return { ...base, shape: "dot", size: second ? 8 : 11, borderWidth: n.target ? 4 : 2,
-           color: { background: fill, border: n.target ? c("target") : second ? c("muted") : c("company") } };
-}
+const rgba = (hex, a) => {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : hex;
+};
 
 /** Graph paper: thin lines every 20 units, darker every 100, in map coordinates (pans/zooms with the map). */
 function drawGrid(network, ctx) {
@@ -64,27 +51,198 @@ function drawGrid(network, ctx) {
   ctx.restore();
 }
 
-export function createMap(container, { onSelect, onDeselect }) {
+export function createMap(container, { images, onSelect, onDeselect, pathFor }) {
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
-  let options = { statusColors: true, showSecond: true };
   let graph = { nodes: [], edges: [] };
+  let options = { showSecond: true, layout: "free" };
+  let selected = null;   // clicked node id
+  let hovered = null;    // hovered node id (preview only when nothing is selected)
+  let smallLabels = false;
 
   const network = new vis.Network(container, { nodes, edges }, {
-    physics: { solver: "forceAtlas2Based", forceAtlas2Based: { gravitationalConstant: -60, springLength: 90 },
-               stabilization: { iterations: 400 } },
-    interaction: { hover: true, tooltipDelay: 150, navigationButtons: false, keyboard: false },
-    edges: { smooth: { type: "continuous" } },
+    physics: {
+      solver: "barnesHut",
+      barnesHut: { gravitationalConstant: -9000, centralGravity: 0.12, springConstant: 0.045, damping: 0.35,
+                   avoidOverlap: 0.6 },
+      stabilization: { iterations: 500, fit: true },
+      minVelocity: 0.9,
+    },
+    interaction: { hover: true, tooltipDelay: 200, keyboard: false, zoomView: false, selectConnectedEdges: false,
+                   hoverConnectedEdges: false },
+    edges: { smooth: { type: "continuous", roundness: 0.35 } },
+    nodes: { shapeProperties: { interpolation: true } },
   });
+
+  // ---- look ------------------------------------------------------------------
+
+  function focusSet() {
+    const id = selected ?? hovered;
+    if (!id || !nodes.get(id)) return null;
+    const hood = neighborhood(graph, id);
+    const path = pathFor(id);
+    if (path) { path.nodes.forEach(n => hood.nodes.add(n)); path.edges.forEach(e => hood.edges.add(e)); }
+    return { ...hood, path: new Set(path?.edges ?? []), fade: selected ? FADE : PREVIEW_FADE };
+  }
+
+  function nodeStyle(n, focus) {
+    const faded = focus && !focus.nodes.has(n.id);
+    const alpha = faded ? focus.fade : 1;
+    const person = n.kind === "person" || n.kind === "second";
+    const showLabel = !(person && smallLabels) || (focus && !faded);
+    const font = { color: rgba(c("text"), showLabel ? alpha : 0), size: person ? 14 : 16, bold: !person,
+                   face: "system-ui, -apple-system, Segoe UI, sans-serif",
+                   strokeWidth: showLabel ? 4 : 0, strokeColor: rgba("#ffffff", alpha * 0.95) };
+    const base = { id: n.id, label: n.label, opacity: alpha, font, hidden: n.kind === "second" && !options.showSecond };
+
+    if (n.kind === "me") {
+      return { ...base, shape: "dot", size: 26, color: { background: c("me"), border: c("me") }, borderWidth: 3,
+               font: { ...font, size: 18 }, mass: 6 };
+    }
+    if (GROUP_KINDS.includes(n.kind)) {
+      const target = n.target;
+      const ring = target ? c("target") : c(n.kind === "target" ? "company" : n.kind);
+      const count = n.count ?? 0;
+      const label = n.kind === "target" && n.gap ? `${n.label}\n(no one yet)` : count ? `${n.label} (${count})` : n.label;
+      return { ...base, ...images.forOrg(n), shape: "circularImage", label,
+               size: (target ? 26 : 20) + Math.min(count, 20) * 1.3,
+               borderWidth: target ? 5 : 3, borderWidthSelected: target ? 6 : 4,
+               color: { border: ring, background: "#ffffff", highlight: { border: ring, background: "#ffffff" },
+                        hover: { border: ring, background: "#ffffff" } },
+               shapeProperties: { useBorderWithImage: true, interpolation: true, borderDashes: n.gap ? [6, 5] : false },
+               font: { ...font, size: 16, color: n.gap ? rgba(c("target"), alpha) : font.color },
+               mass: 2 + Math.min(count, 12) * 0.35 };
+    }
+    // A person: picture, with a ring in their status color.
+    const ring = statusColor(n.status) || c("no-status");
+    return { ...base, ...images.forPerson(n), shape: "circularImage", size: n.kind === "second" ? 14 : 18,
+             borderWidth: 4, borderWidthSelected: 5,
+             color: { border: ring, background: "#ffffff", highlight: { border: ring, background: "#ffffff" },
+                      hover: { border: ring, background: "#ffffff" } },
+             shapeProperties: { useBorderWithImage: true, interpolation: true }, mass: 1 };
+  }
+
+  const byId = () => new Map(graph.nodes.map(n => [n.id, n]));
+
+  function edgeStyle(e, focus, nodeIndex) {
+    const to = nodeIndex.get(e.to), from = nodeIndex.get(e.from);
+    const viaSomeone = e.kind === "intro" || e.kind === "gap" || (e.kind === "also" && to?.kind === "second");
+    const toTarget = from?.target || from?.kind === "target";
+    // Secondary memberships stay hidden (fewer crossings) unless highlighted or pointing at a target.
+    const alsoHidden = e.kind === "also" && !toTarget && !(focus && focus.edges.has(edgeId(e)));
+    const onPath = focus?.path.has(edgeId(e));
+    const faded = focus && !focus.edges.has(edgeId(e));
+    const alpha = faded ? focus.fade * 0.8 : 1;
+    const color = onPath ? c("target") : viaSomeone ? c("edge-dashed") : c("edge");
+    const length = { group: 210 + Math.min(to?.count ?? 0, 12) * 10, gap: to?.gap ? 400 : 260, member: 85,
+                     direct: 190, intro: 85 }[e.kind];
+    return {
+      id: edgeId(e), from: e.from, to: e.to, kind: e.kind, hidden: alsoHidden,
+      width: onPath ? 4.5 : e.kind === "group" ? 2.2 : viaSomeone ? 1.5 : 1.7,
+      dashes: onPath ? false : viaSomeone ? [6, 6] : false,
+      color: { color, highlight: color, hover: color, opacity: alpha },
+      physics: e.kind !== "also" || !!toTarget, length: e.kind === "also" ? 90 : length,
+    };
+  }
+
+  function restyle() {
+    const focus = focusSet();
+    const index = byId();
+    nodes.update(graph.nodes.map(n => nodeStyle(n, focus)));
+    edges.update(graph.edges.map(e => edgeStyle(e, focus, index)));
+  }
+
+  // ---- layouts -----------------------------------------------------------------
+
+  let animation;
+  function animateTo(targets, ms = 750) {
+    cancelAnimationFrame(animation);
+    const start = network.getPositions();
+    const ids = Object.keys(targets).filter(id => nodes.get(id));
+    const t0 = performance.now();
+    const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+    const step = now => {
+      const t = Math.min(1, (now - t0) / ms);
+      const k = ease(t);
+      nodes.update(ids.map(id => {
+        const a = start[id] ?? targets[id], b = targets[id];
+        return { id, x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+      }));
+      if (t < 1) animation = requestAnimationFrame(step);
+      else network.fit({ animation: { duration: 500, easingFunction: "easeInOutQuad" } });
+    };
+    animation = requestAnimationFrame(step);
+  }
+
+  function applyLayout(animate = true) {
+    if (options.layout === "ring") {
+      network.setOptions({ physics: { enabled: false } });
+      const target = ringLayout(graph);
+      if (animate) animateTo(target);
+      else { nodes.update(Object.entries(target).map(([id, p]) => ({ id, ...p }))); network.fit(); }
+    } else {
+      cancelAnimationFrame(animation);
+      network.setOptions({ physics: { enabled: true } });
+      network.once("stabilized", () => network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }));
+      network.startSimulation();
+    }
+  }
+
+  // ---- smooth zoom -----------------------------------------------------------------
+  // vis-network's own wheel zoom jumps in steps; this eases toward the target scale and
+  // keeps the point under the cursor still.
+
+  let zoomTarget = null, zoomAnchor = null, zoomFrame = 0;
+  function zoomStep() {
+    const scale = network.getScale();
+    const next = scale + (zoomTarget - scale) * ZOOM.ease;
+    const { x: ax, y: ay } = zoomAnchor;
+    const under = network.DOMtoCanvas(zoomAnchor);
+    const { width, height } = container.getBoundingClientRect();
+    network.moveTo({ scale: next, position: { x: under.x - (ax - width / 2) / next, y: under.y - (ay - height / 2) / next },
+                     animation: false });
+    checkLabels();
+    if (Math.abs(zoomTarget - next) / zoomTarget > 0.002) zoomFrame = requestAnimationFrame(zoomStep);
+    else zoomFrame = 0;
+  }
+  container.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * rect.height : e.deltaY;
+    const factor = Math.exp(-dy * (e.ctrlKey ? ZOOM.pinch : ZOOM.wheel)); // ctrlKey = trackpad pinch
+    zoomTarget = Math.min(ZOOM.max, Math.max(ZOOM.min, (zoomFrame ? zoomTarget : network.getScale()) * factor));
+    zoomAnchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (!zoomFrame) zoomFrame = requestAnimationFrame(zoomStep);
+  }, { passive: false });
+
+  function checkLabels() {
+    const small = network.getScale() < LABEL_MIN_SCALE;
+    if (small !== smallLabels) { smallLabels = small; restyle(); }
+  }
+  network.on("zoom", checkLabels);
+  network.on("animationFinished", checkLabels);
+
+  // ---- events --------------------------------------------------------------------
+
   network.on("beforeDrawing", ctx => drawGrid(network, ctx));
-  network.on("click", p => (p.nodes.length ? onSelect(p.nodes[0]) : onDeselect()));
+  network.on("click", p => {
+    if (p.nodes.length) { selected = p.nodes[0]; restyle(); onSelect(selected); }
+    else if (!p.edges.length) { clear(); onDeselect(); }
+  });
   network.on("doubleClick", p => {
     const n = p.nodes.length && graph.nodes.find(x => x.id === p.nodes[0]);
     if (n?.url && /^https?:\/\//.test(n.url)) window.open(n.url, "_blank", "noopener");
   });
+  network.on("hoverNode", p => { if (!selected) { hovered = p.node; restyle(); } });
+  network.on("blurNode", () => { if (hovered) { hovered = null; restyle(); } });
+  network.on("dragStart", p => { if (p.nodes.length) container.classList.add("dragging"); });
+  network.on("dragEnd", () => container.classList.remove("dragging"));
 
-  function restyle() {
-    nodes.update(graph.nodes.map(n => ({ ...styleNode(n, options), hidden: n.kind === "second" && !options.showSecond })));
+  function clear() {
+    selected = null;
+    hovered = null;
+    network.unselectAll();
+    restyle();
   }
 
   return {
@@ -92,35 +250,45 @@ export function createMap(container, { onSelect, onDeselect }) {
     /** Show a new graph, keeping positions of nodes that are still there. */
     render(next, layout = {}) {
       const first = nodes.length === 0;
+      const previous = network.getPositions();
       graph = next;
-      const keep = new Set(next.nodes.map(n => n.id));
-      nodes.remove(nodes.getIds().filter(id => !keep.has(id)));
-      const placed = network.getPositions();
-      nodes.update(next.nodes.map(n => {
-        const s = { ...styleNode(n, options), hidden: n.kind === "second" && !options.showSecond };
-        const pos = placed[n.id] ?? layout[n.id];
-        if (n.kind === "me") Object.assign(s, { x: 0, y: 0, fixed: true });
-        else if (pos && !nodes.get(n.id)) Object.assign(s, pos);
-        return s;
+      if (selected && !next.nodes.some(n => n.id === selected)) selected = null;
+      const keepNodes = new Set(next.nodes.map(n => n.id));
+      nodes.remove(nodes.getIds().filter(id => !keepNodes.has(id)));
+      const keepEdges = new Set(next.edges.map(edgeId));
+      edges.remove(edges.getIds().filter(id => !keepEdges.has(id)));
+      // New nodes start next to their parent so they grow out of the map instead of flying in.
+      const parentOf = Object.fromEntries(next.edges.filter(e => e.kind !== "also").map(e => [e.to, e.from]));
+      nodes.add(next.nodes.filter(n => !nodes.get(n.id)).map(n => {
+        const at = n.kind === "me" ? { x: 0, y: 0 } : layout[n.id] ?? previous[parentOf[n.id]];
+        const jitter = () => (Math.random() - 0.5) * 40;
+        return { id: n.id, ...(at ? { x: at.x + (n.kind === "me" ? 0 : jitter()), y: at.y + (n.kind === "me" ? 0 : jitter()) } : {}),
+                 ...(n.kind === "me" ? { fixed: true } : {}) };
       }));
-      const edgeKey = e => `${e.from}>${e.to}>${e.kind}`;
-      const style = EDGE();
-      edges.clear();
-      edges.add(next.edges.map(e => ({ id: edgeKey(e), ...e, ...style[e.kind] })));
-      if (first) network.once("stabilizationIterationsDone", () => network.fit({ animation: false }));
-    },
-    set(opts) {
-      options = { ...options, ...opts };
       restyle();
+      if (first) {
+        if (options.layout === "ring") applyLayout(false);
+        else {
+          network.once("stabilizationIterationsDone", () => network.fit({ animation: false }));
+          network.once("stabilized", () => network.fit({ animation: { duration: 500, easingFunction: "easeInOutQuad" } }));
+        }
+      } else if (options.layout === "ring") applyLayout(true);
     },
-    setPhysics(on) { network.setOptions({ physics: { enabled: on } }); },
-    focus(id) {
+    set(opts) { options = { ...options, ...opts }; restyle(); },
+    setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); },
+    /** Refresh pictures after logos/avatars finish loading. */
+    refresh: restyle,
+    select(id) {
       if (!nodes.get(id)) return;
+      selected = id;
       network.selectNodes([id]);
-      network.focus(id, { scale: 1.2, animation: { duration: 500, easingFunction: "easeInOutQuad" } });
+      restyle();
+      const path = pathFor(id);
+      if (path?.nodes.length > 1) {
+        network.fit({ nodes: path.nodes, animation: { duration: 700, easingFunction: "easeInOutQuad" } });
+      } else network.focus(id, { scale: 1.1, animation: { duration: 700, easingFunction: "easeInOutQuad" } });
     },
-    fit() { network.fit({ animation: { duration: 400 } }); },
-    unselect() { network.unselectAll(); },
-    connected(id) { return network.getConnectedNodes(id); },
+    clear,
+    fit() { network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }); },
   };
 }
