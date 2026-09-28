@@ -1,0 +1,19 @@
+# Keep your real contacts OFF GitHub. Only the fictional examples/ are committed.
+*.xlsx
+*.csv
+!template/contacts_template.xlsx
+!examples/*.xlsx
+!examples/*.csv
+data/
+my_*/
+network_map.html
+*.html
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.vscode/
+!docs/demo.html
