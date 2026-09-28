@@ -1,0 +1,186 @@
+// Names, people, LinkedIn parsing, graph building and intro paths.
+// Run: node --test tests/
+
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { buildGraph } from "../site/js/core/graph.js";
+import { introReport, whoCanIntro } from "../site/js/core/intro.js";
+import { normalizeOrg } from "../site/js/core/org.js";
+import { makePerson, mergePeople, parseCsv, parseDate, parseLinkedInCsv, parseList } from "../site/js/core/people.js";
+import { readWorkbook } from "../site/js/core/workbook.js";
+
+const P = (name, fields = {}) => makePerson({ name, ...fields });
+const ids = (g, kind) => new Set(g.nodes.filter(n => n.kind === kind).map(n => n.id));
+const edges = g => new Set(g.edges.map(e => `${e.from}>${e.to}>${e.kind}`));
+const DEMO = new URL("../site/demo/", import.meta.url);
+const demo = () => readWorkbook(readFileSync(new URL("demo_network.xlsx", DEMO)));
+
+// ---- names -------------------------------------------------------------------
+
+test("normalizeOrg handles suffixes, punctuation and aliases", () => {
+  assert.equal(normalizeOrg("Delta Air Lines, Inc."), "delta air lines");
+  assert.equal(normalizeOrg("BYU"), normalizeOrg("Brigham Young University"));
+  assert.equal(normalizeOrg("Ernst & Young"), normalizeOrg("EY"));
+  assert.equal(normalizeOrg("Société Générale"), "société générale");
+});
+
+test("parseList splits on commas, semicolons and newlines", () => {
+  assert.deepEqual(parseList("Delta, Bain;\nGoogle,,"), ["Delta", "Bain", "Google"]);
+});
+
+// ---- LinkedIn export -----------------------------------------------------------
+
+test("LinkedIn export skips the Notes header and keeps every column", () => {
+  const pool = parseLinkedInCsv(readFileSync(new URL("sample_linkedin_connections.csv", DEMO), "utf8"));
+  assert.equal(pool.length, 7);
+  assert.deepEqual(pool[0], { firstName: "Jordan", lastName: "Lee", url: "https://example.com/in/jordan-lee",
+    email: "", company: "Northwind Consulting", position: "Senior Consultant", connectedOn: "2026-03-12" });
+});
+
+test("LinkedIn export with quotes, commas, CRLF and a BOM", () => {
+  const csv = '﻿Notes:\r\n"a, b"\r\n\r\nFirst Name,Last Name,URL,Email Address,Company,Position,Connected On\r\n' +
+              'Ana,"O\'Neil, Jr.",u,ana@x.com,"Acme, Inc.","VP ""Ops""",01 Feb 2025\r\n';
+  const [e] = parseLinkedInCsv(csv);
+  assert.equal(e.lastName, "O'Neil, Jr.");
+  assert.equal(e.company, "Acme, Inc.");
+  assert.equal(e.position, 'VP "Ops"');
+  assert.equal(e.email, "ana@x.com");
+  assert.equal(e.connectedOn, "2025-02-01");
+});
+
+test("a file that isn't a LinkedIn export names the file in the error", () => {
+  assert.throws(() => parseLinkedInCsv("hello\n", "oops.csv"), /oops\.csv/);
+});
+
+test("parseCsv handles newlines inside quotes", () => {
+  assert.deepEqual(parseCsv('a,"x\ny"\n1,2'), [["a", "x\ny"], ["1", "2"]]);
+});
+
+test("parseDate understands common formats and keeps anything else", () => {
+  assert.equal(parseDate("12 Mar 2026"), "2026-03-12");
+  assert.equal(parseDate("Mar 12, 2026"), "2026-03-12");
+  assert.equal(parseDate("2026-3-12"), "2026-03-12");
+  assert.equal(parseDate("3/12/2026"), "2026-03-12");
+  assert.equal(parseDate(new Date(2026, 2, 12)), "2026-03-12");
+  assert.equal(parseDate("sometime in spring"), "sometime in spring");
+  assert.equal(parseDate(""), "");
+});
+
+// ---- merging -------------------------------------------------------------------
+
+test("your edits override LinkedIn on merge; LinkedIn fills gaps", () => {
+  const merged = mergePeople(
+    [P("Jordan Lee", { company: "Old Co", linkedinUrl: "https://x", email: "j@x.com", source: "linkedin" })],
+    [P("jordan  lee", { company: "New Co", school: "State U", source: "excel" })],
+  );
+  assert.equal(merged.length, 1);
+  const p = merged[0];
+  assert.deepEqual([p.company, p.school, p.linkedinUrl, p.email, p.source],
+                   ["New Co", "State U", "https://x", "j@x.com", "linkedin+excel"]);
+});
+
+// ---- graph ---------------------------------------------------------------------
+
+test("three people form a group, two do not", () => {
+  const g = buildGraph([P("A", { company: "Acme" }), P("B", { company: "Acme" }), P("C", { company: "ACME Inc." }),
+                        P("D", { company: "Solo Co" }), P("E", { company: "Solo Co" })]);
+  assert.deepEqual(ids(g, "company"), new Set(["company:acme"]));
+  assert.ok(edges(g).has("company:acme>p:a>member"));
+  assert.ok(edges(g).has("me>p:d>direct"));
+});
+
+test("min group size is configurable", () => {
+  const g = buildGraph([P("A", { company: "Acme" }), P("B", { company: "Acme" })], { minGroupSize: 2 });
+  assert.deepEqual(ids(g, "company"), new Set(["company:acme"]));
+});
+
+test("someone in two groups gets one solid and one dashed link", () => {
+  const g = buildGraph(["A", "B", "C"].map(n => P(n, { company: "Acme", school: "State U" })));
+  assert.deepEqual(new Set(g.edges.filter(e => e.to === "p:a").map(e => e.kind)), new Set(["member", "also"]));
+});
+
+test("2nd-degree hangs off the connector, and unknown connectors get a placeholder", () => {
+  const g = buildGraph([P("Jordan"), P("Rachel", { connectedThrough: "Jordan" }),
+                        P("Zed", { connectedThrough: "Unknown Person" })]);
+  assert.ok(edges(g).has("p:jordan>p:rachel>intro"));
+  assert.ok(ids(g, "person").has("p:unknown person"));
+  assert.deepEqual(ids(g, "second"), new Set(["p:rachel", "p:zed"]));
+});
+
+test("you aren't duplicated, and 'Connected Through: me' counts as direct", () => {
+  const g = buildGraph([P("Me"), P("A", { connectedThrough: "me" })], { me: "Me" });
+  assert.equal(g.nodes.filter(n => n.id === "me").length, 1);
+  assert.ok(ids(g, "person").has("p:a"));
+});
+
+test("group by tags", () => {
+  const g = buildGraph(["A", "B", "C"].map(n => P(n, { tags: "Gaming" })), { groupBy: ["tags"] });
+  assert.deepEqual([...ids(g, "tag")], ["tag:gaming"]);
+  assert.equal(g.nodes.find(n => n.id === "tag:gaming").label, "Gaming");
+});
+
+test("demo workbook builds: only the people you added are on the map", () => {
+  const m = demo();
+  assert.equal(m.me, "Alex Rivera");
+  const g = buildGraph(m.people, { me: m.me, targets: m.targets });
+  assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 4, targets: 6, gaps: 2 });
+  assert.equal(m.pool.length, 7); // LinkedIn connections stay in the pool, off the map
+});
+
+// ---- targets -------------------------------------------------------------------
+
+test("a target with no connections becomes a gap node", () => {
+  const g = buildGraph([P("A", { company: "Acme" })], { targets: ["Nowhere Inc."] });
+  const gap = g.nodes.find(n => n.kind === "gap");
+  assert.equal(gap.label, "Nowhere Inc.");
+  assert.equal(gap.id, "target:nowhere");
+  assert.ok(edges(g).has("me>target:nowhere>gap"));
+  assert.equal(g.stats.gaps, 1);
+});
+
+test("target groups and people are flagged, aliases match, duplicates ignored", () => {
+  const people = ["A", "B", "C"].map(n => P(n, { company: "Ernst & Young" }))
+    .concat(P("D", { company: "EY", connectedThrough: "A" }));
+  const g = buildGraph(people, { targets: ["EY", { company: "ey", priority: "1" }] });
+  const byId = Object.fromEntries(g.nodes.map(n => [n.id, n]));
+  assert.equal(byId["company:ernst young"].target, true);
+  assert.equal(byId["p:d"].target, true);
+  assert.deepEqual(g.targets, [{ label: "EY", focus: "company:ernst young", direct: ["A", "B", "C"], second: ["D"] }]);
+});
+
+test("a target without a group focuses a person", () => {
+  const g = buildGraph([P("Solo", { company: "Tiny Co" })], { targets: ["Tiny Co"] });
+  assert.equal(g.targets[0].focus, "p:solo");
+});
+
+// ---- intro paths ---------------------------------------------------------------
+
+test("whoCanIntro walks the chain and sorts shortest first", () => {
+  const m = demo();
+  const paths = whoCanIntro(m.people, "Pinecrest Labs", m.me);
+  assert.deepEqual(paths.map(p => [p.person.name, p.chain]), [
+    ["Zoe Adams", ["Liam Walsh", "Zoe Adams"]],
+    ["Sam Rivera", ["Liam Walsh", "Zoe Adams", "Sam Rivera"]],
+  ]);
+  assert.equal(paths[0].ask, "Liam Walsh");
+});
+
+test("whoCanIntro matches names by whole word", () => {
+  const people = [P("Casey Stone"), P("Pat Ey", { company: "Other" })];
+  assert.deepEqual(whoCanIntro(people, "Casey").map(p => p.person.name), ["Casey Stone"]);
+  assert.deepEqual(whoCanIntro(people, "ey").map(p => p.person.name), ["Pat Ey"]);
+});
+
+test("whoCanIntro survives cycles", () => {
+  const people = [P("A", { company: "X", connectedThrough: "B" }), P("B", { connectedThrough: "A" })];
+  assert.deepEqual(whoCanIntro(people, "X")[0].chain, ["B", "A"]);
+});
+
+test("intro report lists who to ask and the gaps", () => {
+  const m = demo();
+  const text = introReport(m.people, ["Summit Airlines", "Harborview Media"], m.me);
+  assert.match(text, /ask \*\*Noah Carter\*\* \(your status with them: Met\)/);
+  assert.match(text, /Noah Carter, Commercial Strategy Analyst at Summit Airlines\*\* \[Met\]: you know them directly\./);
+  assert.match(text, /Targets with no one on your map: Harborview Media/);
+});

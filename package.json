@@ -1,0 +1,13 @@
+{
+  "name": "network-map",
+  "version": "2.0.0",
+  "private": true,
+  "description": "An interactive map of who you know, running entirely in the browser.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\"",
+    "start": "python3 -m http.server 8000 --bind 127.0.0.1 -d site",
+    "demo-data": "node scripts/make_demo.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

@@ -1,14 +1,29 @@
-# Keep your real contacts OFF GitHub. Only the fictional examples/ are committed.
+# Keep your real contacts OFF GitHub. Only the fictional demo, the blank template
+# and test fixtures are committed; everything else below stays on your machine.
 *.xlsx
+*.xls
 *.csv
-!template/contacts_template.xlsx
-!examples/*.xlsx
-!examples/*.csv
+*.html
+!site/index.html
+!site/demo/demo_network.xlsx
+!site/demo/sample_linkedin_connections.csv
+!site/template/contacts_template.xlsx
+!tests/fixtures/*.xlsx
+
+# LinkedIn exports, offline map exports and intro reports name real people
+Connections*.csv
+Basic_LinkedInDataExport*/
+*_report.md
+intro_report*.md
 data/
 my_*/
-network_map.html
-*.html
+backups/
+logos/
+photos/
+layout.json
 
+# Tooling
+node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -16,8 +31,3 @@ __pycache__/
 venv/
 .DS_Store
 .vscode/
-!docs/demo.html
-
-# Intro reports name real people too
-intro_report*.md
-*_report.md
