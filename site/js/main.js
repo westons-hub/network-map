@@ -1,4 +1,4 @@
-// Network Map: app wiring. The demo loads by default; "Use my own data" opens a
+// Orbit: app wiring. The demo loads by default; "Use my own data" opens a
 // workbook or a LinkedIn CSV. Everything happens in this browser tab.
 
 import { buildGraph } from "./core/graph.js";
@@ -23,6 +23,7 @@ import { el, renderOverview, renderTargets } from "./ui/panels.js";
 import { createTodo } from "./ui/todo.js";
 import { buildSuggestions } from "./core/suggest.js";
 import { setSuggestionSource } from "./ui/typeahead.js";
+import { introSeen, playIntro } from "./ui/intro.js";
 import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
 import { isPdf } from "./ui/pdf.js";
@@ -317,8 +318,8 @@ function renderChrome() {
   const { model } = state.doc;
   $("illustrated").checked = model.avatarStyle === "notionists";
   const first = model.me ? model.me.split(" ")[0] : "";
-  $("title").textContent = first ? `${first}'s Network` : "Network Map";
-  document.title = first ? `${first}'s Network · Network Map` : "Network Map";
+  $("title").textContent = first ? `${first}'s orbit` : "Your orbit";
+  document.title = first ? `${first}'s orbit · Orbit` : "Orbit";
 
   const save = $("save");
   save.hidden = state.mode !== "file";
@@ -483,7 +484,7 @@ function toggleTask(task) {
 
 async function openSettings() {
   const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo", calendar: calendars,
-                                     onProfile: () => focus("me") });
+                                     onProfile: () => focus("me"), onReplayIntro: () => playIntro() });
   if (!result) return;
   const ops = [{ type: "setSettings", settings: result.settings }];
   if (result.me !== state.doc.model.me) ops.push({ type: "setMe", name: result.me });
@@ -761,6 +762,13 @@ window.addEventListener("beforeunload", e => {
 });
 
 // ---- start ---------------------------------------------------------------------
+
+// Welcome intro on the first visit (the app keeps loading behind it). ?intro=2.6 freezes it at 2.6 s.
+{
+  const freeze = new URLSearchParams(location.search).get("intro");
+  if (freeze !== null) playIntro({ freezeAt: Number(freeze) || 0 });
+  else if (!introSeen()) playIntro();
+}
 
 (async () => {
   const layout = pref(PREFS.layout, "free") === "ring" ? "ring" : "free";

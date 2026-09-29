@@ -91,7 +91,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
     const person = n.kind === "person" || n.kind === "second";
     const showLabel = !(person && smallLabels) || (focus && !faded);
     const font = { color: rgba(c("text"), showLabel ? alpha : 0), size: person ? 14 : 16, bold: !person,
-                   face: "system-ui, -apple-system, Segoe UI, sans-serif",
+                   face: "DM Sans, system-ui, -apple-system, Segoe UI, sans-serif",
                    strokeWidth: showLabel ? 4 : 0, strokeColor: rgba("#ffffff", alpha * 0.95) };
     const base = { id: n.id, label: n.label, opacity: alpha, font, hidden: n.kind === "second" && !options.showSecond };
 

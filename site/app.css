@@ -1,19 +1,31 @@
+/* Orbit brand: DM Sans (self-hosted, SIL Open Font License; see vendor/fonts/OFL.txt) */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap;
+  src: url("vendor/fonts/dm-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap;
+  src: url("vendor/fonts/dm-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
 :root {
+  /* Orbit brand tokens (brand/brand.css) */
+  --orbit-navy: #1E3A5F; --orbit-orange: #F97316; --orbit-rose: #F43F5E; --orbit-slate: #5B6B80;
+  --orbit-bg-dark: #131A26; --orbit-gradient: linear-gradient(180deg, #F43F5E, #F97316);
+  --font: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Map: light graph paper; edges are always darker than the grid. */
   --paper: #fcfdff; --grid-minor: rgba(80, 125, 190, 0.055); --grid-major: rgba(80, 125, 190, 0.13);
   --edge: #4b5563; --edge-dashed: #8b95a5; --link: #7a5af8;
-  --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e4e7ec;
-  --me: #1f3a5f; --company: #2e6fd8; --school: #1f9d6b; --tag: #8b5cf6; --target: #d92d20;
+  --bg: #F5F6F8; --panel: #ffffff; --text: #1d2330; --muted: #5B6B80; --line: #e4e7ec;
+  --me: #1E3A5F; --company: #2e6fd8; --school: #1f9d6b; --tag: #8b5cf6; --target: #F43F5E;
   --met: #16a34a; --contacted: #0ba5ec; --scheduled: #0e9384; --reach: #f79009; --follow: #ee46bc; --referral: #7a5af8;
   --no-status: #c3c9d4; --meeting: #2e6fd8; --task: #b54708; --overdue: #d92d20;
-  --accent: #2e6fd8; --accent-text: #ffffff; --banner: #fff7e6; --banner-line: #fedf89;
+  --accent: #1E3A5F; --accent-text: #ffffff; --banner: #fff7e6; --banner-line: #fedf89;
   color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; overflow: hidden; margin: 0; }
-body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+body { font: 14px/1.45 var(--font); background: var(--bg); color: var(--text); }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--accent); }
 .muted { color: var(--muted); }
@@ -457,3 +469,27 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .typeahead .value { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .typeahead .meta { margin-left: auto; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
 .typeahead li.add { color: var(--accent); font-weight: 600; }
+
+/* ---- Orbit header ---- */
+h1.logo { margin: 0; line-height: 0; }
+h1.logo img { display: block; height: 28px; width: auto; }
+.brand-sub { margin-top: 5px; font-size: 12px; color: var(--muted); }
+#title { font-weight: 700; color: var(--text); }
+.add-person-btn { background: var(--orbit-gradient); border: 0; color: #fff; box-shadow: 0 2px 8px rgba(244, 63, 94, .25); }
+.add-person-btn:hover { filter: brightness(1.05); border: 0; }
+.btn.primary:hover { filter: brightness(1.12); }
+a { color: #2e5b93; }
+.linklike { color: #2e5b93; }
+.view-tabs button[aria-selected="true"] { border-bottom-color: var(--orbit-orange); }
+.segmented button[aria-pressed="true"] { background: var(--orbit-navy); }
+.cal-day.today .num, .week-head.today .num { background: var(--orbit-orange); }
+
+/* ---- welcome intro ---- */
+.intro { position: fixed; inset: 0; z-index: 1000; background: var(--orbit-bg-dark); display: grid; cursor: pointer; }
+.intro svg { width: 100%; height: 100%; display: block; }
+.intro-title { font: 700 176px var(--font); letter-spacing: -2px; }
+.intro-sub { font: 400 40px var(--font); fill: #A3AEBF; }
+.intro-skip { position: absolute; right: 22px; bottom: 18px; border: 1px solid rgba(255, 255, 255, .25); background: transparent;
+              color: #A3AEBF; font: 600 13px var(--font); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.intro-skip:hover { color: #fff; border-color: rgba(255, 255, 255, .6); }
+@media (max-width: 760px) { .intro svg { height: auto; align-self: center; } }

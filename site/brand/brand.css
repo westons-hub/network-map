@@ -1,0 +1,14 @@
+/* Orbit brand tokens */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap');
+:root{
+  --orbit-navy:#1E3A5F;      /* primary ink, logo core */
+  --orbit-orange:#F97316;    /* accent */
+  --orbit-rose:#F43F5E;      /* accent */
+  --orbit-slate:#5B6B80;     /* secondary text on light */
+  --orbit-bg:#F5F6F8;        /* light background */
+  --orbit-bg-dark:#131A26;   /* dark background */
+  --orbit-ink-dark:#F4F6FA;  /* text on dark */
+  --orbit-slate-dark:#A3AEBF;/* secondary text on dark */
+  --orbit-gradient:linear-gradient(180deg,#F43F5E,#F97316);
+  --orbit-font:'DM Sans',system-ui,sans-serif;
+}

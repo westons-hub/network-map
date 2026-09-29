@@ -112,7 +112,7 @@ const HOW_TO = [
   ["Tasks", "Your to-dos: Task, Person, Company, Due, Done. Scheduling a meeting adds a 'Send thank-you' task automatically."],
   ["Settings", "Your name and email, default meeting length, your Zoom link (used in invites), the invite message, and Avatar style (initials or notionists)."],
   ["Layout", "Managed by the app (saved node positions)."],
-  ["Privacy", "Network Map runs entirely in your browser. This file is never uploaded anywhere."],
+  ["Privacy", "Orbit runs entirely in your browser. This file is never uploaded anywhere."],
 ];
 
 function withHowTo(bytes) {

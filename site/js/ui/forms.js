@@ -97,7 +97,7 @@ export async function photoForm({ name, current }) {
                                        value: /^https?:/i.test(current ?? "") ? current : "" });
   body.append(field("Choose an image", file, "It's shrunk to 96×96 in your browser and saved in your workbook."),
               el("div", "or", { class: "muted small center" }), field("Paste an image link", url));
-  body.append(el("p", "LinkedIn exports don't include photos, and Network Map never downloads them from LinkedIn.",
+  body.append(el("p", "LinkedIn exports don't include photos, and Orbit never downloads them from LinkedIn.",
                  { class: "muted small" }));
   const buttons = [{ label: "Cancel", value: "" }, { label: "Save photo", value: "save", primary: true }];
   if (current) buttons.unshift({ label: "Remove photo", value: "remove", danger: true, left: true });
@@ -180,7 +180,7 @@ export async function meetingForm({ model, meeting, person = "", date = "", star
 }
 
 /**
- * The "Send invite" options. Nothing is sent by Network Map: each button opens a prefilled page or file
+ * The "Send invite" options. Nothing is sent by Orbit: each button opens a prefilled page or file
  * that you review and send or save yourself.
  */
 export async function inviteDialog({ model, meeting, download, onOpen, onEdit, synced = "" }) {
@@ -213,7 +213,7 @@ export async function inviteDialog({ model, meeting, download, onOpen, onEdit, s
   button("Download .ics", "A calendar file for any calendar app.", () =>
     download(new TextEncoder().encode(icsFile(meeting, ctx())), `${meeting.type || "meeting"}-${meeting.person}.ics`
       .replace(/[^\w.-]+/g, "-").toLowerCase(), "text/calendar"));
-  body.append(grid, el("p", "Network Map never sends anything itself. You'll always review and click send or save.",
+  body.append(grid, el("p", "Orbit never sends anything itself. You'll always review and click send or save.",
                         { class: "muted small" }));
   const buttons = [{ label: "Copy message", value: "copy" }, { label: "Done", value: "", primary: true }];
   if (onEdit) buttons.unshift({ label: "Edit meeting", value: "edit", left: true });
@@ -300,7 +300,7 @@ export async function personForm({ model, person }) {
 // ---- settings -----------------------------------------------------------------------------
 
 /** Resolves with { me, avatarStyle, settings } or null. */
-export async function settingsForm({ model, demo, calendar, onProfile }) {
+export async function settingsForm({ model, demo, calendar, onProfile, onReplayIntro }) {
   const s = model.settings;
   const body = el("div", undefined, { class: "form" });
   const me = el("input", undefined, { value: model.me, autocomplete: "name" });
@@ -318,6 +318,8 @@ export async function settingsForm({ model, demo, calendar, onProfile }) {
     row.append(el("button", "Edit my profile…", { class: "btn small", type: "button", onclick: () => {
       document.getElementById("dialog").close(""); onProfile(); } }),
       el("span", "Your photo, schools, past jobs and what you're looking for.", { class: "muted small" }));
+    if (onReplayIntro) row.append(el("button", "Replay intro", { class: "btn small", type: "button", style: "margin-left:auto",
+      onclick: () => { document.getElementById("dialog").close(""); onReplayIntro(); } }));
     body.append(row);
   }
   body.append(two(field("Your name", me), field("Your email", email, "Used as the organizer in .ics invites.")),

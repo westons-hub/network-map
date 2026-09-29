@@ -209,7 +209,7 @@ function fold(line) {
 export function icsFile(meeting, { me, myEmail, email, message }, now = new Date()) {
   const [start, end] = startEnd(meeting);
   const lines = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Network Map//EN", "CALSCALE:GREGORIAN", "METHOD:REQUEST",
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbit//EN", "CALSCALE:GREGORIAN", "METHOD:REQUEST",
     "BEGIN:VEVENT",
     `UID:${meeting.id}@network-map`, `DTSTAMP:${utcStamp(now)}`, `DTSTART:${utcStamp(start)}`, `DTEND:${utcStamp(end)}`,
     `SUMMARY:${icsText(meetingTitle(meeting, me))}`, `DESCRIPTION:${icsText(message)}`, `LOCATION:${icsText(location(meeting))}`,

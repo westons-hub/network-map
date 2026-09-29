@@ -1,6 +1,6 @@
 # Connecting Google Calendar or Outlook (optional)
 
-Network Map works without this: every meeting already has **Add to Google Calendar**, **Add to Outlook** and
+Orbit works without this: every meeting already has **Add to Google Calendar**, **Add to Outlook** and
 **Download .ics**, which open a prefilled event you save yourself. Connecting a calendar lets the app create,
 update and cancel events for you (sending the invite to the other person), and shows your own events, muted, in the
 Calendar tab so you can see when you're free.
@@ -16,10 +16,10 @@ Authorized origins used below:
 
 ## Google Calendar
 
-1. Open the [Google Cloud console](https://console.cloud.google.com/) and create a project (e.g. "Network Map").
+1. Open the [Google Cloud console](https://console.cloud.google.com/) and create a project (e.g. "Orbit").
 2. **APIs & Services → Library →** search **Google Calendar API → Enable**.
 3. **APIs & Services → OAuth consent screen** (Google Auth Platform → Branding/Audience):
-   - User type **External**; app name "Network Map"; your email as support and developer contact.
+   - User type **External**; app name "Orbit"; your email as support and developer contact.
    - **Data access / Scopes → Add** `https://www.googleapis.com/auth/calendar.events`.
    - **Audience → Test users:** add your own Google account. (While the app is in "Testing", only test users can
      sign in, which is exactly right for a personal tool. Publishing for everyone requires Google's verification.)
@@ -37,7 +37,7 @@ your events to show them muted.
 ## Outlook / Microsoft 365
 
 1. Open the [Azure portal](https://portal.azure.com/) → **Microsoft Entra ID → App registrations → New registration.**
-   - Name "Network Map".
+   - Name "Orbit".
    - **Supported account types:** "Accounts in any organizational directory and personal Microsoft accounts"
      (so both work/school and Outlook.com accounts can sign in).
    - **Redirect URI:** platform **Single-page application (SPA)**, URI `https://westons-hub.github.io/network-map/`.
@@ -56,7 +56,7 @@ events to show them muted.
 
 ## Privacy notes
 
-- Only the meetings you create or change in Network Map are sent to your calendar provider.
+- Only the meetings you create or change in Orbit are sent to your calendar provider.
 - Reading your events is only to display them; they're never saved to your workbook.
 - In the demo, the connect buttons say "Connect your own calendar" and don't sign in; the add-to-calendar links work.
 - **Zoom:** auto-creating Zoom meetings needs Zoom's API with a secret key, which requires a server, so it isn't

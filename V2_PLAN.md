@@ -1,6 +1,7 @@
 # Network Map v2: build spec for Claude Code
 
-This is the single spec. V2_ADDITIONS.md (and the change to its section B) and NEXT_UPDATE.md have been merged in here.
+This is the single spec. V2_ADDITIONS.md (and the change to its section B), NEXT_UPDATE.md and FIXES_AND_PDF.md have
+been merged in here.
 Build in the phases at the bottom, run the tests, and **commit locally after each phase. Don't push until I say so.**
 After each phase, show me screenshots of what changed. Ask me about anything unclear before building it.
 
@@ -16,6 +17,9 @@ instantly**, with nothing to install and no sign-up.
   The only outside requests are company logos (the logo service sees a domain). Section H adds optional calendar
   sign-in, which sends only the events I create.
 - **No LinkedIn scraping:** only my own data exports plus manual entry.
+- **`private-samples/` holds real LinkedIn PDFs** (gitignored with `*.pdf`). Never commit them or copy their names or
+  details into code, tests, fixtures, the demo, screenshots, chat or commit messages. Before every commit, check
+  `git status` that nothing from it is staged.
 - **Never commit real data.** `.gitignore` blocks `.xlsx`, `.csv`, `.html` exports and intro reports, except the demo
   (`site/demo/`), the blank template and test fixtures. Demo **people** are fictional; their photos are AI-generated
   faces of people who don't exist.
@@ -167,7 +171,7 @@ LinkedIn's `Connections.csv` only has the **current** company and title and **no
 
 ## E. Networking tracker format + Excel import/export
 
-My tracker's columns, in order. ⚠️ **To confirm with me before Phase 4** (especially the three date columns):
+My tracker's columns, in order (✅ confirmed):
 
 Name | Company | Role / Background | How We're Connected | LinkedIn | Meeting Type | Method | Status |
 Date Reached Out | Meeting Date | Follow-Up Date | Referral? | Relevant Opportunities | Next Steps | Relationship Plan
@@ -212,7 +216,7 @@ returning as Growth Associate | BYU; 11 mutual connections (Casey, Morgan) | Pro
    **Tasks** (Task, Person, Company, Due, Done, Created) · **Settings** (my name, my email, default meeting length,
    Zoom link, avatar style).
 
-## G. Meeting invites (no Zoom API)
+## G. Meeting invites (no Zoom API) — upgraded by S
 
 1. Settings: my name, email, default length (30 min), my Zoom link (personal room or scheduling link).
 2. **"Schedule meeting"** from a calendar day, an event or a person's panel: person (type-ahead, pulls their email),
@@ -272,7 +276,7 @@ new no-connection targets **Apple** and **Nike** (replacing Granite Peak Partner
   gradient, arrowhead) and the orange satellite pops on → ~1.8–2.4 s the mark shrinks and moves down; **"Map your orbit"**
   types in above it letter by letter (DM Sans 700, white), then **"Find your path."** fades in (#A3AEBF) → ~3.3–4.0 s a
   thin wide ellipse draws around the small mark (faint rose/orange) and the **"Orbit"** wordmark appears beside it →
-  4.0–6.0 s an orange and a rose dot travel the ellipse in opposite directions → 6.0–6.5 s fade out, app fades in.
+  4.0–6.0 s an orange and a rose dot travel the ellipse 180° apart in the same direction (as in the video) → 6.0–6.5 s fade out, app fades in.
   First visit only (localStorage, try/catch); "Replay intro" in Settings; skip by click/any key/"Skip";
   `prefers-reduced-motion` → static logo + tagline ~1 s. The app loads behind it.
 
@@ -319,6 +323,75 @@ Calendar and To-Do open on today. **Saved demo edits never go stale:** edits mad
 they were saved). "Reset demo" rebuilds from today. Tests fake the clock (incl. month-end, a Monday, a Sunday) and reload
 a saved demo copy a week later.
 
+## P. Bug: giant gray circle on click (FIXES §1)
+
+Clicking a person put a huge light-gray circle over the map and sidebar, and the text "They introduced you to" floated
+above the logo. Find the cause and fix it. Clicking only highlights on the map and shows details in the sidebar, with no
+overlays. Add a regression check and before/after screenshots.
+
+## Q. LinkedIn profile PDF import: everything (FIXES §2)
+
+LinkedIn's "Save to PDF" layout (Apache FOP) has a left sidebar column and a main column. Parse with pdf.js text
+positions: split the columns by x, then rebuild lines by y.
+- **Left column:** Contact (email, LinkedIn URL, company website; wrapped values like "name@gmail.c" + "om" get
+  rejoined; "(LinkedIn)"/"(Company)" labels say which URL is which), Top Skills, Languages (with proficiency),
+  Certifications, and Honors-Awards, Publications and Patents when present.
+- **Main column:** name, headline, location; Summary (optional); Experience with single-role entries (Company / Title /
+  dates (duration) / location? / description?) and **multi-role** entries (Company / total duration / several Title +
+  dates + location blocks; titles may have a department prefix); year-only dates; several "Present" roles; long company
+  lines; "Page X of Y" stripped and entries joined across page breaks. Education: School / "Degree, Field · (Start -
+  End)" with month or year dates that may wrap.
+- **Mapped to the person:** Name, Headline, Location, Email, LinkedIn, Company website; current company + role = the
+  most recent Present role (a picker when there are several; the others go to Past Companies as current); Past
+  Companies "Company (YYYY–YYYY)" with alumni edges; Schools "School (YYYY–YYYY)" plus degree/field; Skills, Languages,
+  Certifications, Honors, each in **its own column** (Tags stay my own labels); About = Summary. New **Experience** sheet (Person, Company, Title, Start, End, Location,
+  Description) and **Education** sheet (Person, School, Degree, Field, Start, End), shown as a timeline in the
+  person's sidebar details.
+- **Review screen:** everything parsed, grouped and editable; unsure fields highlighted; warns when the person is already
+  on the map and offers **merge** (fills empty fields and adds new history, never overwrites my edits).
+- **Tests:** fictional fixture PDFs for each layout quirk, testing every field. Real samples are checked by hand only
+  (plus an optional test that skips when `private-samples/` is missing), and reported as counts ("Profile 1: 8/8
+  positions, email ✓").
+
+## R. Easy Excel export (FIXES §3)
+
+An **Export** button in the top bar (every view) and ⌘/Ctrl+E: **Everything** (People in tracker columns, Experience,
+Education, Connections, Targets, Meetings, Tasks) · **This view / filtered** · **One person** (from their details).
+Frozen headers, auto widths, wrapped text, hyperlinks (LinkedIn "Profile", mailto), dropdowns kept.
+File name `Orbit-export-YYYY-MM-DD.xlsx`. Round-trip tested (export → import → identical).
+
+## S. Invites like Google Calendar (FIXES §4)
+
+The **Schedule meeting** dialog works like Google Calendar's event editor: title (auto "Coffee chat: {me} ↔ {name}"),
+date, start–end, time zone, **guest chips** (email autocomplete from contacts, several allowed), **Add video call**
+(Zoom = my saved personal link; Google Meet auto-created when Google is connected; Teams when Outlook is connected),
+location, editable description template, reminder.
+- **Default flow (no sign-in):** my saved Zoom link + one-click **"Send invite → Google Calendar"** (prefilled; I click
+  Save). Other options: Outlook (prefilled), Gmail draft, email app (mailto), .ics.
+- **Connected (optional):** with Google Calendar or Outlook connected (H), Send invite creates the event and sends the
+  invites (`sendUpdates=all`).
+- After sending: the meeting shows in the Calendar, Status → Scheduled, and a "Send thank-you" task is created.
+- **No Zoom connection is built** (Zoom's API needs a server secret). The Zoom API is listed under **Roadmap** in the README.
+
+## T. Light and dark mode (FIXES §5)
+
+A System / Light / Dark switch as a **top-bar icon** (so demo visitors find it), remembered per browser. Dark uses bg #131A26, text #F4F6FA, secondary #A3AEBF. Graph
+paper, edges, labels, cards, modals, calendar and tables all get dark versions. Company logos sit on white circles in
+both themes. Logos swap with the theme everywhere (orbit-logo/-mark on light, the -white versions on dark, including
+the intro and footers). WCAG AA contrast in both. Screenshots of Map, Calendar and To-Do in each theme.
+
+## U. Orbit footer on LinkedIn Pool and To-Do (FIXES §6)
+
+A small footer at the bottom of both views, with the theme-matching Orbit mark + "Orbit" in brand style. It never
+covers content.
+
+## V. Auto-created company and school dots (FIXES §7)
+
+When **3 or more people** on the map share a company (current **or past**, via aliases) or a school, that node is
+created live on add/edit/import/merge, the people attach to it, and its logo is fetched (logo provider → favicon →
+initials). Below the threshold it goes away, unless it's a target. The threshold is a setting (default 3). A toast
+says "Created Delta Air Lines group (3 people)".
+
 ## 9. README (portfolio-first)
 
 Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
@@ -337,6 +410,9 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
 3c. **Next update (NEXT_UPDATE.md), one local commit per part:**
    1) demo dates always current (O) · 2) details back in the sidebar (K) · 3) my profile (N) · 4) connections between
    people (M) · 5) autofill everywhere (L) · 6) Orbit rebrand + welcome intro (J)
+3d. **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part:**
+   1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
+   4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first

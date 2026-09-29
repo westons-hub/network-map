@@ -3,18 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Network Map</title>
-<meta name="description" content="An interactive map of who you know, where they work, and who can introduce you to your target companies. Runs entirely in your browser.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='6' fill='%231f3a5f'/%3E%3Ccircle cx='5' cy='7' r='4' fill='%232e6fd8'/%3E%3Ccircle cx='27' cy='9' r='4' fill='%231f9d6b'/%3E%3Ccircle cx='24' cy='27' r='4' fill='%23d92d20'/%3E%3C/svg%3E">
+<title>Orbit</title>
+<meta name="description" content="Orbit: map your network, find your path. See who you know, where they work, and who can introduce you to the companies you're targeting. Runs entirely in your browser.">
+<meta name="theme-color" content="#131A26">
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="brand/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
+<link rel="preload" href="vendor/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 <div id="app">
-  <aside id="sidebar" aria-label="Network Map controls">
+  <aside id="sidebar" aria-label="Orbit controls">
     <header class="top">
       <div class="brand">
-        <h1 id="title">Network Map</h1>
-        <div id="file-status" class="muted small"></div>
+        <h1 class="logo"><img src="brand/orbit-logo.svg" alt="Orbit" width="102" height="28"></h1>
+        <div class="brand-sub"><span id="title">Your orbit</span> · <span id="file-status"></span></div>
       </div>
       <div class="file-actions">
         <button id="save" class="btn primary" hidden>Save</button>

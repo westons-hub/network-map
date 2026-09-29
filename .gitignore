@@ -39,3 +39,6 @@ __pycache__/
 venv/
 .DS_Store
 .vscode/
+
+# Real LinkedIn profile PDFs for local testing only. Never commit.
+private-samples/

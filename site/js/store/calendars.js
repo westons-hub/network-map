@@ -142,7 +142,7 @@ export async function cancelMeeting(meeting) {
               { method: "DELETE" });
   } else if (token.provider === "outlook" && meeting.eventId.startsWith(PREFIX_O)) {
     await api(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(meeting.eventId.slice(PREFIX_O.length))}/cancel`,
-              { method: "POST", body: { comment: "Canceled from Network Map" } });
+              { method: "POST", body: { comment: "Canceled from Orbit" } });
   }
 }
 
