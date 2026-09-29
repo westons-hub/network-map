@@ -95,7 +95,7 @@ test("Google Calendar, Outlook, Gmail and mailto links carry the event and the g
   const g = new URL(googleCalendarUrl(meeting(), ctx()));
   assert.equal(g.origin + g.pathname, "https://calendar.google.com/calendar/render");
   assert.equal(g.searchParams.get("action"), "TEMPLATE");
-  assert.equal(g.searchParams.get("text"), "Coffee Chat: Alex & Priya");
+  assert.equal(g.searchParams.get("text"), "Coffee chat: Alex Rivera ↔ Priya Shah");
   assert.equal(g.searchParams.get("dates").split("/")[0], start);
   assert.equal(g.searchParams.get("add"), "priya@example.com");
   assert.match(g.searchParams.get("details"), /zoom\.us/);
@@ -109,7 +109,7 @@ test("Google Calendar, Outlook, Gmail and mailto links carry the event and the g
 
   const gm = new URL(gmailUrl(meeting(), ctx()));
   assert.equal(gm.searchParams.get("to"), "priya@example.com");
-  assert.match(mailtoUrl(meeting(), ctx()), /^mailto:priya%40example\.com\?subject=Coffee%20Chat/);
+  assert.match(mailtoUrl(meeting(), ctx()), /^mailto:priya%40example\.com\?subject=Coffee%20chat/);
 });
 
 test(".ics file has organizer, attendee, link, UTC times, escaping and folded lines", () => {
@@ -172,4 +172,26 @@ test("saved demo edits don't go stale: reloaded a week later, their dates move w
   assert.deepEqual(demoEditsForToday(ops, weekLater), ops);
   assert.deepEqual(demoEditsForToday(undefined), []);
   assert.deepEqual(shiftOps(ops, 0), ops);
+});
+
+test("invites: several guests, a time zone, a reminder and a custom title", async () => {
+  const { guestList, zonedDate, meetingTitle } = await import("../site/js/core/schedule.js");
+  const m = meeting({ guests: "priya@example.com; sam@example.com", timeZone: "America/New_York", reminder: "15",
+                      title: "Resume review with Priya" });
+  assert.deepEqual(guestList(m, ctx()), ["priya@example.com", "sam@example.com"]);
+  assert.equal(meetingTitle(m, "Alex Rivera"), "Resume review with Priya");
+  // 10:00 in New York on Sep 30 2026 (EDT, UTC-4) is 14:00 UTC, whatever zone this computer is in.
+  assert.equal(zonedDate("2026-09-30", "10:00", "America/New_York").toISOString(), "2026-09-30T14:00:00.000Z");
+  assert.equal(zonedDate("2026-12-01", "10:00", "America/New_York").toISOString(), "2026-12-01T15:00:00.000Z");
+  assert.equal(zonedDate("2026-09-30", "10:00", "Asia/Tokyo").toISOString(), "2026-09-30T01:00:00.000Z");
+  const g = new URL(googleCalendarUrl(m, ctx()));
+  assert.equal(g.searchParams.get("add"), "priya@example.com,sam@example.com");
+  assert.equal(g.searchParams.get("ctz"), "America/New_York");
+  assert.equal(g.searchParams.get("dates"), "20260930T140000Z/20260930T143000Z");
+  assert.equal(g.searchParams.get("text"), "Resume review with Priya");
+  assert.equal(new URL(gmailUrl(m, ctx())).searchParams.get("to"), "priya@example.com,sam@example.com");
+  const ics = icsFile(m, ctx(), NOW).replace(/\r\n /g, "");
+  assert.equal(ics.match(/^ATTENDEE/gm).length, 2);
+  assert.match(ics, /BEGIN:VALARM\r\nACTION:DISPLAY\r\n.*\r\nTRIGGER:-PT15M\r\nEND:VALARM/);
+  assert.match(ics, /DTSTART:20260930T140000Z/);
 });

@@ -51,7 +51,10 @@ export const AVATAR_STYLES = ["initials", "notionists"];
 // Meetings: the spec's columns first, then the meeting link and a stable ID the app uses for edits.
 export const MEETING_COLUMNS = [["Person", "person"], ["Date", "date"], ["Start", "start"], ["End", "end"],
   ["Type", "type"], ["Method", "method"], ["Notes", "notes"], ["Next Step", "nextStep"],
-  ["Calendar Event ID", "eventId"], ["Link", "link"], ["ID", "id"]];
+  ["Calendar Event ID", "eventId"], ["Link", "link"], ["ID", "id"],
+  // From the Google-Calendar-style editor:
+  ["Title", "title"], ["Guests", "guests"], ["Location", "location"], ["Description", "description"],
+  ["Reminder (min)", "reminder"], ["Time Zone", "timeZone"]];
 export const TASK_COLUMNS = [["Task", "task"], ["Person", "person"], ["Company", "company"], ["Due", "due"],
   ["Done", "done"], ["Created", "created"], ["Source", "source"], ["ID", "id"]];
 export const MEETING_TYPES = ["Coffee Chat", "Informational", "Networking Event", "Class/Club", "Interview", "Other"];
@@ -178,7 +181,10 @@ export function readWorkbook(bytes) {
     model.meetings.push({ id: text(known.id) || `m-row${i + 2}`, person: text(known.person), date: text(known.date),
       start: time(known.start), end: time(known.end), type: text(known.type), method: text(known.method),
       notes: String(known.notes ?? "").trim(), nextStep: text(known.nextStep), eventId: text(known.eventId),
-      link: text(known.link), extra });
+      link: text(known.link), extra,
+      // The editor's optional fields, only when set (older files don't have them).
+      ...Object.fromEntries(["title", "guests", "location", "description", "reminder", "timeZone"]
+        .map(f => [f, f === "description" ? String(known[f] ?? "").trim() : text(known[f])]).filter(([, v]) => v)) });
   });
   findSheet(wb, SHEETS.tasks)?.rows.forEach((rec, i) => {
     const { known, extra } = pick(rec, TASK_COLUMNS);
@@ -306,7 +312,7 @@ const POLISH = {
                      lists: { Status: STATUSES, "Meeting Type": MEETING_TYPES, Method: METHODS, "Referral?": REFERRAL,
                               "Relationship Plan": RELATIONSHIP_PLANS } },
   [SHEETS.targets]: { wrap: ["Notes"], lists: { Priority: PRIORITIES, Stage: STAGES } },
-  [SHEETS.meetings]: { wrap: ["Notes", "Next Step"], lists: { Type: MEETING_TYPES, Method: METHODS } },
+  [SHEETS.meetings]: { wrap: ["Notes", "Next Step", "Description"], lists: { Type: MEETING_TYPES, Method: METHODS } },
   [SHEETS.tasks]: { wrap: ["Task"], lists: { Done: ["Yes"] } },
   [SHEETS.connections]: { wrap: ["Notes"], lists: { Type: CONNECTION_TYPES } },
   [SHEETS.experience]: { wrap: ["Description", "Title"] },

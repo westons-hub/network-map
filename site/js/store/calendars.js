@@ -7,7 +7,7 @@
 // forgets them. Only the events you create or edit are sent. Setup: docs/CALENDAR_SETUP.md.
 
 import { CONFIG } from "../../config.js";
-import { meetingTitle, toDate } from "../core/schedule.js";
+import { guestList, meetingInstants, meetingTitle, toDate } from "../core/schedule.js";
 
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GRAPH_SCOPES = ["Calendars.ReadWrite"];
@@ -99,7 +99,6 @@ async function api(url, { method = "GET", body, headers = {} } = {}) {
   return res.status === 204 || res.status === 410 ? null : res.json();
 }
 
-const iso = (date, time) => toDate(date, time).toISOString();
 const [PREFIX_G, PREFIX_O] = ["google:", "outlook:"];
 
 /**
@@ -109,11 +108,19 @@ const [PREFIX_G, PREFIX_O] = ["google:", "outlook:"];
 export async function syncMeeting(meeting, { me, email, message }) {
   if (!token) return null;
   const title = meetingTitle(meeting, me);
-  const start = iso(meeting.date, meeting.start), end = iso(meeting.date, meeting.end || meeting.start);
+  const [s, e] = meetingInstants(meeting); // honors the meeting's time zone
+  const start = s.toISOString(), end = e.toISOString();
+  const guests = guestList(meeting, { email });
+  const reminder = Number(meeting.reminder) || 0;
+  message = meeting.description || message;
+  const where = meeting.location || meeting.link || meeting.method || "";
   if (token.provider === "google") {
     const id = meeting.eventId?.startsWith(PREFIX_G) ? meeting.eventId.slice(PREFIX_G.length) : "";
-    const event = { summary: title, description: message, location: meeting.link || meeting.method || "",
-                    start: { dateTime: start }, end: { dateTime: end }, attendees: email ? [{ email }] : [] };
+    const event = { summary: title, description: message, location: where,
+                    start: { dateTime: start, ...(meeting.timeZone ? { timeZone: meeting.timeZone } : {}) },
+                    end: { dateTime: end, ...(meeting.timeZone ? { timeZone: meeting.timeZone } : {}) },
+                    attendees: guests.map(g => ({ email: g })),
+                    reminders: reminder ? { useDefault: false, overrides: [{ method: "popup", minutes: reminder }] } : { useDefault: true } };
     if (meeting.method === "Google Meet" && !meeting.link) {
       event.conferenceData = { createRequest: { requestId: meeting.id, conferenceSolutionKey: { type: "hangoutsMeet" } } };
     }
@@ -126,8 +133,9 @@ export async function syncMeeting(meeting, { me, email, message }) {
   const id = meeting.eventId?.startsWith(PREFIX_O) ? meeting.eventId.slice(PREFIX_O.length) : "";
   const event = { subject: title, body: { contentType: "Text", content: message },
                   start: { dateTime: start.replace("Z", ""), timeZone: "UTC" }, end: { dateTime: end.replace("Z", ""), timeZone: "UTC" },
-                  location: { displayName: meeting.link || meeting.method || "" },
-                  attendees: email ? [{ emailAddress: { address: email, name: meeting.person }, type: "required" }] : [] };
+                  location: { displayName: where },
+                  attendees: guests.map(g => ({ emailAddress: { address: g, ...(g === email ? { name: meeting.person } : {}) }, type: "required" })),
+                  isReminderOn: reminder > 0, ...(reminder ? { reminderMinutesBeforeStart: reminder } : {}) };
   if (meeting.method === "Teams" && !meeting.link) Object.assign(event, { isOnlineMeeting: true, onlineMeetingProvider: "teamsForBusiness" });
   const saved = id ? await api(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(id)}`, { method: "PATCH", body: event })
                    : await api("https://graph.microsoft.com/v1.0/me/events", { method: "POST", body: event });

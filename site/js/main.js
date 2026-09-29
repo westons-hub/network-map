@@ -16,8 +16,9 @@ import { createCalendar } from "./ui/calendar.js";
 import { createDetails } from "./ui/details.js";
 import { ask, toast } from "./ui/dialog.js";
 import {
-  companySuggestions, inviteDialog, meetingForm, personForm, photoForm, settingsForm, targetForm, taskForm,
+  companySuggestions, personForm, photoForm, settingsForm, targetForm, taskForm,
 } from "./ui/forms.js";
+import { meetingForm } from "./ui/meetingEditor.js";
 import { createImages } from "./ui/images.js";
 import { createMap } from "./ui/map.js";
 import { el, renderOverview, renderTargets } from "./ui/panels.js";
@@ -164,13 +165,9 @@ async function syncToCalendar(meeting) {
   }
 }
 
+/** A meeting's "Invite" / click: the same editor, with the send options. */
 function meetingActions(m) {
-  const provider = calendars.status().provider;
-  const synced = m.eventId && provider && m.eventId.startsWith(`${provider}:`)
-    ? `On your ${provider === "google" ? "Google Calendar" : "Outlook calendar"} (synced).` : "";
-  return inviteDialog({ model: state.doc.model, meeting: m, download: files.download, synced,
-                        onOpen: personOnMap(m.person) ? () => openPerson(m.person) : undefined,
-                        onEdit: () => editMeeting(m) });
+  return editMeeting(m);
 }
 
 function moveMeeting(id, date, start, end) {
@@ -446,8 +443,10 @@ async function removePerson(key, name) {
 
 async function editMeeting(meeting, opts = {}) {
   const model = state.doc.model;
-  const result = await meetingForm({ model, meeting, ...opts });
+  const result = await meetingForm({ model, meeting, ...opts, calendar: calendars.status(), demo: state.mode === "demo",
+                                     download: files.download, canOpen: !!meeting && personOnMap(meeting.person) });
   if (!result) return;
+  if (result.action === "open") return openPerson(meeting.person);
   if (result.action === "delete") {
     edit({ type: "removeMeeting", id: meeting.id });
     toast("Meeting deleted.");
@@ -460,16 +459,19 @@ async function editMeeting(meeting, opts = {}) {
   const ops = [];
   const person = model.people.find(p => normalizeName(p.name) === normalizeName(result.meeting.person));
   if (result.email && person) ops.push({ type: "patchPerson", key: personKey(person), fields: { email: result.email } });
+  if (result.zoomLink) ops.push({ type: "setSettings", settings: { zoomLink: result.zoomLink } });
+  // Saving it adds it to the Calendar, sets their status (Scheduled / Met) and adds a "Send thank-you" task.
   ops.push(...meetingOps(model, result.meeting));
   edit(ops);
-  const upcoming = result.meeting.date >= todayIso();
-  // Connected calendar: create/update the event there (it sends the invite). Otherwise offer the links.
-  if (upcoming && (await syncToCalendar(result.meeting))) return;
-  if (upcoming && !meeting) {
-    const choice = await ask("Meeting saved", `Add it to your calendar and invite ${result.meeting.person}?`,
-      [{ label: "Not now", value: "" }, { label: "Add to calendar & invite…", value: "invite", primary: true }]);
-    if (choice === "invite") await meetingActions(state.doc.model.meetings.find(x => x.id === result.meeting.id) ?? result.meeting);
-  } else toast(meeting ? "Meeting updated." : "Meeting logged.");
+  const who = result.meeting.person;
+  const SENT = { google: `Google Calendar is open with everything filled in. Click Save there to send the invite to ${who}.`,
+                 outlook: "Outlook is open with the event filled in. Click Save to send the invite.",
+                 "outlook-office": "Outlook is open with the event filled in. Click Save to send the invite.",
+                 gmail: "Your Gmail draft is open. Send it when it looks right.", mailto: "Your email app has the message ready.",
+                 ics: "Calendar file downloaded. Open it to add the event and send the invite." };
+  if (result.sent === "connected") await syncToCalendar(result.meeting);
+  else if (result.sent) toast(`Meeting saved. ${SENT[result.sent]}`, 8000);
+  else toast(meeting ? "Meeting updated." : result.meeting.date >= todayIso() ? "Meeting saved (no invite sent)." : "Meeting logged.");
 }
 
 async function editTask(task, opts = {}) {

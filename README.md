@@ -38,7 +38,10 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Logos and photos:** crisp vector logos in the demo; for your own companies, logos from their website icon or, with a free key, logo.dev / Brandfetch. People get a photo you upload or link (resized in your browser and saved in your workbook), or illustrated avatars drawn locally with [DiceBear](https://www.dicebear.com) (CC0 "Notionists" style).
 - **Status colors:** each person's ring shows To Reach Out, Contacted, Scheduled, Met, Follow Up or Referral.
 - **Details in the sidebar:** click anyone (or yourself) and their details open in the sidebar: photo, status (click to change), LinkedIn, email + copy, what's next, the latest meeting, and every field editable in place (click, type, Enter). Groups and targets get a smaller card with your best way in.
-- **Meetings, invites, calendar and to-dos:** schedule or log a meeting from someone's details or the calendar. Your Zoom link is filled in, the person's status updates, and a "send thank-you" task is added. Send the invite through Google Calendar, Outlook, a Gmail draft, your mail app or an `.ics` file. Orbit never sends anything itself; you always click send. The Calendar tab has a month view and a week view with times (drag a meeting to move it, click an empty slot to book one), and the To-Do tab (Overdue / Today / This week / Later) keeps you on track. Optionally connect Google Calendar or Outlook to sync meetings, send invites automatically and see your own events ([setup](docs/CALENDAR_SETUP.md)).
+- **Invites like Google Calendar:** schedule a meeting in an editor that works like Google Calendar's: title, date and time, time zone, guest chips (with autocomplete from your contacts), "Add video call" (your saved Zoom link, or Google Meet / Teams), location, description and a reminder. **Send invite → Google Calendar** opens the event prefilled; you click Save and Google emails the invites. Outlook, a Gmail draft, your mail app and an `.ics` file are one click away. Orbit never sends anything by itself. Saving puts it on the Calendar, sets the person to Scheduled and adds a "send thank-you" task. Optionally connect Google Calendar or Outlook to send invites directly, auto-create Meet or Teams links, and see your own events ([setup](docs/CALENDAR_SETUP.md)).
+- **Calendar and to-dos:** the Calendar tab has a month view and a week view with times (drag a meeting to move it, click an empty slot to book one), and the To-Do tab (Overdue / Today / This week / Later) keeps you on track.
+- **LinkedIn profile PDFs, fully read:** drop someone's "Save to PDF" profile and Orbit reads everything in your browser: contact info, skills, languages, certifications, every role (including several roles at one company) and education. It shows a review screen first, and merges into someone already on your map without overwriting your edits. Their jobs and schools show as a timeline in their details.
+- **Export to Excel (⌘E):** everything, just what you're looking at, or one person, with the People sheet in a networking-tracker layout, frozen headers, clickable links and dropdowns.
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
@@ -90,6 +93,11 @@ npm test             # node --test, no install needed (Node 22+)
 ## Privacy
 
 Orbit has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos for your own data (the logo service sees the company's domain, e.g. `deloitte.com`; the demo's logos are stored in the site). LinkedIn profile PDFs are read in your browser. Invites open in Google Calendar, Outlook or Gmail only when you click them, and a calendar connection is optional: sign-in stays in your browser tab and only the meetings you create are sent. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
+
+## Roadmap
+
+- **Zoom API:** create a unique Zoom meeting for each invite. Zoom's API needs a client secret, which would need a small server (for example a free Cloudflare Worker) for sign-in, so for now invites use your saved personal Zoom link.
+- Saved map positions, an offline HTML export of the map, and the GitHub Pages deploy with a live link.
 
 ## License
 

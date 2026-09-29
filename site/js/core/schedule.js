@@ -140,8 +140,11 @@ export function weekDays(date) {
 
 const firstName = name => String(name ?? "").trim().split(/\s+/)[0] ?? "";
 
+/** "Coffee Chat" -> "Coffee chat: Alex Rivera ↔ Priya Shah" (a title you typed wins). */
 export function meetingTitle(meeting, me) {
-  return `${meeting.type || "Meeting"}: ${firstName(me) || "Me"} & ${firstName(meeting.person)}`;
+  if (meeting.title) return meeting.title;
+  const type = meeting.type ? meeting.type.charAt(0) + meeting.type.slice(1).toLowerCase() : "Meeting";
+  return `${type}: ${me || "Me"} ↔ ${meeting.person}`;
 }
 
 function prettyDate(date) {
@@ -158,36 +161,71 @@ export function fillTemplate(template, { meeting, me }) {
   return String(template).replace(/\{([a-z ]+)\}/gi, (whole, key) => values[key.toLowerCase()] ?? whole).trim();
 }
 
-const utcStamp = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-const startEnd = m => [toDate(m.date, m.start), toDate(m.date, m.end || addMinutes(m.start, 30))];
-const location = m => m.link || m.method || "";
+// ---- time zones ---------------------------------------------------------------------------
 
-/** Google Calendar "create event" link. Saving it there adds the event and emails the guest. */
-export function googleCalendarUrl(meeting, { me, email, message }) {
+export const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; } };
+
+/** A wall-clock date + time in a time zone -> the real instant (a Date). Without a zone, this computer's zone. */
+export function zonedDate(date, time, zone) {
+  const local = toDate(date, time);
+  if (!zone || zone === localZone()) return local;
+  // Guess the instant as if the wall clock were UTC, then correct by the zone's offset at that instant (twice, for DST edges).
+  const [y, mo, d] = date.split("-").map(Number), [h, mi] = (time || "00:00").split(":").map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  let t = wall;
+  for (let i = 0; i < 2; i++) t = wall - zoneOffset(zone, new Date(t));
+  return new Date(t);
+}
+function zoneOffset(zone, at) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric",
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(at).map(p => [p.type, p.value]));
+  const asUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour) % 24, Number(parts.minute), Number(parts.second));
+  return asUtc - Math.floor(at.getTime() / 1000) * 1000;
+}
+
+// ---- invites ------------------------------------------------------------------------------
+
+const utcStamp = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+export const meetingInstants = m => [zonedDate(m.date, m.start, m.timeZone), zonedDate(m.date, m.end || addMinutes(m.start, 30), m.timeZone)];
+const startEnd = meetingInstants;
+const location = m => m.location || m.link || m.method || "";
+
+/** Everyone to invite: the guests list ("a@x.com; b@y.com"), or the email passed in. */
+export function guestList(meeting, ctx = {}) {
+  const fromMeeting = String(meeting.guests ?? "").split(/[;,\s]+/).filter(e => e.includes("@"));
+  const extra = [ctx.email, ...(ctx.guests ?? [])].filter(e => e && e.includes("@"));
+  return [...new Set([...fromMeeting, ...extra].map(e => e.trim()))];
+}
+
+/** Google Calendar "create event" link. Saving it there adds the event and emails the guests. */
+export function googleCalendarUrl(meeting, ctx) {
   const [start, end] = startEnd(meeting);
-  const q = new URLSearchParams({ action: "TEMPLATE", text: meetingTitle(meeting, me),
-    dates: `${utcStamp(start)}/${utcStamp(end)}`, details: message, location: location(meeting) });
-  if (email) q.set("add", email);
+  const q = new URLSearchParams({ action: "TEMPLATE", text: meetingTitle(meeting, ctx.me),
+    dates: `${utcStamp(start)}/${utcStamp(end)}`, details: ctx.message, location: location(meeting) });
+  if (meeting.timeZone) q.set("ctz", meeting.timeZone);
+  const guests = guestList(meeting, ctx);
+  if (guests.length) q.set("add", guests.join(","));
   return `https://calendar.google.com/calendar/render?${q}`;
 }
 
 /** Outlook compose-event deeplink: "live" = Outlook.com, "office" = work/school Microsoft 365. */
-export function outlookUrl(meeting, { me, email, message }, kind = "live") {
+export function outlookUrl(meeting, ctx, kind = "live") {
   const [start, end] = startEnd(meeting);
-  const q = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: meetingTitle(meeting, me),
-    startdt: start.toISOString(), enddt: end.toISOString(), body: message, location: location(meeting) });
-  if (email) q.set("to", email);
+  const q = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: meetingTitle(meeting, ctx.me),
+    startdt: start.toISOString(), enddt: end.toISOString(), body: ctx.message, location: location(meeting) });
+  const guests = guestList(meeting, ctx);
+  if (guests.length) q.set("to", guests.join(","));
   return `https://outlook.${kind === "office" ? "office" : "live"}.com/calendar/0/deeplink/compose?${q}`;
 }
 
-export function gmailUrl(meeting, { me, email, message }) {
-  const q = new URLSearchParams({ view: "cm", fs: "1", to: email || "", su: meetingTitle(meeting, me), body: message });
+export function gmailUrl(meeting, ctx) {
+  const q = new URLSearchParams({ view: "cm", fs: "1", to: guestList(meeting, ctx).join(","), su: meetingTitle(meeting, ctx.me), body: ctx.message });
   return `https://mail.google.com/mail/?${q}`;
 }
 
-export function mailtoUrl(meeting, { me, email, message }) {
+export function mailtoUrl(meeting, ctx) {
   const enc = encodeURIComponent;
-  return `mailto:${enc(email || "")}?subject=${enc(meetingTitle(meeting, me))}&body=${enc(message)}`;
+  return `mailto:${guestList(meeting, ctx).map(enc).join(",")}?subject=${enc(meetingTitle(meeting, ctx.me))}&body=${enc(ctx.message)}`;
 }
 
 const icsText = s => String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
@@ -205,17 +243,24 @@ function fold(line) {
   return out.join("\r\n ");
 }
 
-/** A calendar file (.ics) with you as organizer and them as attendee. */
-export function icsFile(meeting, { me, myEmail, email, message }, now = new Date()) {
+/** A calendar file (.ics) with you as organizer, the guests as attendees, and the reminder. */
+export function icsFile(meeting, ctx, now = new Date()) {
+  const { me, myEmail, message } = ctx;
   const [start, end] = startEnd(meeting);
+  const people = new Map((ctx.names ?? []).map(([email, name]) => [email.toLowerCase(), name]));
+  const guests = guestList(meeting, ctx);
+  const reminder = Number(meeting.reminder);
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbit//EN", "CALSCALE:GREGORIAN", "METHOD:REQUEST",
     "BEGIN:VEVENT",
     `UID:${meeting.id}@network-map`, `DTSTAMP:${utcStamp(now)}`, `DTSTART:${utcStamp(start)}`, `DTEND:${utcStamp(end)}`,
     `SUMMARY:${icsText(meetingTitle(meeting, me))}`, `DESCRIPTION:${icsText(message)}`, `LOCATION:${icsText(location(meeting))}`,
     ...(myEmail ? [`ORGANIZER;CN=${icsText(me || myEmail)}:mailto:${myEmail}`] : []),
-    ...(email ? [`ATTENDEE;CN=${icsText(meeting.person)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`] : []),
-    "STATUS:CONFIRMED", "END:VEVENT", "END:VCALENDAR",
+    ...guests.map((email, i) => `ATTENDEE;CN=${icsText(people.get(email.toLowerCase()) ?? (i === 0 && ctx.email === email ? meeting.person : email))};` +
+                                `ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`),
+    "STATUS:CONFIRMED",
+    ...(reminder > 0 ? ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${icsText(meetingTitle(meeting, me))}`, `TRIGGER:-PT${reminder}M`, "END:VALARM"] : []),
+    "END:VEVENT", "END:VCALENDAR",
   ];
   return lines.map(fold).join("\r\n") + "\r\n";
 }

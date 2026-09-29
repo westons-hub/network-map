@@ -2,10 +2,8 @@
 
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES } from "../core/people.js";
-import {
-  addMinutes, fillTemplate, gmailUrl, googleCalendarUrl, icsFile, isDate, mailtoUrl, newId, outlookUrl, todayIso,
-} from "../core/schedule.js";
-import { MEETING_TYPES, METHODS, PRIORITIES, STAGES } from "../core/workbook.js";
+import { newId, todayIso } from "../core/schedule.js";
+import { PRIORITIES, STAGES } from "../core/workbook.js";
 import { ask, toast } from "./dialog.js";
 import { attachTypeahead } from "./typeahead.js";
 import { el } from "./dom.js";
@@ -109,121 +107,9 @@ export async function photoForm({ name, current }) {
   return null;
 }
 
-// ---- meetings ---------------------------------------------------------------------------
-
+// ---- meetings: see meetingEditor.js ----------------------------------------------------
 
 const findPerson = (model, name) => model.people.find(p => normalizeName(p.name) === normalizeName(name));
-
-/**
- * Schedule a meeting (or log one that already happened: a past date counts as "Met").
- * Resolves with { action: "save", meeting, email? } | { action: "delete" } | null.
- */
-export async function meetingForm({ model, meeting, person = "", date = "", start: startAt = "" }) {
-  const editing = !!meeting;
-  const s = model.settings;
-  const m = meeting ?? { id: newId("m"), person, date: date || todayIso(), start: startAt || "10:00", end: "", type: "Coffee Chat",
-                         method: "Zoom", link: s.zoomLink || "", notes: "", nextStep: "", eventId: "" };
-  const body = el("div", undefined, { class: "form" });
-  const who = el("input", undefined, { name: "person", required: true, value: m.person, autocomplete: "off",
-                                        placeholder: "Start typing a name" });
-  attachTypeahead(who, "person");
-  const emailWarn = el("div", undefined, { class: "warn", hidden: true });
-  const email = el("input", undefined, { type: "email", name: "email", placeholder: "their@email.com" });
-  emailWarn.append(el("span", "No email on file for this person. Add one so the invite can reach them:"), email);
-  const checkEmail = () => {
-    const p = findPerson(model, who.value);
-    emailWarn.hidden = !p || !!p.email;
-  };
-  who.addEventListener("input", checkEmail);
-  who.addEventListener("change", checkEmail);
-
-  const day = el("input", undefined, { type: "date", name: "date", required: true, value: m.date });
-  const start = el("input", undefined, { type: "time", name: "start", required: true, value: m.start || "10:00" });
-  const minutesNow = m.end && m.start ? Math.max(5, (Number(m.end.slice(0, 2)) * 60 + Number(m.end.slice(3))) -
-    (Number(m.start.slice(0, 2)) * 60 + Number(m.start.slice(3)))) : Number(s.meetingLength) || 30;
-  const length = select("length", [15, 20, 30, 45, 60, 90].map(n => [String(n), `${n} min`]), String(minutesNow));
-  if (![...length.options].some(o => o.selected)) length.append(el("option", `${minutesNow} min`, { value: String(minutesNow), selected: true }));
-  const type = select("type", MEETING_TYPES.map(t => [t, t]), m.type || "Coffee Chat");
-  const method = select("method", ["Zoom", "Google Meet", "Teams", "Phone", "In Person"].map(t => [t, t]), m.method || "Zoom");
-  const link = el("input", undefined, { type: "url", name: "link", value: m.link, placeholder: "Meeting link" });
-  const linkHint = el("span", "", { class: "muted small" });
-  const syncMethod = () => {
-    const v = method.value;
-    if (v === "Zoom" && !link.value) link.value = s.zoomLink || "";
-    if (v === "Phone" || v === "In Person") link.value = link.value.startsWith("http") ? "" : link.value;
-    link.placeholder = v === "Zoom" ? "Your Zoom link" : v === "Google Meet" ? "Paste a Meet link (optional)"
-      : v === "Teams" ? "Paste a Teams link (optional)" : v === "Phone" ? "Phone number (optional)" : "Place (optional)";
-    linkHint.textContent = v === "Zoom" && !s.zoomLink ? "Tip: save your Zoom link in Settings to fill this in automatically." : "";
-  };
-  method.addEventListener("change", () => { if (method.value !== "Zoom" && link.value === s.zoomLink) link.value = ""; syncMethod(); });
-  syncMethod();
-  const notes = el("textarea", undefined, { name: "notes", rows: 2, value: m.notes });
-  const next = el("input", undefined, { name: "nextStep", value: m.nextStep, placeholder: "e.g. Send resume" });
-
-  const row = (...fields) => { const r = el("div", undefined, { class: "row3" }); r.append(...fields); return r; };
-  body.append(field("Who", who), emailWarn, row(field("Date", day), field("Time", start), field("Length", length)),
-              row(field("Type", type), field("How", method)), field("Link / place", link, ""), linkHint,
-              field("Notes", notes), field("Next step", next));
-  body.append(el("p", "A past date logs a meeting that happened (status becomes Met). A future date schedules one (status becomes Scheduled). Either way, a \"Send thank-you\" task is added for the next day.",
-                 { class: "muted small" }));
-  checkEmail();
-
-  const buttons = [{ label: "Cancel", value: "" }, { label: editing ? "Save" : "Save meeting", value: "save", primary: true }];
-  if (editing) buttons.unshift({ label: "Delete", value: "delete", danger: true, left: true });
-  const choice = await ask(editing ? "Edit meeting" : "Schedule or log a meeting", body, buttons);
-  if (choice === "delete") return { action: "delete" };
-  if (choice !== "save" || !who.value.trim() || !isDate(day.value)) return null;
-  const saved = { ...m, person: findPerson(model, who.value)?.name ?? who.value.trim(), date: day.value, start: start.value,
-                  end: addMinutes(start.value, Number(length.value)), type: type.value, method: method.value,
-                  link: link.value.trim(), notes: notes.value.trim(), nextStep: next.value.trim() };
-  return { action: "save", meeting: saved, email: !emailWarn.hidden && email.value.trim() ? email.value.trim() : "" };
-}
-
-/**
- * The "Send invite" options. Nothing is sent by Orbit: each button opens a prefilled page or file
- * that you review and send or save yourself.
- */
-export async function inviteDialog({ model, meeting, download, onOpen, onEdit, synced = "" }) {
-  const person = findPerson(model, meeting.person);
-  const me = model.me || "";
-  const body = el("div", undefined, { class: "form" });
-  const message = el("textarea", undefined, { rows: 3, value: fillTemplate(model.settings.inviteTemplate, { meeting, me }) });
-  const to = person?.email || "";
-  const when = new Date(`${meeting.date}T${meeting.start || "00:00"}`)
-    .toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  body.append(el("p", `${meeting.type || "Meeting"} with ${meeting.person} · ${when}${meeting.method ? ` · ${meeting.method}` : ""}`,
-                 { class: "meeting-summary" }));
-  if (meeting.notes) body.append(el("p", meeting.notes, { class: "muted small" }));
-  if (synced) body.append(el("p", synced, { class: "source-note ok" }));
-  if (!to) body.append(el("p", `${meeting.person} has no email yet, so the invite won't include them. Add it in their details.`, { class: "warn" }));
-  body.append(field("Message", message, "Edit it here; {first name}, {date}, {time} and {link} were filled in from your Settings template."));
-  const ctx = () => ({ me, email: to, myEmail: model.settings.email, message: message.value });
-  const open = url => window.open(url, "_blank", "noopener");
-  const grid = el("div", undefined, { class: "invite-grid" });
-  const button = (label, hint, onclick) => {
-    const b = el("button", undefined, { class: "invite-option", type: "button", onclick });
-    b.append(el("strong", label), el("span", hint, { class: "muted small" }));
-    grid.append(b);
-  };
-  button("Add to Google Calendar", "Opens a prefilled event with them as a guest. Save it to send the invite.", () => open(googleCalendarUrl(meeting, ctx())));
-  button("Add to Outlook", "Outlook.com (personal) calendar, prefilled.", () => open(outlookUrl(meeting, ctx(), "live")));
-  button("Add to Outlook (work/school)", "Microsoft 365 calendar, prefilled.", () => open(outlookUrl(meeting, ctx(), "office")));
-  button("Gmail draft", "A new email with your message.", () => open(gmailUrl(meeting, ctx())));
-  button("Email app", "Your default mail app (mailto).", () => { window.location.href = mailtoUrl(meeting, ctx()); });
-  button("Download .ics", "A calendar file for any calendar app.", () =>
-    download(new TextEncoder().encode(icsFile(meeting, ctx())), `${meeting.type || "meeting"}-${meeting.person}.ics`
-      .replace(/[^\w.-]+/g, "-").toLowerCase(), "text/calendar"));
-  body.append(grid, el("p", "Orbit never sends anything itself. You'll always review and click send or save.",
-                        { class: "muted small" }));
-  const buttons = [{ label: "Copy message", value: "copy" }, { label: "Done", value: "", primary: true }];
-  if (onEdit) buttons.unshift({ label: "Edit meeting", value: "edit", left: true });
-  if (onOpen) buttons.unshift({ label: "Open their details", value: "open", left: true });
-  const v = await ask("Add to calendar & invite", body, buttons);
-  if (v === "copy") {
-    try { await navigator.clipboard.writeText(message.value); toast("Message copied."); } catch { toast("Couldn't copy."); }
-  } else if (v === "open") onOpen();
-  else if (v === "edit") onEdit();
-}
 
 // ---- tasks --------------------------------------------------------------------------------
 
