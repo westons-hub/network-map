@@ -163,6 +163,43 @@ const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists", profile:
   settings: { ...emptyModel().settings, email: "alex.rivera@example.com", zoomLink: "https://zoom.us/j/0000000000",
               demoBaseDate: BASE },
   pool };
+// Full work history for a few people (what a LinkedIn profile PDF import gives you): shown as a timeline in
+// their details, with the profile fields filled in. All fictional.
+const HISTORY = {
+  "Sofia Alvarez": {
+    fields: { headline: "Product Manager at Microsoft · Marketplace", location: "Seattle, Washington", skills: "Product Strategy; SQL; Experimentation",
+              languages: "Spanish (Native or Bilingual)", about: "PM for the Microsoft marketplace. Former Deloitte consultant; Stanford GSB." },
+    experience: [["Microsoft", "Product Manager", "2023-07", "Present", "Redmond, Washington", "Owns the marketplace roadmap and pricing tests."],
+                 ["Microsoft", "Product Manager Intern", "2022-06", "2022-09", "Redmond, Washington", ""],
+                 ["Deloitte", "Business Technology Analyst", "2018-08", "2021-06", "San Francisco Bay Area", "Tech strategy for retail and travel clients."]],
+    education: [["Stanford University", "Master of Business Administration - MBA", "", "2021", "2023"],
+                ["University of Utah", "Bachelor of Science - BS", "Information Systems", "2014", "2018"]],
+  },
+  "Jordan Lee": {
+    fields: { headline: "Senior Consultant, Strategy & Analytics at Deloitte", location: "San Francisco, California",
+              skills: "Market Sizing; Financial Modeling; Case Interviews", certifications: "Certified Scrum Product Owner" },
+    experience: [["Deloitte", "Strategy & Analytics: Senior Consultant", "2022-01", "Present", "San Francisco, California", ""],
+                 ["Deloitte", "Strategy & Analytics: Consultant", "2020-08", "2021-12", "San Francisco, California", ""],
+                 ["Adobe", "Business Strategy Intern", "2019-06", "2019-08", "San Jose, California", "Market sizing for a new creative-tools bundle."]],
+    education: [["Stanford University", "Bachelor of Arts - BA", "Economics", "2016", "2020"]],
+  },
+  "Noah Carter": {
+    fields: { headline: "Commercial Strategy Analyst at Delta Air Lines", location: "Seattle, Washington", skills: "Forecasting; Customer Research; Python" },
+    experience: [["Delta Air Lines", "Commercial Strategy Analyst", "2023-02", "Present", "Seattle, Washington", ""],
+                 ["Delta Air Lines", "Loyalty Program Analyst", "2021-07", "2023-01", "Seattle, Washington", ""]],
+    education: [["Stanford University", "Master of Science - MS", "Management Science & Engineering", "2019", "2021"]],
+  },
+};
+for (const [name, h] of Object.entries(HISTORY)) {
+  const p = demo.people.find(x => x.name === name);
+  Object.assign(p, h.fields);
+  demo.experience.push(...h.experience.map(([company, title, start, end, location, description]) =>
+    ({ person: name, company, title, start, end, location, description, extra: {} })));
+  demo.education.push(...h.education.map(([school, degree, field, start, end]) => ({ person: name, school, degree, field, start, end, extra: {} })));
+  const past = [...new Map(h.experience.filter(e => e[0] !== p.company).map(e => [e[0], `${e[0]} (${e[2].slice(0, 4)}–${e[3].slice(0, 4)})`])).values()];
+  if (past.length) p.pastCompanies = past.join("; ");
+}
+
 // Connections: "Introduced me" comes from Connected Through above; plus a few links between people you know.
 reconcile(demo);
 for (const [a, b, type, notes] of [

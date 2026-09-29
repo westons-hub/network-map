@@ -3,11 +3,13 @@
 <p align="center"><strong>Map your orbit. Find your path.</strong><br>
 <em>Your orbit, always moving outward.</em></p>
 
+<p align="center"><a href="https://westons-hub.github.io/network-map/"><strong>▶ Try the live demo</strong></a> · no sign-up, nothing to install, runs in your browser</p>
+
 **Orbit is an interactive map of who you know, where they work, and who can introduce you to the companies you're targeting. It runs entirely in your browser.**
 
-You sit at the center, and your connections branch out from you. When 3 or more of them share a company or school, they collapse into a group bubble. People you know *through* someone hang off that person, so you can see who could make an intro.
+You sit at the center, and your connections branch out from you. When 3 or more of them share a company or school (now or in the past), that company or school gets its own dot. People you know *through* someone hang off that person, so you can see who could make an intro.
 
-![Orbit screenshot](docs/screenshot.png)
+[![A tour of Orbit: the welcome intro, a target's best way in, a person's details and timeline, scheduling a meeting, the calendar, to-dos and dark mode](docs/orbit-demo.gif)](https://westons-hub.github.io/network-map/)
 
 *The people in the demo are fictional, and their photos are AI-generated faces of people who don't exist. Company names and logos are trademarks of their owners.*
 
@@ -44,12 +46,13 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Export to Excel (⌘E):** everything, just what you're looking at, or one person, with the People sheet in a networking-tracker layout, frozen headers, clickable links and dropdowns.
 - **Company and school dots appear on their own:** once 3 people on your map share a company (now or in the past, matched through name aliases) or a school, it gets its own dot with its logo; you can change the number in Settings.
 - **Light and dark mode:** System / Light / Dark from the top bar, in the Orbit brand colors, checked for WCAG AA contrast.
+- **Arrange it your way:** drag people where you want them and they stay there (saved in your workbook); **Lock** freezes the map and **Re-arrange** starts over. **Export → Offline map** saves the map as one file that opens anywhere, even without internet.
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
 ## Use it
 
-**Online:** a live link is coming with the GitHub Pages deploy.
+**Online:** [westons-hub.github.io/network-map](https://westons-hub.github.io/network-map/) opens the fictional demo. Click **Use my own data** to open your own workbook or LinkedIn export; it stays in your browser.
 
 **Locally:** the app is static files, so any web server works:
 
@@ -99,7 +102,6 @@ Orbit has no backend. Your workbook is read and written by JavaScript in your ow
 ## Roadmap
 
 - **Zoom API:** create a unique Zoom meeting for each invite. Zoom's API needs a client secret, which would need a small server (for example a free Cloudflare Worker) for sign-in, so for now invites use your saved personal Zoom link.
-- Saved map positions, an offline HTML export of the map, and the GitHub Pages deploy with a live link.
 
 ## License
 
