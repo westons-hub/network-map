@@ -198,7 +198,7 @@ export async function personForm({ model, person }) {
 // ---- settings -----------------------------------------------------------------------------
 
 /** Resolves with { me, avatarStyle, settings } or null. */
-export async function settingsForm({ model, demo, calendar, onProfile, onReplayIntro }) {
+export async function settingsForm({ model, demo, calendar, onProfile, onReplayIntro, onWelcome }) {
   const s = model.settings;
   const body = el("div", undefined, { class: "form" });
   const me = el("input", undefined, { value: model.me, autocomplete: "name" });
@@ -219,6 +219,8 @@ export async function settingsForm({ model, demo, calendar, onProfile, onReplayI
       el("span", "Your photo, schools, past jobs and what you're looking for.", { class: "muted small" }));
     if (onReplayIntro) row.append(el("button", "Replay intro", { class: "btn small", type: "button", style: "margin-left:auto",
       onclick: () => { document.getElementById("dialog").close(""); onReplayIntro(); } }));
+    if (onWelcome) row.append(el("button", "Welcome screen", { class: "btn small", type: "button",
+      onclick: () => { document.getElementById("dialog").close(""); setTimeout(onWelcome, 0); } }));
     body.append(row);
   }
   body.append(two(field("Your name", me), field("Your email", email, "Used as the organizer in .ics invites.")),

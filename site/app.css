@@ -191,7 +191,7 @@ h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .05e
 #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
          padding: 9px 14px; border-radius: 8px; font-size: 13px; max-width: min(520px, 90vw); z-index: 20;
          box-shadow: 0 8px 24px rgba(16, 24, 40, .2); }
-dialog { border: 1px solid var(--line); border-radius: 12px; padding: 18px; width: min(440px, 92vw); }
+dialog { border: 1px solid var(--line); border-radius: 12px; padding: 18px; width: min(440px, 92vw); background: var(--panel); color: var(--text); }
 dialog::backdrop { background: var(--backdrop); }
 dialog h3 { margin: 0 0 8px; }
 dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
@@ -613,3 +613,31 @@ dialog:has(.event-editor) { width: min(640px, 96vw); }
   border-top: 1px solid var(--line); color: var(--muted); font: 700 13px var(--font); letter-spacing: -.01em; max-width: 860px; }
 .brand-footer img { width: 18px; height: 18px; }
 #pool-view .brand-footer { max-width: none; }
+
+/* ---- welcome card + "Start your own" guide ---- */
+dialog:has(.welcome) { width: min(620px, 94vw); text-align: center; }
+dialog:has(.welcome) h3 { font-size: 30px; margin-top: 6px; }
+.welcome-logo { display: block; margin: 0 auto 10px; height: 50px; width: auto; }
+.welcome-line { color: var(--muted); font-size: 15px; max-width: 460px; margin: 0 auto 20px; }
+.welcome-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.welcome-choice { display: grid; gap: 4px; padding: 22px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--panel);
+  cursor: pointer; color: var(--text); text-align: center; transition: border-color .15s, transform .15s; }
+.welcome-choice strong { font-size: 18px; }
+.welcome-choice span { color: var(--muted); font-size: 13px; }
+.welcome-choice:hover, .welcome-choice:focus-visible { border-color: var(--accent); transform: translateY(-1px); outline: none; }
+.welcome-choice.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); box-shadow: inset 0 -3px 0 var(--orbit-orange); }
+.welcome-choice.primary span { color: var(--accent-text); opacity: .85; }
+dialog:has(.welcome) .actions { display: none; }
+@media (max-width: 520px) { .welcome-choices { grid-template-columns: 1fr; } }
+
+dialog:has(.onboarding) { width: min(700px, 96vw); }
+.onboarding-img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); margin: 6px 0 10px; }
+.onboarding h4 { margin: 6px 0 2px; font-size: 16px; }
+.onboarding-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.onboarding-dots { display: flex; gap: 6px; }
+.onboarding-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.onboarding-dots span.on { background: var(--orbit-orange); }
+.onboarding-drop { display: grid; place-items: center; gap: 8px; min-height: 260px; margin: 6px 0 10px; font-size: 18px;
+  border: 3px dashed var(--orbit-orange); border-radius: 16px; background: var(--soft-bg); }
+.onboarding-alt { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+#data-menu-btn { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }

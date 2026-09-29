@@ -26,6 +26,7 @@ import { createTodo } from "./ui/todo.js";
 import { buildSuggestions } from "./core/suggest.js";
 import { setSuggestionSource } from "./ui/typeahead.js";
 import { introSeen, playIntro } from "./ui/intro.js";
+import { showOnboarding, showWelcome, welcomeSeen } from "./ui/welcome.js";
 import { isDark, nextThemeMode, onThemeChange, setTheme, themeMode } from "./ui/theme.js";
 import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
@@ -206,8 +207,8 @@ function addMany(entries) {
   toast(`Added ${people.length} ${people.length === 1 ? "person" : "people"} to your map.`);
 }
 
-async function importPool() {
-  const picked = await files.pickFile();
+async function importPool(file) {
+  const picked = file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : await files.pickFile();
   if (!picked) return;
   if (!/\.csv$/i.test(picked.name)) return toast("Choose the Connections.csv from your LinkedIn data export.");
   try {
@@ -240,7 +241,7 @@ setSuggestionSource({
 function render() {
   const { model } = state.doc;
   suggestions = null;
-  const me = model.me || "You";
+  const me = model.me || "Your Name"; // a new map: fill in My profile to put your name here
   const before = state.announceGroups ? state.graph : null;
   state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets,
                                            minGroupSize: Number(model.settings.groupSize) || 3 });
@@ -361,12 +362,30 @@ function renderChrome() {
                                                                            onclick: reopen }));
     }
     banner.hidden = false;
+  } else if (!model.me) {
+    // A new map: start with your profile (your name goes in the center).
+    banner.append("Welcome to your map! Start with your profile: your name, photo, schools, jobs and Zoom link. ");
+    banner.append(el("button", "Fill in my profile →", { class: "linklike", type: "button", onclick: () => focus("me") }));
+    banner.hidden = false;
   } else banner.hidden = true;
+  renderDataMenu();
+}
 
-  const reopenItem = document.querySelector('[data-action="reopen"]');
-  reopenItem.hidden = !state.lastHandle || state.mode === "file";
-  reopenItem.textContent = state.lastHandle ? `Reopen ${state.lastHandle.name}` : "";
-  document.querySelector('[data-action="demo"]').hidden = state.mode === "demo";
+/** "Use my own data" in the demo; your map's name + its menu once you're on your own map. */
+function renderDataMenu() {
+  const own = state.mode === "file";
+  menuBtn.textContent = own ? `${state.fileName.replace(/\.xlsx$/i, "")} ▾` : "Use my own data";
+  menuBtn.title = own ? "Save, open another file, export, or switch to the demo" : "";
+  const item = (action, label) => el("button", label, { role: "menuitem", type: "button", "data-action": action });
+  const items = own
+    ? [item("save", "Save"), item("open", "Open another file…"), item("export", "Export…"), item("demo", "Switch to demo"), el("hr"),
+       item("importPool", "Import LinkedIn connections (CSV)…"), item("download", "Download a copy (.xlsx)"), item("settings", "Settings…"),
+       item("backups", "Backups…"), item("new", "Start a new, empty map"), item("template", "Download the blank template")]
+    : [item("start", "Start your own map (step by step)…"), item("open", "Open my workbook or LinkedIn CSV…"),
+       ...(state.lastHandle ? [item("reopen", `Reopen ${state.lastHandle.name}`)] : []),
+       item("new", "Start a new, empty map"), item("template", "Download the blank template"), el("hr"),
+       item("download", "Download a copy of the demo (.xlsx)"), item("settings", "Settings…"), item("backups", "Backups…")];
+  menu.replaceChildren(...items);
 }
 
 // ---- edits -------------------------------------------------------------------
@@ -503,7 +522,8 @@ function toggleTask(task) {
 
 async function openSettings() {
   const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo", calendar: calendars,
-                                     onProfile: () => focus("me"), onReplayIntro: () => playIntro() });
+                                     onProfile: () => focus("me"), onReplayIntro: () => playIntro(),
+                                     onWelcome: () => welcome() });
   if (!result) return;
   const ops = [{ type: "setSettings", settings: result.settings }];
   if (result.me !== state.doc.model.me) ops.push({ type: "setMe", name: result.me });
@@ -597,17 +617,33 @@ async function reopen() {
   await openPicked({ ...(await files.readHandle(handle)), handle });
 }
 
-async function newWorkbook() {
-  const body = el("label", undefined, { class: "field" });
-  const input = el("input", undefined, { placeholder: "Your name", autocomplete: "name", name: "me" });
-  body.append(el("span", "Your name (shown in the center of your map)"), input);
-  const choice = await ask("Start a new workbook", body,
-    [{ label: "Cancel", value: "" }, { label: "Create", value: "create", primary: true }]);
-  if (choice !== "create") return;
+/** A new, empty map: "Your Name" in the center and a prompt to fill in My profile. */
+async function newWorkbook({ quiet = false } = {}) {
   Object.assign(state, { mode: "file", fileName: DEFAULT_NAME, handle: null, neverSaved: true, selected: null,
-                         doc: { model: emptyModel(input.value.trim()), base: null, lastModified: null, pending: [] } });
+                         doc: { model: emptyModel(""), base: null, lastModified: null, pending: [] } });
   render();
-  toast("New workbook ready. Add your target companies, then Save.");
+  showView("map");
+  if (!quiet) toast("Your new map is ready. Start with your profile, then add people and targets. Save when you like.", 7000);
+}
+
+/** "Start your own": the step-by-step LinkedIn export guide, then a new map with your connections in the Pool. */
+async function startOwn() {
+  if (unsaved()) {
+    const choice = await ask("Unsaved changes", `You have unsaved changes to ${state.fileName}.`,
+      [{ label: "Cancel", value: "" }, { label: "Continue without saving", value: "go" }]);
+    if (choice !== "go") return;
+  }
+  const r = await showOnboarding();
+  if (!r) return;
+  await newWorkbook({ quiet: !!r.csv });
+  if (r.csv) await importPool(r.csv);
+  else if (r.manual) addPerson();
+}
+
+async function welcome() {
+  const choice = await showWelcome();
+  if (choice === "start") await startOwn();
+  else if (choice === "demo" && state.mode !== "demo") await loadDemo();
 }
 
 // ---- saving ------------------------------------------------------------------
@@ -786,9 +822,11 @@ function closeMenu() {
 menuBtn.addEventListener("click", e => { e.stopPropagation(); menu.hidden ? openMenu() : closeMenu(); });
 document.addEventListener("click", e => { if (!menu.contains(e.target)) closeMenu(); });
 
-const ACTIONS = { open: openFile, reopen, new: newWorkbook, template: downloadTemplate, download: downloadCopy,
-                  backups: showBackups, settings: openSettings, demo: loadDemo, importPool };
-const SAFE_ACTIONS = ["download", "backups", "template", "settings", "importPool"]; // don't leave the current file
+const ACTIONS = { open: openFile, reopen, new: () => newWorkbook(), template: downloadTemplate, download: downloadCopy,
+                  backups: showBackups, settings: openSettings, demo: loadDemo, importPool: () => importPool(), save,
+                  export: () => setTimeout(openExportMenu, 0), start: startOwn };
+// These don't leave the current file (startOwn asks about unsaved changes itself).
+const SAFE_ACTIONS = ["download", "backups", "template", "settings", "importPool", "save", "export", "start"];
 menu.addEventListener("click", async e => {
   const action = e.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
@@ -901,11 +939,18 @@ window.addEventListener("beforeunload", e => {
 
 // ---- start ---------------------------------------------------------------------
 
+let markDemoReady;
+const demoReady = new Promise(r => { markDemoReady = r; });
+
 // Welcome intro on the first visit (the app keeps loading behind it). ?intro=2.6 freezes it at 2.6 s.
 {
   const freeze = new URLSearchParams(location.search).get("intro");
   if (freeze !== null) playIntro({ freezeAt: Number(freeze) || 0 });
-  else if (!introSeen()) playIntro();
+  else {
+    // First visit: the intro, then the Welcome card (See the demo / Start your own).
+    const intro = introSeen() ? Promise.resolve() : playIntro();
+    if (!welcomeSeen()) Promise.all([intro, demoReady]).then(() => welcome());
+  }
 }
 
 (async () => {
@@ -915,6 +960,7 @@ window.addEventListener("beforeunload", e => {
   if (pref(PREFS.lock, "") === "1") setLocked(true);
   try {
     await loadDemo();
+    markDemoReady();
   } catch (e) {
     console.error(e);
     toast(`Couldn't load the demo: ${e.message}`, 10000);

@@ -1,7 +1,7 @@
 # Network Map v2: build spec for Claude Code
 
-This is the single spec. V2_ADDITIONS.md (and the change to its section B), NEXT_UPDATE.md and FIXES_AND_PDF.md have
-been merged in here.
+This is the single spec. V2_ADDITIONS.md (and the change to its section B), NEXT_UPDATE.md, FIXES_AND_PDF.md and
+ROUND_2.md have been merged in here.
 Build in the phases at the bottom, run the tests, and **commit locally after each phase. Don't push until I say so.**
 After each phase, show me screenshots of what changed. Ask me about anything unclear before building it.
 
@@ -392,6 +392,50 @@ created live on add/edit/import/merge, the people attach to it, and its logo is 
 initials). Below the threshold it goes away, unless it's a target. The threshold is a setting (default 3). A toast
 says "Created Delta Air Lines group (3 people)".
 
+## W. Round 2: onboarding, a simpler demo, fixes (ROUND_2.md)
+
+**A. Welcome + onboarding.** (1) After the intro on the first visit, a large "Welcome!" card with the Orbit logo, one line about
+Orbit and two choices: **See the demo** ("Explore an example network") or **Start your own** ("Build your network map").
+Remembered (localStorage, try/catch); "Welcome screen" in Settings shows it again. (2) Start your own: a step-by-step guide to
+LinkedIn's data export, with an illustration per step (`site/onboarding/step1.svg`…, generic UI mockups with arrows, no
+LinkedIn logo or design, swappable for real screenshots): Me → Settings & Privacy · Data privacy → Get a copy of your data ·
+"Download larger data archive" (Connections, Positions, Education) or just Connections · wait for the email (≈10 min / up to
+24 h), download, unzip · drop Connections.csv on the big drop zone here. Plus "Skip for now" (empty map) and "Add people
+manually instead". (3) A new map starts with "Your Name" in the center and a prompt to fill in My profile (name, photo, school,
+jobs, Zoom link); the center dot and header show the real name once set. (4) "Use my own data" only in demo mode; with your own
+map it becomes the map's name + a menu (Save, Open another file, Export, Switch to demo; then Import LinkedIn connections,
+Download a copy, Settings, Backups, New empty workbook, Blank template). ✅ confirmed
+
+**B. Simpler demo.** (5) All current demo people stay, but the only organizations are **Stanford University** (school group),
+**Microsoft** and **Deloitte** (company groups) and **Google** (a target with no one yet). Current companies/schools are moved
+onto these; Delta, Goldman Sachs, Qualtrics, Apple, Nike, Adobe and University of Utah leave the map and targets. Past
+companies may stay in work histories but stay under the group threshold. Enough relationships remain for highlights and
+paths; dates stay fresh. (6) Every school/company dot can be edited: type (School/Company), website and picture/logo (upload,
+URL, or find automatically), saved in the Companies sheet. ✅ Changing the type **moves the people too**: School → Company moves
+it from their Schools to Company (or Past Companies if they already have one); Company → School the other way.
+
+**C. Map.** (7) "No one yet" dots can be dragged and their positions are saved. (8) The Lock button and feature are removed;
+Re-arrange stays. (9) Legend & view: a "Groups form at: [2–10] people" slider (default 3), live, saved in Settings.
+(10) The "(N)" on a group and "People in this group" equal the person dots actually connected to it, counting current and
+past members the same way everywhere (tested against the drawn edges). (11) Group by: Company, School, Skills, Languages,
+Certifications, Tags (several allowed). ✅ Each selected field makes a dot for every value shared by at least N people
+(the slider); a person hangs off their first group with dashed links to the others; targets always show; saved in the
+workbook's Settings. Search matches any field and shows which one matched.
+
+**D. Person details.** (12) A LinkedIn PDF drop zone at the bottom of every person's details runs the PDF import in merge mode
+for them (with the More → Save to PDF tip). (13) Chip inputs with autocomplete for Skills, Languages, Certifications, Tags,
+Schools and Past Companies (Enter/comma adds, × removes), stored the same way. (14) "My Zoom link" in My profile, the same
+value as in Settings.
+
+**E. Calendar and tasks.** (15) Deleting a meeting removes its not-done automatic tasks (linked by meeting ID); asks "Also
+remove N related tasks?" if you edited them. Tested. (16) Fix the white box over "This Week" in To-Do (narrow/wide, both
+themes). (17) The To-Do **and LinkedIn Pool** footers show only the Orbit mark, in the theme color ✅.
+
+**F. Fixes.** (18) "+ Add person": the orange accent becomes part of the button (clean bottom border with the right radius,
+both themes). (19) Save → close → open is lossless for everything (people and all fields, photos, Experience, Education,
+Connections, Targets, Companies, Meetings, Tasks, Layout, Settings incl. group threshold/group-by/Zoom link, My profile):
+automatic test, plus by hand in Chrome (save to the same file) and Safari (download), and through a real Excel re-save.
+
 ## 9. README (portfolio-first)
 
 Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
@@ -413,6 +457,7 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a571
 3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(dc94e2b … 5af12f2)*:
    1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
+3e. **Round 2 (W), one local commit per group A–F, then a "Round 2 done" commit; push only when asked.**
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
