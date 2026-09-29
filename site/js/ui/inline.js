@@ -3,14 +3,17 @@
 
 import { el } from "./dom.js";
 import { attachTypeahead } from "./typeahead.js";
+import { chipInput, chipList } from "./chips.js";
 
 /**
  * opts: { value, placeholder, multiline, type ("text"|"date"|"email"|"url"),
  *         kind: type-ahead kind (company, school, role, tag, person…), multi: several entries (Schools, Past Companies, Tags),
- *         display: value -> string|Node, onSave: newValue -> void, label }
+ *         display: value -> string|Node, onSave: newValue -> void, label,
+ *         chips: a multi-value field name (school, pastCompanies, tags, skills, languages, certifications) }
  */
 export function inlineField(opts) {
-  const { value = "", placeholder = "Add…", multiline = false, type = "text", kind, multi = false, display, onSave, label } = opts;
+  const { value = "", placeholder = "Add…", multiline = false, type = "text", kind, multi = false, onSave, label, chips } = opts;
+  const display = opts.display ?? (chips ? v => (v ? chipList(v, chips) : "") : undefined);
   const wrap = el("span", undefined, { class: `inline${multiline ? " multiline" : ""}` });
 
   function show() {
@@ -24,6 +27,7 @@ export function inlineField(opts) {
   }
 
   function edit() {
+    if (chips) return editChips();
     const input = multiline ? el("textarea", undefined, { rows: Math.min(8, Math.max(3, value.split("\n").length + 1)) })
       : el("input", undefined, { type, autocomplete: "off" });
     input.value = value;
@@ -47,6 +51,24 @@ export function inlineField(opts) {
       else if (e.key === "Enter" && (!multiline || e.metaKey || e.ctrlKey)) { e.preventDefault(); finish(true); }
     });
     input.addEventListener("blur", () => finish(true));
+  }
+
+  /** Chips: Enter on an empty entry or clicking away saves; Esc cancels. */
+  function editChips() {
+    let done = false;
+    const finish = save => {
+      if (done) return;
+      done = true;
+      const next = box.value();
+      if (save && next !== value) onSave(next);
+      else show();
+    };
+    const box = chipInput({ value, field: chips, placeholder, label, onEnterEmpty: () => finish(true) });
+    box.element.classList.add("inline-chips");
+    box.input.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } });
+    box.element.addEventListener("focusout", e => { if (!box.element.contains(e.relatedTarget)) setTimeout(() => { if (!box.element.contains(document.activeElement)) finish(true); }, 0); });
+    wrap.replaceChildren(box.element);
+    box.focus();
   }
 
   show();

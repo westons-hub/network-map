@@ -24,11 +24,11 @@ export function searchMap(graph, people, query, limit = 8) {
   const push = r => { if (!seen.has(r.id) && onMap.has(r.id)) { seen.add(r.id); out.push(r); } };
   const orgQ = normalizeOrg(q);
   // 1) Names: people, then groups and targets (a name that starts with the query first).
-  const byName = graph.nodes.filter(n => n.kind !== "me" && String(n.label ?? "").toLowerCase().includes(q)
+  const byName = graph.nodes.filter(n => String(n.label ?? "").toLowerCase().includes(q)
                                          || (n.key && normalizeOrg(n.label ?? "") === orgQ))
     .sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q)) ||
                     Number(!a.id.startsWith("p:")) - Number(!b.id.startsWith("p:")));
-  for (const n of byName) push({ id: n.id, label: n.label, field: n.id.startsWith("p:") ? "Name" : n.field ?? n.kind, value: "" });
+  for (const n of byName) push({ id: n.id, label: n.label, field: n.kind === "me" ? "You" : n.id.startsWith("p:") ? "Name" : n.field ?? n.kind, value: "" });
   // 2) Any field of a person.
   for (const [f, name] of FIELDS) {
     for (const p of people) {

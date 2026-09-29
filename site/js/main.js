@@ -74,6 +74,7 @@ const details = createDetails({
     focus,
     patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); details.saved(); },
     setProfile: fields => { edit({ type: "setProfile", fields }); details.saved(); },
+    setZoomLink: link => { edit({ type: "setSettings", settings: { zoomLink: link } }); details.saved(); },
     addConnection: connection => {
       if (!connection.b || !connection.a || normalizeName(connection.a) === normalizeName(connection.b)) return;
       edit({ type: "addConnection", connection });
@@ -90,6 +91,7 @@ const details = createDetails({
     editAll,
     exportPerson: name => runExport({ kind: "people", names: [name] }),
     editOrg,
+    importPdfFor: (name, file) => addPerson({ pdf: file, into: name }),
     removePerson,
     scheduleMeeting: opts => editMeeting(null, opts),
     editMeeting: m => editMeeting(m),
@@ -187,8 +189,8 @@ function moveMeeting(id, date, start, end) {
 
 // ---- adding people ------------------------------------------------------------------
 
-async function addPerson({ pdf, entry } = {}) {
-  const result = await addPersonFlow({ model: state.doc.model, demo: state.mode === "demo", pdf, entry });
+async function addPerson({ pdf, entry, into } = {}) {
+  const result = await addPersonFlow({ model: state.doc.model, demo: state.mode === "demo", pdf, entry, into });
   if (!result) return;
   if (result.open) return openPerson(result.open);
   const { person: { links = [], history, ...person }, existingKey } = result;

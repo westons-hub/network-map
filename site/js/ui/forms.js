@@ -6,6 +6,7 @@ import { newId, todayIso } from "../core/schedule.js";
 import { PRIORITIES, STAGES } from "../core/workbook.js";
 import { ask, toast } from "./dialog.js";
 import { attachTypeahead } from "./typeahead.js";
+import { chipField } from "./chips.js";
 import { el } from "./dom.js";
 
 function field(label, input, hint) {
@@ -181,43 +182,41 @@ export async function personForm({ model, person }) {
     name: input("name", person.name, { required: true }),
     role: input("role", person.role),
     company: input("company", person.company),
-    school: input("school", person.school, { placeholder: "e.g. BYU (2022–2026); Lakeview High" }),
-    pastCompanies: input("pastCompanies", person.pastCompanies, { placeholder: "e.g. Deloitte (2019–2021)" }),
+    school: chipField("school", person.school, { placeholder: "e.g. BYU (2022–2026)" }),
+    pastCompanies: chipField("pastCompanies", person.pastCompanies, { placeholder: "e.g. Deloitte (2019–2021)" }),
     email: input("email", person.email, { type: "email" }),
     linkedinUrl: input("linkedinUrl", person.linkedinUrl, { type: "url", placeholder: "https://www.linkedin.com/in/…" }),
     connectedThrough: input("connectedThrough", person.connectedThrough, { placeholder: "Blank = you know them directly" }),
     // (Other connections — coworker, classmate, friend, mentor — are added in the Connections section.)
     connectedOn: input("connectedOn", person.connectedOn, { type: "date" }),
     status: select("status", [["", "No status"], ...STATUSES.map(x => [x, x])], person.status),
-    tags: input("tags", person.tags.join(", "), { placeholder: "Comma-separated" }),
+    tags: chipField("tags", person.tags, { placeholder: "Add a tag" }),
     notes: el("textarea", undefined, { name: "notes", rows: 4, value: person.notes }),
     headline: input("headline", person.headline),
     location: input("location", person.location),
     website: input("website", person.website, { type: "url" }),
-    skills: input("skills", person.skills, { placeholder: "; separated" }),
-    languages: input("languages", person.languages, { placeholder: "e.g. Spanish (Professional Working)" }),
-    certifications: input("certifications", person.certifications),
+    skills: chipField("skills", person.skills, { placeholder: "Add a skill" }),
+    languages: chipField("languages", person.languages, { placeholder: "e.g. Spanish (Professional Working)" }),
+    certifications: chipField("certifications", person.certifications, { placeholder: "Add a certification" }),
     honors: input("honors", person.honors),
     about: el("textarea", undefined, { name: "about", rows: 3, value: person.about ?? "" }),
   };
   attachTypeahead(fields.connectedThrough, "person");
   attachTypeahead(fields.company, "company");
   attachTypeahead(fields.role, "role");
-  attachTypeahead(fields.school, "school", { multi: true });
-  attachTypeahead(fields.pastCompanies, "company", { multi: true });
-  attachTypeahead(fields.tags, "tag", { multi: true });
   const two = (a, b) => { const r = el("div", undefined, { class: "row2" }); r.append(a, b); return r; };
+  const f = name => fields[name].element ?? fields[name];
   body.append(
     el("div", "Basics", { class: "form-section" }), field("Name", fields.name), two(field("Role", fields.role), field("Company", fields.company)),
     two(field("Email", fields.email), field("LinkedIn", fields.linkedinUrl)),
     field("Headline", fields.headline), two(field("Location", fields.location), field("Website", fields.website)),
-    el("div", "Connection", { class: "form-section" }), two(field("Schools", fields.school), field("Past companies", fields.pastCompanies)),
+    el("div", "Connection", { class: "form-section" }), two(field("Schools", f("school")), field("Past companies", f("pastCompanies"))),
     field("Introduced by", fields.connectedThrough, "Who introduced you? Coworker/classmate/friend/mentor links are in Connections."),
     two(field("Connected on", fields.connectedOn), field("Status", fields.status)),
-    el("div", "Skills and more", { class: "form-section" }), two(field("Skills", fields.skills), field("Languages", fields.languages)),
-    two(field("Certifications", fields.certifications), field("Honors, publications, patents", fields.honors)),
+    el("div", "Skills and more", { class: "form-section" }), two(field("Skills", f("skills")), field("Languages", f("languages"))),
+    two(field("Certifications", f("certifications")), field("Honors, publications, patents", fields.honors)),
     field("About", fields.about),
-    el("div", "Notes", { class: "form-section" }), field("Tags", fields.tags), field("Notes", fields.notes));
+    el("div", "Notes", { class: "form-section" }), field("Tags", f("tags")), field("Notes", fields.notes));
   const choice = await ask(`Edit ${person.name}`, body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
   if (choice !== "save" || !fields.name.value.trim()) return null;
   const out = {};

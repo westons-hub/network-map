@@ -237,20 +237,23 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const md = meetingDate(model, p.name);
     info.append(
       row("Email", edit("email", { type: "email", placeholder: "Add email" })),
-      row("Schools", edit("school", { kind: "school", multi: true, placeholder: "Add school(s)", label: "schools" })),
-      row("Past companies", edit("pastCompanies", { kind: "company", multi: true, placeholder: "e.g. Deloitte (2019–2021)",
+      row("Schools", edit("school", { chips: "school", placeholder: "Add a school", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { chips: "pastCompanies", placeholder: "e.g. Deloitte (2019–2021)",
                                                      label: "past companies" })),
       row("Connected on", edit("connectedOn", { type: "date", placeholder: "Add date", display: v => prettyDate(v, false) || v })),
       row("Meeting date", el("span", md ? `${prettyDate(md.meeting.date)}${md.upcoming ? " (upcoming)" : ""}` : "—")),
       row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste profile link",
         display: v => v ? "Profile link" : "" })),
-      row("Tags", edit("tags", { placeholder: "Add tags", kind: "tag", multi: true })),
+      row("Tags", edit("tags", { placeholder: "Add a tag", chips: "tags", label: "tags" })),
     );
     // From a LinkedIn profile PDF (shown once there's something to show).
-    for (const [label, f] of [["Location", "location"], ["Website", "website"], ["Skills", "skills"], ["Languages", "languages"],
-                              ["Certifications", "certifications"], ["Honors", "honors"]]) {
+    for (const [label, f] of [["Location", "location"], ["Website", "website"], ["Honors", "honors"]]) {
       if (p[f]) info.append(row(label, edit(f, { label: label.toLowerCase(), type: f === "website" ? "url" : "text" })));
     }
+    // Skills, languages and certifications are always there to add to (chips, with suggestions).
+    info.append(row("Skills", edit("skills", { chips: "skills", placeholder: "Add a skill", label: "skills" })),
+                row("Languages", edit("languages", { chips: "languages", placeholder: "Add a language", label: "languages" })),
+                row("Certifications", edit("certifications", { chips: "certifications", placeholder: "Add a certification", label: "certifications" })));
     card.append(info);
     if (p.about) {
       card.append(section("About", placeholder ? el("div", p.about, { class: "pre" })
@@ -265,6 +268,29 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     // Notes: full text, editable in place.
     card.append(section("Notes", placeholder ? el("span", p.notes || "—", { class: "muted" })
       : inlineField({ value: p.notes, multiline: true, label: "notes", placeholder: "Add notes…", onSave: save("notes") })));
+
+    // Their LinkedIn PDF fills in everything (merged: your edits are never overwritten).
+    if (!placeholder) {
+      const drop = el("div", undefined, { class: "drop-zone pdf-drop", tabIndex: 0, role: "button",
+        "aria-label": `Add ${p.name}'s LinkedIn PDF` });
+      const file = el("input", undefined, { type: "file", accept: "application/pdf,.pdf", hidden: true,
+        onchange: () => { if (file.files[0]) handlers.importPdfFor(p.name, file.files[0]); } });
+      drop.append(el("strong", "Add their LinkedIn PDF to fill in everything"),
+        el("span", "Drop it here or click to choose. On their LinkedIn profile: More → Save to PDF. It's read on your computer, " +
+                   "and nothing you've entered is overwritten.", { class: "muted small" }), file);
+      drop.addEventListener("click", () => file.click());
+      drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+      drop.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); drop.classList.add("over"); });
+      drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+      drop.addEventListener("drop", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove("over");
+        const f = [...e.dataTransfer.files].find(x => /\.pdf$/i.test(x.name) || x.type === "application/pdf");
+        if (f) handlers.importPdfFor(p.name, f);
+      });
+      card.append(drop);
+    }
 
     if (!placeholder) {
       const foot = el("div", undefined, { class: "card-foot" });
@@ -337,10 +363,14 @@ export function createDetails({ sidebar, getCtx, handlers }) {
 
     const info = el("div", undefined, { class: "card-info" });
     info.append(
-      row("Schools", edit("school", { kind: "school", multi: true, placeholder: "e.g. BYU (2022–2026)", label: "schools" })),
-      row("Past companies", edit("pastCompanies", { kind: "company", multi: true, placeholder: "e.g. Deloitte (2019–2021)", label: "past companies" })),
+      row("Schools", edit("school", { chips: "school", placeholder: "e.g. BYU (2022–2026)", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { chips: "pastCompanies", placeholder: "e.g. Deloitte (2019–2021)", label: "past companies" })),
       row("Email", edit("email", { type: "email", placeholder: "Add email" })),
       row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste your profile link", display: v => (v ? "Profile link" : "") })),
+      // The same Zoom link as in Settings: it goes into every invite.
+      row("My Zoom link", inlineField({ value: model.settings?.zoomLink ?? "", type: "url", label: "my Zoom link",
+        placeholder: "Your personal room link", display: v => (v ? v.replace(/^https?:\/\//, "") : ""),
+        onSave: v => handlers.setZoomLink(v) })),
       row("Location", edit("location", { placeholder: "Add location" })),
     );
     card.append(info);

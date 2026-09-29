@@ -660,3 +660,11 @@ dialog:has(.onboarding) { width: min(700px, 96vw); }
 .search-results li.active, .search-results li:hover { background: var(--hover-bg); }
 .search-results li.empty { cursor: default; }
 .group-slider input[type=range] { height: 18px; padding: 0; border: 0; background: transparent; }
+.pdf-drop { display: grid; gap: 4px; margin: 14px 0 4px; padding: 14px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: 12px; font-size: 13px; }
+.pdf-drop:hover, .pdf-drop:focus-visible, .pdf-drop.over { border-color: var(--orbit-orange); background: var(--soft-bg); outline: none; }
+.chip-list { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.chip-static { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 12px; line-height: 20px; }
+.inline-chips { min-height: 32px; }
+.field-chips input, .field .field-chips input { border: 0; outline: none; padding: 4px; flex: 1 1 120px; width: auto; min-width: 100px; background: transparent; box-shadow: none; }
+.field-chips:focus-within { border-color: var(--accent); }

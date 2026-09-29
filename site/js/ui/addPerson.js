@@ -15,11 +15,13 @@ import { ask, toast } from "./dialog.js";
 import { el } from "./dom.js";
 import { resizeImage } from "./forms.js";
 import { attachTypeahead } from "./typeahead.js";
+import { chipField } from "./chips.js";
 import { isPdf, readProfilePdf } from "./pdf.js";
 
 const TIP = "For full history, open their LinkedIn profile → More → Save to PDF, then drop it here.";
 
 function field(label, input, { hint, needs } = {}) {
+  input = input.element ?? input; // chip fields
   // A group of inputs (connections, history rows) sits in a div: a <label> would send clicks to its first input.
   const wrap = el(input.tagName === "DIV" ? "div" : "label", undefined, { class: `field${needs ? " needs" : ""}` });
   wrap.append(el("span", label), input);
@@ -177,26 +179,24 @@ async function reviewPerson({ model, draft, note, existing, pdf, filled = [] }) 
   const input = (name, attrs = {}) => el("input", undefined, { name, value: val(name), autocomplete: "off", ...attrs });
   const f = {
     name: input("name", { required: true }), role: input("role"), company: input("company"),
-    school: input("school", { placeholder: "e.g. BYU (2022–2026); Lakeview High" }),
-    pastCompanies: input("pastCompanies", { placeholder: "e.g. Deloitte (2019–2021)" }),
+    school: chipField("school", val("school"), { placeholder: "e.g. BYU (2022–2026)" }),
+    pastCompanies: chipField("pastCompanies", val("pastCompanies"), { placeholder: "e.g. Deloitte (2019–2021)" }),
     email: input("email", { type: "email" }), linkedinUrl: input("linkedinUrl", { type: "url" }),
     connectedOn: input("connectedOn", { type: "date" }),
     status: el("select", undefined, { name: "status" }),
-    tags: input("tags", { placeholder: "Comma-separated" }),
+    tags: chipField("tags", draft.tags ?? "", { placeholder: "Add a tag" }),
     notes: el("textarea", undefined, { name: "notes", rows: 3, value: val("notes") }),
   };
   // From a profile PDF: the rest of what LinkedIn shows.
   if (pdf || PDF_FIELDS.some(k => val(k))) {
     Object.assign(f, { headline: input("headline"), location: input("location"), website: input("website", { type: "url" }),
-      skills: input("skills", { placeholder: "; separated" }), languages: input("languages"), certifications: input("certifications"),
+      skills: chipField("skills", val("skills"), { placeholder: "Add a skill" }), languages: chipField("languages", val("languages")),
+      certifications: chipField("certifications", val("certifications")),
       honors: input("honors"), about: el("textarea", undefined, { name: "about", rows: 3, value: val("about") }) });
   }
   for (const s of ["", ...STATUSES]) f.status.append(el("option", s || "Choose…", { value: s, selected: s === (draft.status ?? "") }));
   attachTypeahead(f.company, "company");
   attachTypeahead(f.role, "role");
-  attachTypeahead(f.school, "school", { multi: true });
-  attachTypeahead(f.pastCompanies, "company", { multi: true });
-  attachTypeahead(f.tags, "tag", { multi: true });
   const lists = [];
 
   // Connections: who introduced you, and who they know (coworker, classmate, friend, mentor, other).
@@ -325,12 +325,14 @@ async function reviewPerson({ model, draft, note, existing, pdf, filled = [] }) 
  * The whole flow. Resolves with { person, existingKey } to save, { open: name } to open someone
  * already on the map, or null.
  */
-export async function addPersonFlow({ model, demo, pdf, entry }) {
+export async function addPersonFlow({ model, demo, pdf, entry, into }) {
   const found = entry ? { draft: personFromPool(entry), source: "pool", note: "Filled in from your LinkedIn connections." }
     : await findPerson({ model, demo, pdf });
   if (!found) return null;
   if (found.open) return found;
-  const existing = model.people.find(p => normalizeName(p.name) === normalizeName(found.draft.name));
+  // From someone's details (into): merge into them, even if the PDF spells their name differently.
+  const existing = model.people.find(p => normalizeName(p.name) === normalizeName(into ?? found.draft.name));
+  if (existing && into) found.draft = { ...found.draft, name: existing.name };
   // Someone already on the map: fill their empty fields from what we found, never overwrite what's there.
   const merged = existing ? fillPerson(existing, found.draft) : { person: found.draft, filled: [] };
   const person = await reviewPerson({ model, draft: merged.person, note: found.note, existing, pdf: found.pdf,

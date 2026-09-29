@@ -34,6 +34,8 @@ function tally(kind) {
 /** Everything to suggest, per kind: [{ value, key, count (people on the map), pool (people in the LinkedIn pool) }]. */
 export function buildSuggestions(model) {
   const company = tally("company"), school = tally("school"), role = tally("role"), tag = tally("tag");
+  const skill = tally("skill"), language = tally("language"), certification = tally("certification");
+  const list = v => String(v ?? "").split(/[;\n]/).map(x => x.trim()).filter(Boolean);
   for (const p of model.people) {
     const orgs = new Set([p.company, ...entryNames(p.pastCompanies)].filter(Boolean).map(normalizeOrg));
     if (p.company) company.add(p.company, { count: 1 });
@@ -41,6 +43,9 @@ export function buildSuggestions(model) {
     for (const name of entryNames(p.school)) school.add(name, { count: 1 });
     if (p.role) role.add(p.role, { count: 1 });
     for (const t of p.tags ?? []) tag.add(t, { count: 1 });
+    for (const v of list(p.skills)) skill.add(v, { count: 1 });
+    for (const v of list(p.languages)) language.add(v.replace(/\s*\([^)]*\)\s*$/, ""), { count: 1 });
+    for (const v of list(p.certifications)) certification.add(v, { count: 1 });
   }
   for (const e of model.pool ?? []) {
     if (e.company) company.add(e.company, { pool: 1 });
@@ -57,6 +62,7 @@ export function buildSuggestions(model) {
   const fixed = values => values.map(v => ({ value: v, key: v.toLowerCase(), count: 0, pool: 0 }));
   return {
     company: company.list(), school: school.list(), role: role.list(), tag: tag.list(),
+    skill: skill.list(), language: language.list(), certification: certification.list(),
     person: model.people.map(p => ({ value: p.name, key: normalizeName(p.name), count: 0, pool: 0, detail: [p.role, p.company].filter(Boolean).join(" @ ") })),
     status: fixed(STATUSES), meetingType: fixed(MEETING_TYPES), method: fixed(METHODS),
     relationshipPlan: fixed(RELATIONSHIP_PLANS), connectionType: fixed(CONNECTION_TYPES),
