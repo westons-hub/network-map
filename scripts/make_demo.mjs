@@ -18,37 +18,34 @@ const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
 // Name, Company, School, Role, Connected Through, Status, Tags, Notes
 const PEOPLE = [
   ["Jordan Lee", "Deloitte", "Stanford University", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
-  ["Priya Shah", "Deloitte", "University of Utah", "Manager", "", "Scheduled", "", ""],
+  ["Priya Shah", "Deloitte", "Stanford University", "Manager", "", "Scheduled", "", ""],
   ["Marcus Bell", "Deloitte", "Stanford", "Analyst", "", "Met", "Consulting club", ""],
   ["Hana Kim", "Deloitte LLP", "", "Partner", "", "To Reach Out", "", "Leads the strategy practice"],
   ["Sofia Alvarez", "Microsoft", "Stanford University", "Product Manager", "", "Met", "Product", "Owns the marketplace roadmap"],
   ["Ethan Brooks", "Microsoft", "", "Data Analyst", "", "Scheduled", "Product", ""],
-  ["Lena Novak", "Microsoft", "University of Utah", "Program Manager", "", "To Reach Out", "Product", ""],
-  ["Noah Carter", "Delta Air Lines", "Stanford University", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
-  ["Grace Owens", "Delta Air Lines", "", "Recruiter", "", "Scheduled", "", ""],
-  ["Daniel Ortiz", "Goldman Sachs", "Stanford University", "Strategy Associate", "", "Met", "", ""],
-  ["Mia Chen", "Google", "University of Utah", "Product Lead", "", "Met", "", ""],
-  ["Owen Price", "Google", "University of Utah", "Associate Product Manager", "", "To Reach Out", "", ""],
-  ["Ava Thompson", "Adobe", "University of Utah", "Operations Lead", "", "Met", "", ""],
+  ["Lena Novak", "Microsoft", "", "Program Manager", "", "To Reach Out", "Product", ""],
+  ["Noah Carter", "Microsoft", "Stanford University", "Business Strategy Analyst", "", "Met", "", "Info session speaker"],
+  ["Grace Owens", "Deloitte", "", "Campus Recruiter", "", "Scheduled", "", ""],
+  ["Daniel Ortiz", "Deloitte", "Stanford University", "Strategy Associate", "", "Met", "", ""],
+  ["Mia Chen", "Microsoft", "Stanford University", "Product Lead", "", "Met", "", ""],
+  ["Owen Price", "Microsoft", "", "Associate Product Manager", "", "To Reach Out", "", ""],
+  ["Ava Thompson", "Microsoft", "", "Operations Lead", "", "Met", "", ""],
   ["Liam Walsh", "Independent", "", "Founder", "", "Met", "", "Old roommate"],
   ["Rachel Green", "Deloitte", "", "Principal", "Jordan Lee", "To Reach Out", "", "Jordan offered an intro"],
   ["Tom Nguyen", "Microsoft", "", "Director of Product", "Sofia Alvarez", "To Reach Out", "Product", ""],
   ["Isla Moore", "Microsoft", "", "UX Researcher", "Sofia Alvarez", "", "Product", ""],
-  ["Victor Hale", "Delta Air Lines", "", "VP Network Planning", "Noah Carter", "", "", ""],
-  ["Chloe Park", "Adobe", "", "Design Manager", "Mia Chen", "", "", ""],
+  ["Victor Hale", "Microsoft", "", "VP of Strategy", "Noah Carter", "", "", ""],
+  ["Chloe Park", "Microsoft", "", "Design Manager", "Mia Chen", "", "", ""],
   ["Ben Foster", "Stanford University", "", "Career Coach", "Daniel Ortiz", "", "", ""],
-  ["Zoe Adams", "Qualtrics", "", "Director of Strategy", "Liam Walsh", "", "", ""],
-  ["Sam Rivera", "Qualtrics", "", "Head of Growth", "Zoe Adams", "", "", "3rd-degree example"],
+  ["Zoe Adams", "Microsoft", "", "Director of Strategy", "Liam Walsh", "", "", ""],
+  ["Sam Rivera", "Microsoft", "", "Head of Growth", "Zoe Adams", "", "", "3rd-degree example"],
 ];
 
 // Company, Priority, Stage, Notes
 const TARGETS = [
   ["Deloitte", "1", "Networking", "Strategy practice"],
-  ["Delta Air Lines", "1", "Applied", ""],
-  ["Goldman Sachs", "2", "Researching", "Three pool contacts there aren't on the map yet"],
-  ["Qualtrics", "2", "Researching", "Reachable only through Liam"],
-  ["Apple", "3", "Researching", "No one yet"],
-  ["Nike", "3", "Researching", "No one yet"],
+  ["Google", "1", "Researching", "No one on the map yet: two people there are in your LinkedIn pool"],
+  ["Microsoft", "2", "Networking", "Product roles; Sofia is the warmest way in"],
 ];
 
 // Explicit logo domains for every organization in the demo (the demo never guesses domains).
@@ -66,26 +63,26 @@ const COMPANIES = [
 const BASE = "2026-09-28";
 // [person, days from BASE, start, minutes, type, method, notes, next step]
 const MEETINGS = [
-  ["Liam Walsh", -30, "18:00", 60, "Coffee Chat", "In Person", "Caught up; he offered to introduce me to Zoe at Qualtrics.", "Ask Liam for the Zoe intro"],
+  ["Liam Walsh", -30, "18:00", 60, "Coffee Chat", "In Person", "Caught up; he offered to introduce me to Zoe on Microsoft's strategy team.", "Ask Liam for the Zoe intro"],
   ["Sofia Alvarez", -20, "12:00", 30, "Coffee Chat", "In Person", "Marketplace roadmap, how PMs at Microsoft pick problems.", "Send thank-you"],
   ["Jordan Lee", -12, "16:30", 30, "Informational", "Zoom", "Walked through case interview prep and the strategy practice.", "Send resume for review"],
-  ["Noah Carter", -5, "09:00", 30, "Informational", "Phone", "Delta's commercial strategy team; APM-style rotation.", "Apply to the fall rotation"],
-  ["Daniel Ortiz", -2, "15:00", 30, "Coffee Chat", "Zoom", "Goldman strategy group; offered to connect me with Ben.", "Send thank-you"],
+  ["Noah Carter", -5, "09:00", 30, "Informational", "Phone", "Microsoft's business strategy team; APM-style rotation.", "Apply to the fall rotation"],
+  ["Daniel Ortiz", -2, "15:00", 30, "Coffee Chat", "Zoom", "Deloitte strategy group; offered to connect me with Ben.", "Send thank-you"],
   ["Priya Shah", 1, "10:00", 30, "Coffee Chat", "Zoom", "", ""],
-  ["Grace Owens", 6, "13:30", 30, "Interview", "Teams", "Recruiter screen for the Delta internship.", ""],
+  ["Grace Owens", 6, "13:30", 30, "Interview", "Teams", "Recruiter screen for the Deloitte internship.", ""],
   ["Mia Chen", 12, "11:00", 30, "Coffee Chat", "Google Meet", "", ""],
   ["Ethan Brooks", 25, "14:00", 30, "Informational", "Zoom", "", ""],
 ];
 // [task, person, company, due (days from BASE), done]
 const TASKS = [
-  ["Send thank-you to Daniel Ortiz within 24 hrs", "Daniel Ortiz", "Goldman Sachs", -1, false],
+  ["Send thank-you to Daniel Ortiz within 24 hrs", "Daniel Ortiz", "Deloitte", -1, false],
   ["Follow up with Hana Kim about the strategy practice", "Hana Kim", "Deloitte", -3, false],
   ["Send resume to Jordan for review", "Jordan Lee", "Deloitte", 0, false],
   ["Prepare questions for coffee chat with Priya", "Priya Shah", "Deloitte", 1, false],
-  ["Ask Liam for the intro to Zoe Adams", "Liam Walsh", "Qualtrics", 3, false],
-  ["Research Apple strategy & operations roles", "", "Apple", 9, false],
+  ["Ask Liam for the intro to Zoe Adams", "Liam Walsh", "Microsoft", 3, false],
+  ["Research Google strategy & operations roles", "", "Google", 9, false],
   ["Update resume with fall projects", "", "", 14, false],
-  ["Send thank-you to Noah Carter within 24 hrs", "Noah Carter", "Delta Air Lines", -4, true],
+  ["Send thank-you to Noah Carter within 24 hrs", "Noah Carter", "Microsoft", -4, true],
   ["Send thank-you to Sofia Alvarez within 24 hrs", "Sofia Alvarez", "Microsoft", -19, true],
 ];
 const day = n => { const d = new Date(`${BASE}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -139,7 +136,7 @@ const PROFILE = {
   role: "MBA Candidate",
   headline: "Stanford MBA '27 · Looking for strategy & product roles",
   company: "",
-  school: "Stanford University (2025–2027); University of Utah (2016–2020)",
+  school: "Stanford University (2025–2027); University of Washington (2016–2020)",
   pastCompanies: "Delta Air Lines (2020–2022); Adobe (2022–2025)",
   email: "alex.rivera@example.com",
   linkedinUrl: "https://www.linkedin.com/in/alex-rivera-demo",
@@ -173,7 +170,7 @@ const HISTORY = {
                  ["Microsoft", "Product Manager Intern", "2022-06", "2022-09", "Redmond, Washington", ""],
                  ["Deloitte", "Business Technology Analyst", "2018-08", "2021-06", "San Francisco Bay Area", "Tech strategy for retail and travel clients."]],
     education: [["Stanford University", "Master of Business Administration - MBA", "", "2021", "2023"],
-                ["University of Utah", "Bachelor of Science - BS", "Information Systems", "2014", "2018"]],
+                ["University of Washington", "Bachelor of Science - BS", "Information Systems", "2014", "2018"]],
   },
   "Jordan Lee": {
     fields: { headline: "Senior Consultant, Strategy & Analytics at Deloitte", location: "San Francisco, California",
@@ -184,8 +181,8 @@ const HISTORY = {
     education: [["Stanford University", "Bachelor of Arts - BA", "Economics", "2016", "2020"]],
   },
   "Noah Carter": {
-    fields: { headline: "Commercial Strategy Analyst at Delta Air Lines", location: "Seattle, Washington", skills: "Forecasting; Customer Research; Python" },
-    experience: [["Delta Air Lines", "Commercial Strategy Analyst", "2023-02", "Present", "Seattle, Washington", ""],
+    fields: { headline: "Business Strategy Analyst at Microsoft", location: "Seattle, Washington", skills: "Forecasting; Customer Research; Python" },
+    experience: [["Microsoft", "Business Strategy Analyst", "2023-02", "Present", "Redmond, Washington", ""],
                  ["Delta Air Lines", "Loyalty Program Analyst", "2021-07", "2023-01", "Seattle, Washington", ""]],
     education: [["Stanford University", "Master of Science - MS", "Management Science & Engineering", "2019", "2021"]],
   },

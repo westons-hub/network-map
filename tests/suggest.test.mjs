@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { buildSuggestions, matchSuggestions } from "../site/js/core/suggest.js";
-import { readWorkbook } from "../site/js/core/workbook.js";
+import { emptyModel, readWorkbook } from "../site/js/core/workbook.js";
+import { makePerson } from "../site/js/core/people.js";
 
 const demo = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
 const s = buildSuggestions(demo);
@@ -13,14 +14,15 @@ const values = list => list.map(x => x.value);
 test("companies come from people, past companies, the pool, targets and the Companies sheet, with counts", () => {
   const deloitte = s.company.find(x => x.key === "deloitte");
   assert.equal(deloitte.value, "Deloitte");          // the Companies sheet / target spelling wins over "Deloitte LLP"
-  assert.equal(deloitte.count, 5);                   // Jordan, Priya, Marcus, Hana, Rachel
+  assert.equal(deloitte.count, 7);                   // Jordan, Priya, Marcus, Hana, Grace, Daniel, Rachel
   assert.ok(deloitte.pool >= 3);
-  assert.ok(s.company.some(x => x.value === "Nike" && x.count === 0)); // a target nobody works at yet
+  assert.ok(s.company.some(x => x.value === "Google" && x.count === 0)); // a target nobody works at yet
   assert.ok(s.company.some(x => x.value === "Adobe")); // from your profile's past companies too
 });
 
 test("aliases: 'U of U' finds University of Utah, 'stanford' finds Stanford University", () => {
-  assert.equal(values(matchSuggestions(s.school, "U of U", { kind: "school" }))[0], "University of Utah");
+  const utah = buildSuggestions({ ...emptyModel("Me"), people: [makePerson({ name: "A", school: "University of Utah (2014–2018)" })] });
+  assert.equal(values(matchSuggestions(utah.school, "U of U", { kind: "school" }))[0], "University of Utah");
   assert.equal(values(matchSuggestions(s.school, "stanford", { kind: "school" }))[0], "Stanford University");
   assert.deepEqual(values(matchSuggestions(s.company, "del", { kind: "company" })).slice(0, 2).sort(), ["Deloitte", "Delta Air Lines"]);
 });

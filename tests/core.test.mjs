@@ -124,10 +124,11 @@ test("demo workbook builds: only the people you added are on the map", () => {
   const m = demo();
   assert.equal(m.me, "Alex Rivera");
   const g = buildGraph(m.people, { me: m.me, targets: m.targets });
-  assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 5, targets: 6, gaps: 2 });
-  // Deloitte is a group; the other five targets are their own nodes.
-  assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(),
-    ["company:deloitte", "company:delta air lines", "target:apple", "target:goldman sachs", "target:nike", "target:qualtrics"]);
+  assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 3, targets: 3, gaps: 1 });
+  // The simple demo: Stanford, Microsoft and Deloitte are groups; Google is a target with no one yet.
+  assert.deepEqual(g.nodes.filter(n => !["me", "person", "second"].includes(n.kind)).map(n => n.id).sort(),
+    ["company:deloitte", "company:microsoft", "school:stanford", "target:google"]);
+  assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(), ["company:deloitte", "company:microsoft", "target:google"]);
   assert.equal(m.avatarStyle, "notionists");
   assert.equal(g.nodes.find(n => n.id === "school:stanford").label, "Stanford University");
   assert.equal(m.pool.length, 26); // LinkedIn connections stay in the pool, off the map
@@ -180,12 +181,12 @@ test("a target reachable only through someone links to you with a dashed (gap) e
 
 test("whoCanIntro walks the chain and sorts shortest first", () => {
   const m = demo();
-  const paths = whoCanIntro(m.people, "Qualtrics", m.me);
+  const paths = [...whoCanIntro(m.people, "Zoe Adams", m.me), ...whoCanIntro(m.people, "Sam Rivera", m.me)];
   assert.deepEqual(paths.map(p => [p.person.name, p.chain]), [
     ["Zoe Adams", ["Liam Walsh", "Zoe Adams"]],
     ["Sam Rivera", ["Liam Walsh", "Zoe Adams", "Sam Rivera"]],
   ]);
-  assert.equal(paths[0].ask, "Liam Walsh");
+  assert.equal(paths[1].ask, "Liam Walsh");
 });
 
 test("whoCanIntro matches names by whole word", () => {
@@ -201,10 +202,10 @@ test("whoCanIntro survives cycles", () => {
 
 test("intro report lists who to ask and the gaps", () => {
   const m = demo();
-  const text = introReport(m.people, ["Delta Air Lines", "Nike"], m.me);
+  const text = introReport(m.people, ["Microsoft", "Google"], m.me);
   assert.match(text, /ask \*\*Noah Carter\*\* \(your status with them: Met\)/);
-  assert.match(text, /Noah Carter, Commercial Strategy Analyst at Delta Air Lines\*\* \[Met\]: you know them directly\./);
-  assert.match(text, /Targets with no one on your map: Nike/);
+  assert.match(text, /Noah Carter, Business Strategy Analyst at Microsoft\*\* \[Met\]: you know them directly\./);
+  assert.match(text, /Targets with no one on your map: Google/);
 });
 
 // ---- schools & past companies ------------------------------------------------------
@@ -260,4 +261,23 @@ test("company and school dots appear live at the threshold (current or past, via
   const target = buildGraph(ppl.slice(0, 1), { targets: [{ company: "Delta Air Lines" }] });
   assert.ok(target.nodes.some(n => n.id === "target:delta air lines"), "a target stays below the threshold");
   assert.deepEqual(newGroups(null, three), [], "opening a file doesn't announce anything");
+});
+
+test("a dot can change type: School <-> Company moves it between people's fields; its website and logo are saved", async () => {
+  const { applyOp } = await import("../site/js/core/ops.js");
+  const { emptyModel } = await import("../site/js/core/workbook.js");
+  let m = { ...emptyModel("Me"), people: [P("A", { school: "Stanford (2018–2022); Lakeview High" }), P("B", { school: "Stanford University", company: "Acme" }),
+                                         P("C", { company: "Stanford University" }), P("D", { pastCompanies: "Stanford University (2010–2012)" })] };
+  m = applyOp(m, { type: "changeOrgKind", name: "Stanford University", to: "company" });
+  assert.deepEqual(m.people.map(p => [p.company, p.school, p.pastCompanies]), [
+    ["Stanford University", "Lakeview High", ""], ["Acme", "", "Stanford University"], ["Stanford University", "", ""],
+    ["", "", "Stanford University (2010–2012)"]]);
+  assert.ok(buildGraph(m.people).nodes.some(n => n.id === "company:stanford" && n.kind === "company"));
+  m = applyOp(m, { type: "changeOrgKind", name: "Stanford University", to: "school" });
+  assert.deepEqual(m.people.map(p => [p.company, p.school, p.pastCompanies]), [
+    ["", "Lakeview High; Stanford University", ""], ["Acme", "Stanford University", ""], ["", "Stanford University", ""],
+    ["", "Stanford University (2010–2012)", ""]]);
+  m = applyOp(m, { type: "upsertCompany", company: { company: "Stanford University", website: "stanford.edu", logo: "data:image/png;base64,AA" } });
+  m = applyOp(m, { type: "upsertCompany", company: { company: "Stanford", website: "www.stanford.edu", logo: "" } });
+  assert.deepEqual(m.companies.map(c => [c.company, c.website, c.logo]), [["Stanford", "www.stanford.edu", ""]]);
 });

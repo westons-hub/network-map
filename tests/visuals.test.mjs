@@ -16,11 +16,14 @@ import { readWorkbook } from "../site/js/core/workbook.js";
 const demo = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
 const graph = buildGraph(demo.people, { me: demo.me, targets: demo.targets });
 const target = name => graph.targets.find(t => t.label === name);
+// A target you can reach only through an intro: Zoe (whom Liam introduced you to) at "Qualtrics".
+const chainPeople = demo.people.map(p => (p.name === "Zoe Adams" ? { ...p, company: "Qualtrics" } : p));
+const chainGraph = buildGraph(chainPeople, { me: demo.me, targets: [...demo.targets, { company: "Qualtrics" }] });
 
 // ---- best path ----------------------------------------------------------------
 
 test("best path to a target reachable only through a chain", () => {
-  const p = bestPath(graph, demo.people, target("Qualtrics"), demo.me);
+  const p = bestPath(chainGraph, chainPeople, chainGraph.targets.find(t => t.label === "Qualtrics"), demo.me);
   assert.deepEqual(p.names, ["Alex Rivera", "Liam Walsh", "Zoe Adams"]);
   assert.equal(p.ask, "Liam Walsh");
   assert.deepEqual(p.nodes, ["me", "p:liam walsh", "p:zoe adams", "target:qualtrics"]);
@@ -28,10 +31,10 @@ test("best path to a target reachable only through a chain", () => {
 });
 
 test("best path through a group bubble goes me -> group -> person", () => {
-  const p = bestPath(graph, demo.people, target("Goldman Sachs"), demo.me);
-  assert.deepEqual(p.names, ["Alex Rivera", "Daniel Ortiz"]);
-  assert.deepEqual(p.nodes, ["me", "target:goldman sachs", "p:daniel ortiz"]);
-  assert.deepEqual(p.edges, ["me>target:goldman sachs>group", "target:goldman sachs>p:daniel ortiz>member"]);
+  const p = bestPath(graph, demo.people, target("Deloitte"), demo.me);
+  assert.deepEqual(p.names, ["Alex Rivera", "Jordan Lee"]);
+  assert.deepEqual(p.nodes, ["me", "company:deloitte", "p:jordan lee"]);
+  assert.deepEqual(p.edges, ["me>company:deloitte>group", "company:deloitte>p:jordan lee>member"]);
 });
 
 test("among equally short paths, the warmest contact wins", () => {
@@ -41,13 +44,13 @@ test("among equally short paths, the warmest contact wins", () => {
 });
 
 test("a target reached through someone sits next to them in the ring", () => {
-  const pos = ringLayout(graph);
+  const pos = ringLayout(chainGraph);
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
-  assert.ok(d("target:qualtrics", "p:liam walsh") < d("target:qualtrics", "company:delta air lines"));
+  assert.ok(d("target:qualtrics", "p:liam walsh") < d("target:qualtrics", "company:deloitte"));
 });
 
 test("no path to a target with no one there", () => {
-  assert.equal(bestPath(graph, demo.people, target("Nike"), demo.me), null);
+  assert.equal(bestPath(graph, demo.people, target("Google"), demo.me), null);
 });
 
 test("neighborhood includes secondary links", () => {
@@ -62,7 +65,7 @@ test("ring layout: you at the center, everyone placed, gap targets outermost, me
   assert.deepEqual(pos.me, { x: 0, y: 0 });
   for (const n of graph.nodes) assert.ok(Number.isFinite(pos[n.id]?.x) && Number.isFinite(pos[n.id]?.y), n.id);
   const r = id => Math.hypot(pos[id].x, pos[id].y);
-  const gaps = ["target:apple", "target:nike"];
+  const gaps = ["target:google"];
   const inner = graph.nodes.filter(n => !gaps.includes(n.id)).map(n => r(n.id));
   for (const g of gaps) assert.ok(r(g) > Math.max(...inner), g);
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);

@@ -86,6 +86,40 @@ export async function resizeImage(file, size = 96) {
 }
 
 /**
+ * Edit a company or school dot: its type (moving people between Schools and Company), website and picture.
+ * Resolves with { kind, website, logo } or null.
+ */
+export async function orgForm({ name, kind, website = "", logo = "", canChangeType = true, preview }) {
+  const body = el("div", undefined, { class: "form" });
+  const type = select("kind", [["company", "Company"], ["school", "School"]], kind === "school" ? "school" : "company");
+  const site = el("input", undefined, { type: "text", value: website, placeholder: "e.g. stanford.edu", autocomplete: "off" });
+  const file = el("input", undefined, { type: "file", accept: "image/*" });
+  const url = el("input", undefined, { type: "url", placeholder: "or paste an image link", value: /^https?:/.test(logo) ? logo : "" });
+  const img = el("img", undefined, { src: preview, alt: "", class: "org-preview", width: 64, height: 64 });
+  let picture = logo;
+  const auto = el("button", "Find logo automatically", { class: "btn small", type: "button", onclick: () => {
+    picture = ""; url.value = ""; file.value = ""; img.src = site.value ? `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(site.value.replace(/^https?:\/\//, "").split("/")[0])}` : preview;
+    hint.textContent = site.value ? "Uses the website's icon." : "Add the website first, so Orbit knows where to look.";
+  } });
+  const hint = el("span", "", { class: "muted small" });
+  file.addEventListener("change", async () => { if (file.files[0]) { picture = await resizeImage(file.files[0], 128); img.src = picture; url.value = ""; } });
+  url.addEventListener("input", () => { if (/^https?:\/\//i.test(url.value.trim())) { picture = url.value.trim(); img.src = picture; } });
+  const pic = el("div", undefined, { class: "org-picture" });
+  const controls = el("div", undefined, { class: "org-picture-controls" });
+  controls.append(file, url, auto, hint);
+  pic.append(img, controls);
+  if (canChangeType) {
+    body.append(field("Type", type, kind === "school"
+      ? "Changing it to Company moves it from people's Schools to their Company (or Past Companies)."
+      : "Changing it to School moves it from people's Company and Past Companies to their Schools."));
+  }
+  body.append(field("Website", site, "Used to find the logo, and saved in the Companies sheet."), field("Picture / logo", pic));
+  const choice = await ask(`Edit ${name}`, body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
+  if (choice !== "save") return null;
+  return { kind: canChangeType ? type.value : kind, website: site.value.trim(), logo: picture };
+}
+
+/**
  * Pick a photo file or paste an image URL. Resolves with { photo } ("" = remove) or null if cancelled.
  */
 export async function photoForm({ name, current }) {

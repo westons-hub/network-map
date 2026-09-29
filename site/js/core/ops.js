@@ -5,7 +5,7 @@
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
 import { INTRODUCED, reconcile, withConnection, withoutConnection } from "./connections.js";
-import { mergeHistoryRows } from "./history.js";
+import { formatEntries, mergeHistoryRows, parseEntries } from "./history.js";
 import { mergePool } from "./pool.js";
 
 const clone = m => structuredClone(m);
@@ -112,6 +112,17 @@ export function applyOp(model, op) {
     case "removeTarget":
       m.targets = m.targets.filter(t => normalizeOrg(t.company) !== op.key);
       break;
+    case "upsertCompany": { // a company/school dot's website and picture (the Companies sheet)
+      const key = normalizeOrg(op.company.company);
+      const i = m.companies.findIndex(c => normalizeOrg(c.company) === key);
+      const row = { company: op.company.company, website: op.company.website ?? "", logo: op.company.logo ?? "", extra: {} };
+      if (i >= 0) m.companies[i] = { ...m.companies[i], ...row, extra: m.companies[i].extra ?? {} };
+      else m.companies.push(row);
+      break;
+    }
+    case "changeOrgKind": // { name, to: "school" | "company" }: move it between people's Schools and Company / Past Companies
+      changeOrgKind(m, op.name, op.to);
+      break;
     case "setLayout":
       m.layout = { ...m.layout, ...op.positions };
       break;
@@ -139,6 +150,34 @@ function syncIntroducer(m, name) {
 }
 
 export const replay = (model, ops) => ops.reduce(applyOp, model);
+
+/**
+ * A dot changes type. School -> Company: it leaves each person's Schools and becomes their Company, or a Past
+ * Company (with the same years) if they already have a company. Company -> School: the reverse, from Company
+ * and Past Companies into Schools.
+ */
+function changeOrgKind(m, name, to) {
+  const key = normalizeOrg(name);
+  const same = e => normalizeOrg(e.name) === key;
+  for (const p of m.people) {
+    if (to === "company") {
+      const hit = parseEntries(p.school).filter(same);
+      if (!hit.length) continue;
+      p.school = formatEntries(parseEntries(p.school).filter(e => !same(e)));
+      if (!p.company) p.company = name;
+      else if (normalizeOrg(p.company) !== key && !parseEntries(p.pastCompanies).some(same)) {
+        p.pastCompanies = formatEntries([...parseEntries(p.pastCompanies), { name, years: hit[0].years }]);
+      }
+    } else {
+      const current = normalizeOrg(p.company) === key;
+      const past = parseEntries(p.pastCompanies).filter(same);
+      if (!current && !past.length) continue;
+      if (current) p.company = "";
+      p.pastCompanies = formatEntries(parseEntries(p.pastCompanies).filter(e => !same(e)));
+      if (!parseEntries(p.school).some(same)) p.school = formatEntries([...parseEntries(p.school), { name, years: past[0]?.years ?? "" }]);
+    }
+  }
+}
 
 /** Someone was renamed: their meetings, tasks and history follow them. */
 function renameInLogs(m, newName, oldKey) {

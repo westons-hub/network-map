@@ -16,7 +16,7 @@ import { createCalendar } from "./ui/calendar.js";
 import { createDetails } from "./ui/details.js";
 import { ask, toast } from "./ui/dialog.js";
 import {
-  companySuggestions, personForm, photoForm, settingsForm, targetForm, taskForm,
+  companySuggestions, orgForm, personForm, photoForm, settingsForm, targetForm, taskForm,
 } from "./ui/forms.js";
 import { meetingForm } from "./ui/meetingEditor.js";
 import { createImages } from "./ui/images.js";
@@ -88,6 +88,7 @@ const details = createDetails({
     editPhoto,
     editAll,
     exportPerson: name => runExport({ kind: "people", names: [name] }),
+    editOrg,
     removePerson,
     scheduleMeeting: opts => editMeeting(null, opts),
     editMeeting: m => editMeeting(m),
@@ -435,6 +436,22 @@ async function editTarget(key) {
   edit({ type: "upsertTarget", key, target: result.target });
   const t = state.graph.targets.find(x => x.key === normalizeOrg(result.target.company));
   if (t) focus(t.focus);
+}
+
+/** Edit a company / school dot: type (moves people), website and logo (the Companies sheet). */
+async function editOrg(node) {
+  const model = state.doc.model;
+  const name = node.label.replace(/\s*\(.*$/, "");
+  const row = model.companies.find(c => normalizeOrg(c.company) === node.key) ?? {};
+  const kind = node.kind === "school" ? "school" : "company";
+  const result = await orgForm({ name, kind, website: row.website ?? "", logo: row.logo ?? "", preview: images.forOrg(node).image,
+                                 canChangeType: node.kind !== "tag" && !node.target });
+  if (!result) return;
+  const ops = [{ type: "upsertCompany", company: { company: row.company || name, website: result.website, logo: result.logo } }];
+  if (result.kind !== kind) ops.push({ type: "changeOrgKind", name, to: result.kind });
+  edit(ops);
+  if (result.kind !== kind) focus(`${result.kind}:${node.key}`);
+  toast(result.kind !== kind ? `${name} is now a ${result.kind}; people's fields were updated.` : `Saved ${name}.`);
 }
 
 async function editPhoto(node) {

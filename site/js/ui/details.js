@@ -385,7 +385,10 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const kind = node.kind === "target" ? "Target company" : `${node.kind[0].toUpperCase()}${node.kind.slice(1)} group`;
     const sub = el("div", t ? `${kind}${node.kind !== "target" ? " · target" : ""}` : `${kind} · ${node.count} you know directly`,
                    { class: "card-sub" });
-    card.append(header(img, el("div", node.label, { class: "card-name static" }), sub));
+    const name = el("div", undefined, { class: "card-name static" });
+    name.append(node.label, " ", el("button", "Edit", { class: "chip small-chip", type: "button", title: "Type, website and logo",
+                                                          onclick: () => handlers.editOrg(node) }));
+    card.append(header(img, name, sub));
 
     if (t) {
       const target = model.targets.find(x => normalizeOrg(x.company) === t.key) ?? {};

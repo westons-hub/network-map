@@ -641,3 +641,7 @@ dialog:has(.onboarding) { width: min(700px, 96vw); }
   border: 3px dashed var(--orbit-orange); border-radius: 16px; background: var(--soft-bg); }
 .onboarding-alt { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
 #data-menu-btn { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.small-chip { font-size: 11px; padding: 1px 8px; vertical-align: 2px; }
+.org-picture { display: flex; gap: 12px; align-items: flex-start; }
+.org-preview { width: 64px; height: 64px; border-radius: 50%; background: #fff; border: 1px solid var(--line); object-fit: contain; flex: none; }
+.org-picture-controls { display: grid; gap: 6px; flex: 1; }
