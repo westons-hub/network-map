@@ -98,5 +98,7 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
     renderRows();
   }
 
-  return { render };
+  /** The rows the current filters show (for "Export this view"). */
+  const visible = () => searchPool(getModel().pool, filters);
+  return { render, visible, filtered: () => Object.values(filters).some(Boolean) };
 }

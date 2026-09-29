@@ -4,7 +4,8 @@
 import { buildGraph } from "./core/graph.js";
 import { replay } from "./core/ops.js";
 import { normalizeName, normalizeOrg } from "./core/org.js";
-import { bestPath } from "./core/paths.js";
+import { exportWorkbook } from "./core/export.js";
+import { bestPath, neighborhood } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
 import { demoEditsForToday, meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
 import { saveDoc } from "./core/sync.js";
@@ -81,6 +82,7 @@ const details = createDetails({
     },
     editPhoto,
     editAll,
+    exportPerson: name => runExport({ kind: "people", names: [name] }),
     removePerson,
     scheduleMeeting: opts => editMeeting(null, opts),
     editMeeting: m => editMeeting(m),
@@ -669,6 +671,75 @@ async function showBackups() {
   await ask("Backups", body, [{ label: "Close", value: "", primary: true }]);
 }
 
+// ---- export to Excel ------------------------------------------------------------
+
+/** What "This view" means right now: { label, scope } or null. */
+function viewScope() {
+  const model = state.doc.model;
+  if (state.view === "map") {
+    if (!state.selected) return { label: `Everyone on the map (${model.people.length})`, scope: { kind: "people", names: model.people.map(p => p.name) } };
+    const ids = neighborhood(state.graph, state.selected).nodes;
+    const names = model.people.filter(p => ids.has(`p:${personKey(p)}`)).map(p => p.name);
+    return names.length ? { label: `The ${names.length} highlighted ${names.length === 1 ? "person" : "people"}`, scope: { kind: "people", names } } : null;
+  }
+  if (state.view === "pool") {
+    const entries = pool.visible();
+    return { label: `${pool.filtered() ? "Filtered" : "All"} LinkedIn connections (${entries.length})`, scope: { kind: "pool", entries } };
+  }
+  if (state.view === "todo") {
+    const tasks = model.tasks.filter(t => !t.done);
+    return { label: `Open tasks (${tasks.length})`, scope: { kind: "tasks", tasks } };
+  }
+  const { from, to, label } = calendar.visibleRange();
+  const meetings = model.meetings.filter(m => m.date >= from && m.date <= to);
+  return { label: `Meetings in ${label} (${meetings.length})`, scope: { kind: "meetings", meetings } };
+}
+
+function runExport(scope) {
+  closeExportMenu();
+  try {
+    const out = exportWorkbook(state.doc.model, scope);
+    files.download(out.bytes, out.name);
+    toast(`Exported ${out.what} to ${out.name}${state.mode === "demo" ? " (fictional demo data)" : ""}.`);
+  } catch (e) {
+    console.error(e);
+    toast(`Couldn't export: ${e.message}`, 8000);
+  }
+}
+
+const exportMenu = $("export-menu"), exportBtn = $("export-btn");
+if (!/Mac|iPhone|iPad/.test(navigator.platform)) exportBtn.querySelector("kbd").textContent = "Ctrl+E";
+function openExportMenu() {
+  const view = viewScope();
+  const person = state.selected?.startsWith("p:") ? state.doc.model.people.find(p => `p:${personKey(p)}` === state.selected) : null;
+  const item = (title, sub, scope) => {
+    const b = el("button", undefined, { role: "menuitem", type: "button", disabled: !scope, onclick: () => runExport(scope) });
+    b.append(title, el("small", sub));
+    return b;
+  };
+  exportMenu.replaceChildren(
+    item("Everything", "People (tracker columns), Experience, Education, Connections, Targets, Meetings, Tasks", { kind: "all" }),
+    item("This view", view?.label ?? "Nothing highlighted", view?.scope),
+    item("One person", person ? person.name : "Open someone's details first", person ? { kind: "people", names: [person.name] } : null),
+  );
+  exportMenu.hidden = false;
+  exportBtn.setAttribute("aria-expanded", "true");
+  exportMenu.querySelector("button")?.focus();
+}
+function closeExportMenu() {
+  exportMenu.hidden = true;
+  exportBtn.setAttribute("aria-expanded", "false");
+}
+exportBtn.addEventListener("click", e => { e.stopPropagation(); exportMenu.hidden ? openExportMenu() : closeExportMenu(); });
+document.addEventListener("click", e => { if (!exportMenu.contains(e.target)) closeExportMenu(); });
+exportMenu.addEventListener("keydown", e => {
+  const items = [...exportMenu.querySelectorAll("button:not(:disabled)")];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
+  if (e.key === "Escape") { closeExportMenu(); exportBtn.focus(); }
+});
+
 // ---- menu, search, toggles -----------------------------------------------------
 
 const menu = $("data-menu");
@@ -706,12 +777,17 @@ $("add-person").addEventListener("click", () => addPerson());
 const typing = t => t.closest?.("input, textarea, select, [contenteditable]");
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && state.mode === "file") { e.preventDefault(); save(); }
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "e" && !$("dialog").open) {
+    e.preventDefault();
+    exportMenu.hidden ? openExportMenu() : closeExportMenu();
+  }
   if (e.key.toLowerCase() === "n" && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e.target) && !$("dialog").open) {
     e.preventDefault();
     addPerson();
   }
   if (e.key === "Escape" && !$("dialog").open) {
-    if (!menu.hidden) closeMenu();
+    if (!exportMenu.hidden) closeExportMenu();
+    else if (!menu.hidden) closeMenu();
     else if (state.selected || details.openId) clearSelection();
   }
 });

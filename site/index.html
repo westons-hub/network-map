@@ -107,12 +107,21 @@
   </aside>
 
   <main id="main-pane">
-    <nav class="view-tabs" role="tablist" aria-label="Views">
-      <button role="tab" data-view="map" aria-selected="true">Map</button>
-      <button role="tab" data-view="calendar" aria-selected="false">Calendar</button>
-      <button role="tab" data-view="todo" aria-selected="false">To-Do <span id="todo-badge" class="tab-badge" hidden></span></button>
-      <button role="tab" data-view="pool" aria-selected="false">LinkedIn pool <span id="pool-count" class="tab-count"></span></button>
-    </nav>
+    <div class="topbar">
+      <nav class="view-tabs" role="tablist" aria-label="Views">
+        <button role="tab" data-view="map" aria-selected="true">Map</button>
+        <button role="tab" data-view="calendar" aria-selected="false">Calendar</button>
+        <button role="tab" data-view="todo" aria-selected="false">To-Do <span id="todo-badge" class="tab-badge" hidden></span></button>
+        <button role="tab" data-view="pool" aria-selected="false">LinkedIn pool <span id="pool-count" class="tab-count"></span></button>
+      </nav>
+      <div class="topbar-actions">
+        <div class="menu">
+          <button id="export-btn" class="btn small" type="button" aria-haspopup="true" aria-expanded="false"
+                  title="Export to Excel (⌘E / Ctrl+E)">Export <kbd>⌘E</kbd></button>
+          <div id="export-menu" class="menu-list" role="menu" hidden></div>
+        </div>
+      </div>
+    </div>
     <div id="map-wrap" class="view" data-view="map">
       <div id="map" aria-label="Network map"></div>
       <div class="map-tools">

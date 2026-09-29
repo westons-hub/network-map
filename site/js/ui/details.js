@@ -190,6 +190,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       links.append(el("button", "Schedule meeting", { class: "chip primary", type: "button",
                                                       onclick: () => handlers.scheduleMeeting({ person: p.name }) }));
       links.append(el("button", "Add task", { class: "chip", type: "button", onclick: () => handlers.addTask({ person: p.name }) }));
+      links.append(el("button", "Export", { class: "chip", type: "button", title: "Export this person to Excel",
+                                            onclick: () => handlers.exportPerson(p.name) }));
     }
     card.append(links);
 

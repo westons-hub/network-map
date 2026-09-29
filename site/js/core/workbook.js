@@ -9,8 +9,10 @@
 
 import * as XLSX from "../../vendor/xlsx.mjs";
 import { clean } from "./org.js";
-import { makeConnection, reconcile } from "./connections.js";
-import { POOL_COLUMNS, makePerson, parseDate, poolEntry } from "./people.js";
+import { CONNECTION_TYPES, makeConnection, reconcile } from "./connections.js";
+import { DERIVED_COLUMNS, OWN_TRACKER_COLUMNS, REFERRAL, RELATIONSHIP_PLANS, TRACKER_HEADERS, trackerCells } from "./tracker.js";
+import { polishXlsx } from "./xlsxPolish.js";
+import { POOL_COLUMNS, STATUSES, makePerson, parseDate, poolEntry } from "./people.js";
 
 export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
                         meetings: "Meetings", tasks: "Tasks", connections: "Connections", experience: "Experience",
@@ -37,7 +39,7 @@ export const EXPERIENCE_COLUMNS = [["Person", "person"], ["Company", "company"],
   ["End", "end"], ["Location", "location"], ["Description", "description"]];
 export const EDUCATION_COLUMNS = [["Person", "person"], ["School", "school"], ["Degree", "degree"], ["Field", "field"],
   ["Start", "start"], ["End", "end"]];
-const PEOPLE_ALIASES = { "email address": "email", "url": "linkedinUrl", "linkedin": "linkedinUrl",
+const PEOPLE_ALIASES = { "email address": "email", "url": "linkedinUrl", "linkedin": "linkedinUrl", "role / background": "role",
                          "title": "role", "position": "role", "school": "school", "past company": "pastCompanies" };
 export const TARGET_COLUMNS = [["Company", "company"], ["Priority", "priority"], ["Stage", "stage"], ["Notes", "notes"]];
 export const COMPANY_COLUMNS = [["Company", "company"], ["Website", "website"], ["Logo", "logo"]];
@@ -78,7 +80,19 @@ function findSheet(wb, name) {
 
 /** Sheet -> array of {header: value}. Dates stay Date objects; blank cells are "". */
 function rowsOf(ws) {
-  return XLSX.utils.sheet_to_json(ws, { defval: "", raw: true });
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: "", raw: true });
+  // A cell that shows a label ("Profile") but links to a web page stands for the link itself.
+  if (!ws?.["!ref"]) return rows;
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  const headers = [];
+  for (let c = range.s.c; c <= range.e.c; c++) headers[c] = ws[XLSX.utils.encode_cell({ r: range.s.r, c })]?.v;
+  for (const [addr, cell] of Object.entries(ws)) {
+    if (addr[0] === "!" || !/^https?:\/\//i.test(cell?.l?.Target ?? "") || /^https?:\/\//i.test(String(cell.v ?? ""))) continue;
+    const { r, c } = XLSX.utils.decode_cell(addr);
+    const row = rows[r - range.s.r - 1];
+    if (row && headers[c] !== undefined && String(headers[c]) in row) row[headers[c]] = cell.l.Target;
+  }
+  return rows;
 }
 
 /** Split a record into known fields (by column spec) and extra columns to carry along. */
@@ -113,7 +127,11 @@ export function readWorkbook(bytes) {
                       && XLSX.utils.sheet_to_json(wb.Sheets[s.name], { header: 1 })[0]?.some(h => lower(h) === "name"));
     if (people) model.notices.push(`Updated an older file: the "${people.name}" sheet is now "People".`);
   }
+  // In an Orbit export, the tracker's derived columns (Meeting Date, Next Steps…) come back from the Meetings,
+  // Tasks and Connections sheets, so their copies on People are skipped.
+  const isExport = !!findSheet(wb, SHEETS.meetings) && (people?.rows[0] ? DERIVED_COLUMNS.some(h => h in people.rows[0]) : false);
   for (const rec of people?.rows ?? []) {
+    if (isExport) for (const h of DERIVED_COLUMNS) delete rec[h];
     const { known, extra } = pick(rec, PEOPLE_COLUMNS, PEOPLE_ALIASES);
     if (!clean(known.name)) continue;
     model.people.push(makePerson({ ...known, extra, source: "excel" }));
@@ -218,10 +236,11 @@ export function readWorkbook(bytes) {
 }
 
 /** Items -> sheet rows: header row + one row per item, extra columns appended. */
-function tableRows(items, columns, toCells) {
+function tableRows(items, columns, toCells, skipExtra = []) {
   const extraHeaders = [];
+  const skip = new Set(skipExtra.map(h => h.toLowerCase()));
   for (const it of items) {
-    for (const h of Object.keys(it.extra ?? {})) if (!extraHeaders.includes(h)) extraHeaders.push(h);
+    for (const h of Object.keys(it.extra ?? {})) if (!extraHeaders.includes(h) && !skip.has(h.toLowerCase())) extraHeaders.push(h);
   }
   return [
     [...columns.map(([h]) => h), ...extraHeaders],
@@ -235,51 +254,96 @@ function dateCell(v) {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : (v ?? "");
 }
 
-function sheetFrom(rows, widths) {
+/** Column widths from the content: at least the header, at most 60 characters (photos count as short). */
+function autoWidths(rows) {
+  const widths = [];
+  for (const row of rows) {
+    row.forEach((v, i) => {
+      const text = v instanceof Date ? "2026-01-01" : typeof v === "object" && v ? v.text ?? "" : String(v ?? "");
+      const len = text.startsWith("data:") ? 10 : Math.max(...text.split("\n").map(l => l.length));
+      widths[i] = Math.max(widths[i] ?? 8, Math.min(len + 2, 60));
+    });
+  }
+  return widths;
+}
+
+function sheetFrom(rows, { links = true, filter = false } = {}) {
+  // Link cells are { text, url }: shown as the text, clickable. Emails link to mailto:.
+  const plain = rows.map(r => r.map(v => (v && typeof v === "object" && !(v instanceof Date) ? v.text : v)));
   // Dates become numbers with a date format (timezone-safe); cellDates would store UTC instants.
-  const ws = XLSX.utils.aoa_to_sheet(rows, { dateNF: "yyyy-mm-dd" });
-  ws["!cols"] = rows[0].map((_, i) => ({ wch: widths[i] ?? 16 }));
+  const ws = XLSX.utils.aoa_to_sheet(plain, { dateNF: "yyyy-mm-dd" });
+  ws["!cols"] = autoWidths(rows).map(wch => ({ wch }));
+  if (links) {
+    rows.forEach((r, ri) => r.forEach((v, ci) => {
+      const cell = ws[XLSX.utils.encode_cell({ r: ri, c: ci })];
+      if (!cell || ri === 0) return;
+      if (v && typeof v === "object" && v.url) cell.l = { Target: v.url, Tooltip: v.url };
+      else if (typeof v === "string" && /^[^\s@<>()]+@[^\s@<>()]+\.[a-z]{2,}$/i.test(v) && rows[0][ci] === "Email") cell.l = { Target: `mailto:${v}` };
+    }));
+  }
+  if (filter && rows.length > 1) ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) };
   return ws;
 }
+
+// The rest of a person's columns after the tracker's fifteen, in the tracker layout.
+const TRACKER_REST = ["email", "photo", "pastCompanies", "school", "tags", "connectedOn", "connectedThrough", "notes",
+  "headline", "location", "website", "skills", "languages", "certifications", "honors", "about"];
+
+function peopleRows(model, tracker) {
+  const cell = (p, f) => (f === "tags" ? p.tags.join(", ") : f === "connectedOn" ? dateCell(p.connectedOn) : p[f] ?? "");
+  if (!tracker) return tableRows(model.people, PEOPLE_COLUMNS, p => PEOPLE_COLUMNS.map(([, f]) => cell(p, f)));
+  const rest = TRACKER_REST.map(f => PEOPLE_COLUMNS.find(([, x]) => x === f));
+  return tableRows(model.people, [...TRACKER_HEADERS.map(h => [h]), ...rest], p => {
+    const t = trackerCells(model, p);
+    return [...TRACKER_HEADERS.map(h => (/Date/.test(h) ? dateCell(t[h]) : t[h])), ...rest.map(([, f]) => cell(p, f))];
+  }, OWN_TRACKER_COLUMNS);
+}
+
+// Dropdowns and wrapped columns per sheet (see xlsxPolish.js).
+const POLISH = {
+  [SHEETS.people]: { wrap: ["Notes", "About", "Role / Background", "How We're Connected", "Next Steps", "Relevant Opportunities",
+                            "Past Companies", "Schools", "Headline"],
+                     lists: { Status: STATUSES, "Meeting Type": MEETING_TYPES, Method: METHODS, "Referral?": REFERRAL,
+                              "Relationship Plan": RELATIONSHIP_PLANS } },
+  [SHEETS.targets]: { wrap: ["Notes"], lists: { Priority: PRIORITIES, Stage: STAGES } },
+  [SHEETS.meetings]: { wrap: ["Notes", "Next Step"], lists: { Type: MEETING_TYPES, Method: METHODS } },
+  [SHEETS.tasks]: { wrap: ["Task"], lists: { Done: ["Yes"] } },
+  [SHEETS.connections]: { wrap: ["Notes"], lists: { Type: CONNECTION_TYPES } },
+  [SHEETS.experience]: { wrap: ["Description", "Title"] },
+  [SHEETS.education]: { wrap: ["Degree", "Field"] },
+  [SHEETS.companies]: {}, [SHEETS.pool]: {},
+  [SHEETS.me]: { wrap: ["Value"] }, [SHEETS.settings]: { wrap: ["Value"] },
+};
 
 /**
  * Model -> .xlsx bytes (Uint8Array). Pass the bytes you opened as `base` to keep
  * sheets we don't manage (like "How to use") and their order.
+ * Options: tracker (People in the networking-tracker layout, for Export), only (just these sheet keys).
  */
-export function writeWorkbook(model, base) {
+export function writeWorkbook(model, base, { tracker = false, only = null } = {}) {
   // cellNF/cellStyles keep number formats and styles on sheets we pass through untouched.
   const wb = base ? XLSX.read(base, { type: "array", cellNF: true, cellStyles: true }) : XLSX.utils.book_new();
-  const sheets = {
-    [SHEETS.people]: sheetFrom(tableRows(model.people, PEOPLE_COLUMNS, p => PEOPLE_COLUMNS.map(([, f]) =>
-      f === "tags" ? p.tags.join(", ") : f === "connectedOn" ? dateCell(p.connectedOn) : p[f] ?? "")),
-      [22, 24, 30, 24, 28, 36, 14, 22, 14, 14, 20, 40, 36, 34, 24, 28, 30, 26, 30, 30, 50]),
-    [SHEETS.targets]: sheetFrom(tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
-      [28, 10, 14, 40]),
-    [SHEETS.companies]: sheetFrom(tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),
-      [28, 30, 30]),
-    [SHEETS.pool]: sheetFrom([POOL_COLUMNS, ...model.pool.map(e =>
-      [e.firstName, e.lastName, e.url, e.email, e.company, e.position, dateCell(e.connectedOn)])],
-      [14, 16, 40, 28, 28, 30, 14]),
-    [SHEETS.meetings]: sheetFrom(tableRows(model.meetings ?? [], MEETING_COLUMNS, m => MEETING_COLUMNS.map(([, f]) =>
-      f === "date" ? dateCell(m.date) : m[f] ?? "")), [22, 12, 8, 8, 16, 12, 40, 30, 22, 30, 16]),
-    [SHEETS.tasks]: sheetFrom(tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>
+  const rows = {
+    [SHEETS.people]: peopleRows(model, tracker),
+    [SHEETS.targets]: tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
+    [SHEETS.companies]: tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),
+    [SHEETS.pool]: [POOL_COLUMNS, ...model.pool.map(e =>
+      [e.firstName, e.lastName, e.url ? { text: e.url, url: e.url } : "", e.email, e.company, e.position, dateCell(e.connectedOn)])],
+    [SHEETS.meetings]: tableRows(model.meetings ?? [], MEETING_COLUMNS, m => MEETING_COLUMNS.map(([, f]) =>
+      f === "date" ? dateCell(m.date) : m[f] ?? "")),
+    [SHEETS.tasks]: tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>
       f === "due" || f === "created" ? dateCell(t[f]) : f === "done" ? (t.done ? "Yes" : "") : t[f] ?? "")),
-      [40, 22, 20, 12, 8, 12, 20, 16]),
-    [SHEETS.connections]: sheetFrom(tableRows(model.connections ?? [], CONNECTION_COLUMNS,
-      c => CONNECTION_COLUMNS.map(([, f]) => c[f] ?? "")), [24, 24, 16, 40]),
-    [SHEETS.experience]: sheetFrom(tableRows(model.experience ?? [], EXPERIENCE_COLUMNS,
-      r => EXPERIENCE_COLUMNS.map(([, f]) => r[f] ?? "")), [22, 26, 34, 10, 10, 26, 60]),
-    [SHEETS.education]: sheetFrom(tableRows(model.education ?? [], EDUCATION_COLUMNS,
-      r => EDUCATION_COLUMNS.map(([, f]) => r[f] ?? "")), [22, 30, 34, 26, 10, 10]),
-    [SHEETS.me]: sheetFrom([["Field", "Value"], ["Name", model.me ?? ""],
-                            ...PROFILE_ROWS.map(([label, f]) => [label, model.profile?.[f] ?? ""])], [22, 70]),
-    [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],
-                                  ["Avatar style", model.avatarStyle ?? "initials"],
-                                  ...SETTING_ROWS.map(([label, field, fallback]) => [label, model.settings?.[field] ?? fallback])],
-                                 [26, 60]),
-    [SHEETS.layout]: sheetFrom([["Node", "X", "Y"], ...Object.entries(model.layout ?? {}).map(([id, p]) =>
-      [id, Math.round(p.x), Math.round(p.y)])], [36, 8, 8]),
+    [SHEETS.connections]: tableRows(model.connections ?? [], CONNECTION_COLUMNS, c => CONNECTION_COLUMNS.map(([, f]) => c[f] ?? "")),
+    [SHEETS.experience]: tableRows(model.experience ?? [], EXPERIENCE_COLUMNS, r => EXPERIENCE_COLUMNS.map(([, f]) => r[f] ?? "")),
+    [SHEETS.education]: tableRows(model.education ?? [], EDUCATION_COLUMNS, r => EDUCATION_COLUMNS.map(([, f]) => r[f] ?? "")),
+    [SHEETS.me]: [["Field", "Value"], ["Name", model.me ?? ""], ...PROFILE_ROWS.map(([label, f]) => [label, model.profile?.[f] ?? ""])],
+    [SHEETS.settings]: [["Setting", "Value"], ["Your name", model.me ?? ""], ["Avatar style", model.avatarStyle ?? "initials"],
+                        ...SETTING_ROWS.map(([label, field, fallback]) => [label, model.settings?.[field] ?? fallback])],
+    [SHEETS.layout]: [["Node", "X", "Y"], ...Object.entries(model.layout ?? {}).map(([id, p]) => [id, Math.round(p.x), Math.round(p.y)])],
   };
+  const keep = only ? new Set(only.map(k => SHEETS[k] ?? k)) : null;
+  const sheets = Object.fromEntries(Object.entries(rows).filter(([name]) => !keep || keep.has(name)).map(([name, r]) =>
+    [name, sheetFrom(r, { filter: name === SHEETS.people || name === SHEETS.pool })]));
 
   // Migrated files: the old "Contacts" sheet is replaced by People.
   const legacy = wb.SheetNames.find(s => lower(s) === "contacts");
@@ -293,10 +357,15 @@ export function writeWorkbook(model, base) {
     else XLSX.utils.book_append_sheet(wb, ws, name);
   }
   // People first; Layout hidden (it's for the app, not for you).
-  wb.SheetNames = [SHEETS.people, ...wb.SheetNames.filter(s => s !== SHEETS.people)];
+  // An export lists what matters most first.
+  const first = tracker ? [SHEETS.people, SHEETS.experience, SHEETS.education, SHEETS.connections, SHEETS.targets, SHEETS.meetings,
+                           SHEETS.tasks].filter(n => wb.SheetNames.includes(n)) : wb.SheetNames.includes(SHEETS.people) ? [SHEETS.people] : [];
+  wb.SheetNames = [...first, ...wb.SheetNames.filter(s => !first.includes(s))];
   wb.Workbook = { ...(wb.Workbook ?? {}), Sheets: wb.SheetNames.map(name => ({
     name, Hidden: lower(name) === lower(SHEETS.layout) ? 1 : 0 })) };
-  return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx", compression: true }));
+  const bytes = new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx", compression: true }));
+  const spec = Object.fromEntries(Object.keys(sheets).filter(n => POLISH[n]).map(n => [n, { headers: rows[n][0], ...POLISH[n] }]));
+  return polishXlsx(bytes, spec);
 }
 
 /** A CSV the user opened: a LinkedIn export, or a people list with a Name column. */

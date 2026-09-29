@@ -115,12 +115,13 @@ const HOW_TO = [
   ["Privacy", "Orbit runs entirely in your browser. This file is never uploaded anywhere."],
 ];
 
-function withHowTo(bytes) {
-  const wb = XLSX.read(bytes, { type: "array", cellNF: true, cellStyles: true });
+/** A workbook with just the "How to use" sheet, passed as the base so writeWorkbook keeps it (and formats the rest). */
+function howToBase() {
+  const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(HOW_TO);
   ws["!cols"] = [{ wch: 22 }, { wch: 110 }];
   XLSX.utils.book_append_sheet(wb, ws, "How to use");
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true });
+  return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
 }
 
 // ---- demo ----
@@ -170,9 +171,9 @@ for (const [a, b, type, notes] of [
   ["Jordan Lee", "Owen Price", "Mentor", "Jordan mentors Owen on case interviews"],
   ["Hana Kim", "Ethan Brooks", "Coworker", "Worked together at Deloitte"],
 ]) demo.connections.push(makeConnection({ a, b, type, notes }));
-writeFileSync(join(SITE, "demo", "demo_network.xlsx"), withHowTo(writeWorkbook(demo)));
+writeFileSync(join(SITE, "demo", "demo_network.xlsx"), writeWorkbook(demo, howToBase()));
 
 // ---- blank template ----
-writeFileSync(join(SITE, "template", "contacts_template.xlsx"), withHowTo(writeWorkbook(emptyModel(""))));
+writeFileSync(join(SITE, "template", "contacts_template.xlsx"), writeWorkbook(emptyModel(""), howToBase()));
 
 console.log(`demo: ${demo.people.length} people, ${demo.targets.length} targets, ${pool.length} in pool`);

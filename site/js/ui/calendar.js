@@ -267,5 +267,13 @@ export function createCalendar(root, { getModel, getExternal = () => [], onDay, 
 
   document.addEventListener("click", e => { if (menu && !menu.parentElement?.contains(e.target)) closeMenu(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
-  return { render, showWeek(date) { mode = "week"; anchor = date; weekScroll = null; render(); } };
+  /** The dates on screen (the month, or the week) for "Export this view". */
+  function visibleRange() {
+    const d = toDate(anchor);
+    if (mode === "week") { const days = weekDays(anchor); return { from: days[0], to: days.at(-1), label: "this week" }; }
+    const from = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)), to = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    return { from, to, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }) };
+  }
+
+  return { render, visibleRange, showWeek(date) { mode = "week"; anchor = date; weekScroll = null; render(); } };
 }
