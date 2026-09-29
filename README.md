@@ -46,7 +46,7 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Export to Excel (⌘E):** everything, just what you're looking at, or one person, with the People sheet in a networking-tracker layout, frozen headers, clickable links and dropdowns.
 - **Company and school dots appear on their own:** once 3 people on your map share a company (now or in the past, matched through name aliases) or a school, it gets its own dot with its logo; you can change the number in Settings.
 - **Light and dark mode:** System / Light / Dark from the top bar, in the Orbit brand colors, checked for WCAG AA contrast.
-- **Arrange it your way:** drag people where you want them and they stay there (saved in your workbook); **Lock** freezes the map and **Re-arrange** starts over. **Export → Offline map** saves the map as one file that opens anywhere, even without internet.
+- **Arrange it your way:** drag people and companies (even "no one yet" targets) where you want them and they stay there (saved in your workbook); **Re-arrange** starts over. **Export → Offline map** saves the map as one file that opens anywhere, even without internet.
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 

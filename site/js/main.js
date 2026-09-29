@@ -1,10 +1,11 @@
 // Orbit: app wiring. The demo loads by default; "Use my own data" opens a
 // workbook or a LinkedIn CSV. Everything happens in this browser tab.
 
-import { buildGraph, newGroups } from "./core/graph.js";
+import { DEFAULT_GROUP_BY, GROUP_FIELDS, buildGraph, newGroups } from "./core/graph.js";
 import { replay } from "./core/ops.js";
 import { normalizeName, normalizeOrg } from "./core/org.js";
 import { exportWorkbook } from "./core/export.js";
+import { searchMap } from "./core/search.js";
 import { bestPath, neighborhood } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
 import { demoEditsForToday, meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
@@ -37,7 +38,7 @@ const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
 const TEMPLATE_URL = "template/contacts_template.xlsx";
 const DEFAULT_NAME = "my_network.xlsx";
-const PREFS = { layout: "network-map:layout", view: "network-map:view", lock: "orbit:map-locked" };
+const PREFS = { layout: "network-map:layout", view: "network-map:view" };
 
 const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
 const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
@@ -245,7 +246,7 @@ function render() {
   const me = model.me || "Your Name"; // a new map: fill in My profile to put your name here
   const before = state.announceGroups ? state.graph : null;
   state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets,
-                                           minGroupSize: Number(model.settings.groupSize) || 3 });
+                                           minGroupSize: groupSize(), groupBy: groupBy() });
   // Company / school dots appear live once enough people share one; say so.
   const created = newGroups(before, state.graph);
   if (created.length) {
@@ -259,10 +260,35 @@ function render() {
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
   map.render(state.graph, model.layout);
   renderSidebar();
+  renderGrouping();
   renderChrome();
   renderViews();
   details.render();
 }
+
+// Legend & view → grouping (saved in the workbook's Settings). While the slider moves, the map previews it.
+let groupPreview = null;
+const groupSize = () => groupPreview ?? (Number(state.doc.model.settings.groupSize) || 3);
+function groupBy() {
+  const v = String(state.doc.model.settings.groupBy ?? "").split(/[,;]/).map(x => x.trim().toLowerCase())
+    .filter(x => GROUP_FIELDS.some(([f]) => f === x));
+  return v.length || state.doc.model.settings.groupBy === "" ? v : DEFAULT_GROUP_BY;
+}
+function renderGrouping() {
+  $("group-size").value = String(groupSize());
+  $("group-size-value").textContent = String(groupSize());
+  const on = new Set(groupBy());
+  for (const box of document.querySelectorAll(".group-by input")) box.checked = on.has(box.value);
+}
+$("group-size").addEventListener("input", e => { groupPreview = Number(e.target.value); $("group-size-value").textContent = e.target.value; render(); });
+$("group-size").addEventListener("change", e => {
+  groupPreview = null;
+  if (Number(e.target.value) !== (Number(state.doc.model.settings.groupSize) || 3)) edit({ type: "setSettings", settings: { groupSize: Number(e.target.value) } });
+});
+document.querySelector(".group-by").addEventListener("change", () => {
+  const picked = [...document.querySelectorAll(".group-by input:checked")].map(b => b.value);
+  edit({ type: "setSettings", settings: { groupBy: picked.join(", ") } });
+});
 
 function renderSidebar() {
   if (!state.graph) return;
@@ -877,14 +903,41 @@ document.addEventListener("keydown", e => {
   }
 });
 
-$("search").addEventListener("keydown", e => {
-  if (e.key !== "Enter") return;
-  const q = e.target.value.trim().toLowerCase();
-  if (!q) return;
-  const orgQ = normalizeOrg(q);
-  const hit = state.graph.nodes.find(n => n.label?.toLowerCase().includes(q))
-           ?? state.graph.nodes.find(n => [n.company, n.school].some(v => v && (v.toLowerCase().includes(q) || normalizeOrg(v) === orgQ)));
-  if (hit) focus(hit.id); else toast(`No one on the map matches “${e.target.value.trim()}”.`);
+// Search anything: a short list of matches that says which field matched ("Skills · SQL").
+const searchBox = $("search"), results = $("search-results");
+function renderSearch() {
+  const hits = searchMap(state.graph, state.doc.model.people, searchBox.value);
+  results.replaceChildren(...hits.map((h, i) => {
+    const li = el("li", undefined, { role: "option", tabIndex: -1, class: i === 0 ? "active" : "",
+      onmousedown: ev => { ev.preventDefault(); pickSearch(h); } });
+    li.append(el("strong", h.label), el("span", h.value ? ` · ${h.field}: ${h.value}` : ` · ${h.field}`, { class: "muted small" }));
+    return li;
+  }));
+  if (searchBox.value.trim() && !hits.length) results.append(el("li", "No matches on your map.", { class: "muted small empty" }));
+  results.hidden = !searchBox.value.trim();
+  results.hits = hits;
+}
+function pickSearch(h) {
+  results.hidden = true;
+  focus(h.id);
+}
+searchBox.addEventListener("input", renderSearch);
+searchBox.addEventListener("blur", () => setTimeout(() => { results.hidden = true; }, 120));
+searchBox.addEventListener("focus", () => { if (searchBox.value.trim()) renderSearch(); });
+searchBox.addEventListener("keydown", e => {
+  const items = [...results.querySelectorAll("li[role=option]")];
+  const i = items.findIndex(li => li.classList.contains("active"));
+  const move = d => { items.forEach(li => li.classList.remove("active")); items[(i + d + items.length) % items.length]?.classList.add("active"); };
+  if (e.key === "ArrowDown" && items.length) { e.preventDefault(); move(1); }
+  else if (e.key === "ArrowUp" && items.length) { e.preventDefault(); move(-1); }
+  else if (e.key === "Escape") { results.hidden = true; }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    if (!searchBox.value.trim()) return;
+    if (!results.hits) renderSearch();
+    const h = results.hits?.[Math.max(0, i)];
+    if (h) pickSearch(h); else toast(`No one on the map matches “${searchBox.value.trim()}”.`);
+  }
 });
 
 $("show2").addEventListener("change", e => map.set({ showSecond: e.target.checked }));
@@ -909,20 +962,10 @@ $("show-alumni").addEventListener("change", e => map.set({ showAlumni: e.target.
 }
 $("fit").addEventListener("click", () => map.fit());
 
-// Lock (nothing moves; remembered in this browser) and Re-arrange (forget dragged positions).
-function setLocked(locked) {
-  const b = $("lock");
-  b.setAttribute("aria-pressed", String(locked));
-  b.textContent = locked ? "🔒 Locked" : "🔓 Lock";
-  b.title = locked ? "Unlock to drag people around again" : "Lock the map so nothing moves";
-  setPref(PREFS.lock, locked ? "1" : "");
-  map.setLocked(locked);
-}
-$("lock").addEventListener("click", () => setLocked($("lock").getAttribute("aria-pressed") !== "true"));
+// Re-arrange: forget dragged positions and lay the map out again.
 $("rearrange").addEventListener("click", () => {
   const had = Object.keys(state.doc.model.layout ?? {}).length;
   if (had) edit({ type: "clearLayout" });
-  setLocked(false);
   map.rearrange();
   toast(had ? "Re-arranged. Your dragged positions were cleared." : "Re-arranged.");
 });
@@ -974,7 +1017,6 @@ const demoReady = new Promise(r => { markDemoReady = r; });
   const layout = pref(PREFS.layout, "free") === "ring" ? "ring" : "free";
   layoutButtons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
   map.set({ layout });
-  if (pref(PREFS.lock, "") === "1") setLocked(true);
   try {
     await loadDemo();
     markDemoReady();

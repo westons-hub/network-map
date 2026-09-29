@@ -55,7 +55,8 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
   let graph = { nodes: [], edges: [] };
-  let options = { showSecond: true, showAlumni: true, layout: "free", locked: false };
+  let options = { showSecond: true, showAlumni: true, layout: "free" };
+  const pinned = new Set(); // dots you've dragged (or that have a saved spot): the automatic layout leaves them alone
   let selected = null;   // clicked node id
   let hovered = null;    // hovered node id (preview only when nothing is selected)
   let smallLabels = false;
@@ -172,7 +173,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
 
   /** Free layout: put no-connection targets on a ring just outside the settled network. */
   function placeGaps(animate = true) {
-    const ids = graph.nodes.filter(n => n.kind === "target" && n.gap).map(n => n.id);
+    const ids = graph.nodes.filter(n => n.kind === "target" && n.gap && !pinned.has(n.id)).map(n => n.id);
     if (!ids.length || options.layout !== "free") return;
     const ring = outerRing(network.getPositions(), ids);
     if (animate) animateTo(ring, 500); else nodes.update(Object.entries(ring).map(([id, p]) => ({ id, ...p })));
@@ -206,8 +207,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       else { nodes.update(Object.entries(target).map(([id, p]) => ({ id, ...p }))); network.fit(); }
     } else {
       cancelAnimationFrame(animation);
-      network.setOptions({ physics: { enabled: !options.locked } });
-      if (options.locked) return;
+      network.setOptions({ physics: { enabled: true } });
       network.once("stabilized", () => placeGaps(true)); // animateTo fits the view when it's done
       network.startSimulation();
     }
@@ -268,16 +268,10 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
     const moved = p.nodes.filter(id => id !== "me");
     if (!moved.length || options.layout !== "free") return;
     const pos = network.getPositions(moved);
+    moved.forEach(id => pinned.add(id));
     nodes.update(moved.map(id => ({ id, fixed: true })));
     onMoved(Object.fromEntries(moved.map(id => [id, { x: Math.round(pos[id].x), y: Math.round(pos[id].y) }])));
   });
-
-  /** Locked: nothing moves (no physics, no dragging), but you can still click, pan and zoom. */
-  function applyLock() {
-    network.setOptions({ interaction: { dragNodes: !options.locked } });
-    if (options.layout === "free") network.setOptions({ physics: { enabled: !options.locked } });
-    container.classList.toggle("locked", options.locked);
-  }
 
   function clear() {
     selected = null;
@@ -302,7 +296,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       const parentOf = Object.fromEntries(next.edges.filter(e => e.kind !== "also").map(e => [e.to, e.from]));
       nodes.add(next.nodes.filter(n => !nodes.get(n.id)).map(n => {
         // A position you dragged it to (saved in the Layout sheet) is kept exactly and pinned there.
-        if (n.kind !== "me" && layout[n.id]) return { id: n.id, ...layout[n.id], fixed: true };
+        if (n.kind !== "me" && layout[n.id]) { pinned.add(n.id); return { id: n.id, ...layout[n.id], fixed: true }; }
         const at = n.kind === "me" ? { x: 0, y: 0 } : previous[parentOf[n.id]];
         const jitter = () => (Math.random() - 0.5) * 40;
         return { id: n.id, ...(at ? { x: at.x + (n.kind === "me" ? 0 : jitter()), y: at.y + (n.kind === "me" ? 0 : jitter()) } : {}),
@@ -322,13 +316,11 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       }
     },
     set(opts) { options = { ...options, ...opts }; restyle(); },
-    setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); applyLock(); },
-    setLocked(locked) { options.locked = locked; applyLock(); },
+    setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); },
     /** Forget dragged positions and let the physics lay the map out again. */
     rearrange() {
       nodes.update(nodes.getIds().filter(id => id !== "me").map(id => ({ id, fixed: false })));
-      options.locked = false;
-      applyLock();
+      pinned.clear();
       if (options.layout === "free") {
         network.setOptions({ physics: { enabled: true } });
         network.once("stabilized", () => { placeGaps(true); network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }); });

@@ -22,6 +22,18 @@ import { makePerson, personKey } from "./people.js";
 
 export const MIN_GROUP_SIZE = 3;
 
+/** What the map can group people by (Legend & view → Group by). Company and School are the default. */
+export const GROUP_FIELDS = [["company", "Company"], ["school", "School"], ["skills", "Skills"], ["languages", "Languages"],
+                             ["certifications", "Certifications"], ["tags", "Tags"]];
+export const DEFAULT_GROUP_BY = ["company", "school"];
+
+/** A person's values for a list field: "SQL; Pricing" -> ["SQL", "Pricing"]; languages drop "(Native …)". */
+export function fieldValues(p, field) {
+  if (field === "tags") return p.tags ?? [];
+  const list = String(p[field] ?? "").split(/[;\n]/).map(v => v.trim()).filter(Boolean);
+  return field === "languages" ? list.map(v => v.replace(/\s*\([^)]*\)\s*$/, "")) : list;
+}
+
 const asTarget = t => (typeof t === "string" ? { company: t } : t);
 
 /** A person's schools: the Schools cell can hold several ("BYU (2022–2026); Lakeview High"). */
@@ -68,7 +80,7 @@ export function graphStats(g) {
 
 export function buildGraph(people, { me = "Me", profile = {}, connections = [], minGroupSize = MIN_GROUP_SIZE,
                                      groupBy = ["company", "school"], targets = [] } = {}) {
-  const g = { nodes: [], edges: [], groups: {}, targets: [] };
+  const g = { nodes: [], edges: [], groups: {}, alumni: {}, targets: [] };
   const meKey = normalizeName(me);
   const byKey = new Map(people.filter(p => personKey(p) !== meKey).map(p => [personKey(p), p]));
 
@@ -97,12 +109,20 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
     if (!counts.has(k)) counts.set(k, []);
     if (!counts.get(k).includes(p)) counts.get(k).push(p);
   };
+  const fields = groupBy.filter(f => f !== "company" && f !== "school");
+  const fieldLabels = {}; // "skills:sql" -> "SQL" (most common spelling)
   for (const p of everyone) {
     if (groupBy.includes("company")) for (const key of new Set(valuesOf(p, "company").map(normalizeOrg))) if (key) add("company", key, p);
     if (groupBy.includes("school")) {
       for (const key of new Set(schoolsOf(p).map(normalizeOrg))) if (key) add("school", key, p);
     }
-    if (groupBy.includes("tags") && isDirect(p)) for (const t of p.tags) add("tag", t.toLowerCase(), p);
+    for (const f of fields) {
+      for (const v of fieldValues(p, f)) {
+        const key = `${f}:${v.toLowerCase()}`;
+        fieldLabels[key] ??= v;
+        add("tag", key, p);
+      }
+    }
   }
 
   const groupIds = new Map();
@@ -111,10 +131,9 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
     if (members.length < minGroupSize) continue;
     const [kind, key] = k.split(/\|(.*)/s);
     const gid = `${kind}:${key}`;
-    const label = labels[kind]?.[key] ?? members[0].tags.find(t => t.toLowerCase() === key);
+    const label = labels[kind]?.[key] ?? fieldLabels[key];
     groupIds.set(k, gid);
-    g.groups[gid] = members.map(m => m.name);
-    g.nodes.push({ id: gid, label, kind, key, count: members.length });
+    g.nodes.push({ id: gid, label, kind, key, count: members.length, ...(kind === "tag" ? { field: key.split(":")[0] } : {}) });
     g.edges.push({ from: "me", to: gid, kind: "group" });
   }
 
@@ -134,10 +153,9 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
     if (id) Object.assign(nodesById.get(id), meta);
     else {
       id = `target:${key}`;
-      g.nodes.push({ id, label: t.company, kind: "target", key, count: directAt.length, gap: !at.length, ...meta });
+      g.nodes.push({ id, label: t.company, kind: "target", key, count: 0, gap: !at.length, ...meta });
       g.edges.push({ from: "me", to: id, kind: directAt.length ? "group" : "gap" });
       groupIds.set(`company|${key}`, id); // people there attach to the target like a group
-      g.groups[id] = directAt;
     }
     // Alumni: people who used to work there (ranked below current employees).
     const alumni = [...byKey.values()].flatMap(p => parseEntries(p.pastCompanies)
@@ -153,9 +171,11 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
       const gid = value && groupIds.get(`${kind}|${normalizeOrg(value)}`);
       if (gid && !out.includes(gid)) out.push(gid);
     }
-    for (const t of p.tags) {
-      const gid = groupIds.get(`tag|${t.toLowerCase()}`);
-      if (gid) out.push(gid);
+    for (const f of fields) {
+      for (const v of fieldValues(p, f)) {
+        const gid = groupIds.get(`tag|${f}:${v.toLowerCase()}`);
+        if (gid && !out.includes(gid)) out.push(gid);
+      }
     }
     return out;
   };
@@ -208,6 +228,18 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
         g.edges.push({ from: gid, to: `p:${personKey(p)}`, kind: "alumni", years: e.years });
       }
     }
+  }
+
+  // ---- counts come from the lines actually drawn: everyone linked to a group (current, 2nd-degree, alumni) ----
+  const names = new Map(g.nodes.map(n => [n.id, n.label]));
+  for (const n of g.nodes) {
+    if (!["company", "school", "tag", "target"].includes(n.kind)) continue;
+    const linked = g.edges.filter(e => e.from === n.id && ["member", "also", "alumni"].includes(e.kind));
+    const current = [...new Set(linked.filter(e => e.kind !== "alumni").map(e => e.to))];
+    const alumni = [...new Set(linked.filter(e => e.kind === "alumni").map(e => e.to))].filter(id => !current.includes(id));
+    n.count = current.length + alumni.length;
+    g.groups[n.id] = current.map(id => names.get(id)).sort();
+    g.alumni[n.id] = alumni.map(id => names.get(id)).sort();
   }
 
   g.stats = graphStats(g);

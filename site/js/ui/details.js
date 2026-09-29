@@ -383,7 +383,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     img.append(el("img", undefined, { src: logo.image, alt: "", onerror: e => { e.target.src = logo.brokenImage; } }));
     const t = graph.targets.find(x => x.focus === node.id);
     const kind = node.kind === "target" ? "Target company" : `${node.kind[0].toUpperCase()}${node.kind.slice(1)} group`;
-    const sub = el("div", t ? `${kind}${node.kind !== "target" ? " · target" : ""}` : `${kind} · ${node.count} you know directly`,
+    const kindLabel = node.field ? `${node.field[0].toUpperCase()}${node.field.slice(1)} group` : kind;
+    const sub = el("div", `${kindLabel}${t && node.kind !== "target" ? " · target" : ""} · ${node.count} ${node.count === 1 ? "person" : "people"}`,
                    { class: "card-sub" });
     const name = el("div", undefined, { class: "card-name static" });
     name.append(node.label, " ", el("button", "Edit", { class: "chip small-chip", type: "button", title: "Type, website and logo",
@@ -417,9 +418,10 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       if (target.notes) card.append(section("Notes", el("div", target.notes)));
     }
 
-    const people = t ? [...t.direct, ...t.second] : graph.groups[node.id] ?? [];
-    const alumni = t?.alumni ?? graph.edges.filter(e => e.from === node.id && e.kind === "alumni")
-      .map(e => ({ name: graph.nodes.find(n => n.id === e.to)?.label, years: e.years })).filter(a => a.name);
+    // The same people as the lines on the map (and the count on the dot): current members, then alumni.
+    const people = graph.groups[node.id] ?? [];
+    const years = new Map(graph.edges.filter(e => e.from === node.id && e.kind === "alumni").map(e => [e.to, e.years]));
+    const alumni = (graph.alumni?.[node.id] ?? []).map(name => ({ name, years: years.get(personId(name)) ?? "" }));
     if (people.length) {
       const list = el("div", undefined, { class: "people-chips" });
       for (const name of people) {
@@ -429,7 +431,7 @@ export function createDetails({ sidebar, getCtx, handlers }) {
         chip.append(name);
         list.append(chip);
       }
-      card.append(section(t ? "People you know there" : "People in this group", list));
+      card.append(section(`${t ? "People you know there" : "People in this group"} (${people.length})`, list));
     }
     if (alumni.length) {
       const list = el("div", undefined, { class: "people-chips" });
@@ -437,7 +439,7 @@ export function createDetails({ sidebar, getCtx, handlers }) {
         list.append(el("button", `${a.name}${a.years ? ` (${a.years})` : ""}`, { class: "person-chip alumni", type: "button",
                                                                                onclick: () => handlers.focus(personId(a.name)) }));
       }
-      card.append(section("Alumni", list));
+      card.append(section(`Alumni (${alumni.length})`, list));
     }
     if (t) {
       const onMap = new Set(model.people.map(p => normalizeName(p.name)));

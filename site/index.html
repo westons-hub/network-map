@@ -53,8 +53,11 @@
       <div class="search">
         <button id="add-person" class="btn primary add-person-btn" type="button" title="Add a person (N)">
           + Add person <kbd>N</kbd></button>
-        <input type="search" id="search" placeholder="Find a person, company or school" autocomplete="off"
-               aria-label="Find on the map">
+        <div class="search-wrap">
+          <input type="search" id="search" placeholder="Find anyone or anything (name, company, skill…)" autocomplete="off"
+                 aria-label="Find on the map" aria-controls="search-results">
+          <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+        </div>
       </div>
 
       <section id="targets-section" aria-labelledby="targets-heading">
@@ -85,6 +88,7 @@
         <div class="legend">
           <span><i class="dot ring-company"></i>Company group</span>
           <span><i class="dot ring-school"></i>School group</span>
+          <span><i class="dot ring-tag"></i>Skill, language, tag… group</span>
           <span><i class="dot ring-target"></i>Target company</span>
           <span><i class="dot ring-gap"></i>Target, no one yet</span>
         </div>
@@ -96,14 +100,26 @@
           <span><i class="line link"></i>Coworker · classmate · friend · mentor</span>
           <span><i class="line path"></i>Best path to a target</span>
         </div>
+        <div class="legend-title">Grouping</div>
+        <label class="group-slider"><span>Groups form at: <strong id="group-size-value">3</strong> people</span>
+          <input type="range" id="group-size" min="2" max="10" step="1" value="3" aria-label="Groups form at this many people"></label>
+        <div class="group-by" role="group" aria-label="Group by">
+          <span class="muted small">Group by:</span>
+          <label><input type="checkbox" value="company"> Company</label>
+          <label><input type="checkbox" value="school"> School</label>
+          <label><input type="checkbox" value="skills"> Skills</label>
+          <label><input type="checkbox" value="languages"> Languages</label>
+          <label><input type="checkbox" value="certifications"> Certifications</label>
+          <label><input type="checkbox" value="tags"> Tags</label>
+        </div>
         <div class="toggles">
           <label><input type="checkbox" id="show2" checked> Show 2nd-degree connections</label>
           <label><input type="checkbox" id="show-alumni" checked> Show alumni links</label>
           <label><input type="checkbox" id="illustrated"> Illustrated avatars for people without a photo
             <span class="muted small">(DiceBear Notionists, drawn in your browser)</span></label>
         </div>
-        <p class="muted small">Groups form when 3+ people you know directly share a company or school.
-          Click anyone for their details; double-click to open their LinkedIn.</p>
+        <p class="muted small">A dot appears when enough people on your map share a value (for companies, current or past).
+          Targets always have one. Click anyone for their details; double-click to open their LinkedIn.</p>
       </details>
 
       <footer class="privacy muted small">
@@ -137,7 +153,6 @@
           <button type="button" data-layout="free" aria-pressed="true" title="Physics layout">Free</button>
           <button type="button" data-layout="ring" aria-pressed="false" title="Groups on a circle around you">Ring</button>
         </div>
-        <button id="lock" class="btn small" type="button" aria-pressed="false" title="Lock the map so nothing moves">🔓 Lock</button>
         <button id="rearrange" class="btn small" type="button" title="Forget dragged positions and lay the map out again">Re-arrange</button>
         <button id="fit" class="btn small" type="button" title="Show everything">Fit</button>
       </div>

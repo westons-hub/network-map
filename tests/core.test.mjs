@@ -116,8 +116,8 @@ test("you aren't duplicated, and 'Connected Through: me' counts as direct", () =
 
 test("group by tags", () => {
   const g = buildGraph(["A", "B", "C"].map(n => P(n, { tags: "Gaming" })), { groupBy: ["tags"] });
-  assert.deepEqual([...ids(g, "tag")], ["tag:gaming"]);
-  assert.equal(g.nodes.find(n => n.id === "tag:gaming").label, "Gaming");
+  assert.deepEqual([...ids(g, "tag")], ["tag:tags:gaming"]);
+  assert.equal(g.nodes.find(n => n.id === "tag:tags:gaming").label, "Gaming");
 });
 
 test("demo workbook builds: only the people you added are on the map", () => {
@@ -161,13 +161,13 @@ test("a target below the group size is still its own node, and people there atta
   const g = buildGraph([P("Solo", { company: "Tiny Co", school: "State" }), P("Via", { company: "Tiny Co", connectedThrough: "Solo" })],
                        { targets: [{ company: "Tiny Co", priority: "2", stage: "Applied" }] });
   const t = g.nodes.find(n => n.id === "target:tiny");
-  assert.deepEqual([t.kind, t.count, t.gap, t.priority, t.stage], ["target", 1, false, "2", "Applied"]);
+  assert.deepEqual([t.kind, t.count, t.gap, t.priority, t.stage], ["target", 2, false, "2", "Applied"]); // Solo + Via
   assert.equal(g.targets[0].focus, "target:tiny");
   assert.ok(edges(g).has("me>target:tiny>group"));
   assert.ok(edges(g).has("target:tiny>p:solo>member"));
   assert.ok(edges(g).has("target:tiny>p:via>also"));
   assert.ok(!edges(g).has("me>p:solo>direct"));
-  assert.deepEqual(g.groups["target:tiny"], ["Solo"]);
+  assert.deepEqual(g.groups["target:tiny"], ["Solo", "Via"]);
 });
 
 test("a target reachable only through someone links to you with a dashed (gap) edge", () => {
@@ -280,4 +280,43 @@ test("a dot can change type: School <-> Company moves it between people's fields
   m = applyOp(m, { type: "upsertCompany", company: { company: "Stanford University", website: "stanford.edu", logo: "data:image/png;base64,AA" } });
   m = applyOp(m, { type: "upsertCompany", company: { company: "Stanford", website: "www.stanford.edu", logo: "" } });
   assert.deepEqual(m.companies.map(c => [c.company, c.website, c.logo]), [["Stanford", "www.stanford.edu", ""]]);
+});
+
+test("group by any field: languages (without the proficiency), skills, certifications; several at once", () => {
+  const ppl = [P("A", { languages: "Spanish (Native or Bilingual); French (Elementary)", skills: "SQL" }),
+               P("B", { languages: "Spanish (Professional Working)", skills: "SQL; Python" }),
+               P("C", { languages: "spanish", skills: "Python" }), P("D", { skills: "Python", certifications: "CSPO" })];
+  const g = buildGraph(ppl, { groupBy: ["languages", "skills"] });
+  assert.deepEqual(g.nodes.filter(n => n.kind === "tag").map(n => [n.id, n.label, n.count, n.field]).sort(),
+    [["tag:languages:spanish", "Spanish", 3, "languages"], ["tag:skills:python", "Python", 3, "skills"]]);
+  // Everyone hangs off their first group; the others get a secondary link.
+  assert.ok(edges(g).has("tag:languages:spanish>p:c>member"));
+  assert.ok(edges(g).has("tag:skills:python>p:c>also"));
+  assert.equal(buildGraph(ppl, { groupBy: ["certifications"] }).nodes.filter(n => n.kind === "tag").length, 0);
+});
+
+test("every group's count equals the people actually linked to it on the map (current, 2nd-degree and alumni)", () => {
+  const m = demo();
+  for (const opts of [{}, { groupBy: ["company", "school", "skills", "languages"] }, { minGroupSize: 2 }]) {
+    const g = buildGraph(m.people, { me: m.me, targets: m.targets, connections: m.connections, ...opts });
+    const people = new Set(g.nodes.filter(n => n.kind === "person" || n.kind === "second").map(n => n.id));
+    for (const n of g.nodes.filter(x => ["company", "school", "tag", "target"].includes(x.kind))) {
+      const linked = new Set(g.edges.filter(e => e.from === n.id && people.has(e.to)).map(e => e.to));
+      assert.equal(n.count, linked.size, `${n.id}: label says ${n.count}, ${linked.size} linked`);
+      assert.equal(g.groups[n.id].length + g.alumni[n.id].length, linked.size, `${n.id}: "People in this group" list`);
+    }
+  }
+});
+
+test("search matches any field and says which one matched", async () => {
+  const { searchMap } = await import("../site/js/core/search.js");
+  const m = demo();
+  const g = buildGraph(m.people, { me: m.me, targets: m.targets });
+  const first = q => { const r = searchMap(g, m.people, q)[0]; return r && [r.label, r.field, r.value]; };
+  assert.deepEqual(first("liam"), ["Liam Walsh", "Name", ""]);
+  assert.deepEqual(first("Experimentation"), ["Sofia Alvarez", "Skills", "Experimentation"]);
+  assert.deepEqual(first("spanish"), ["Sofia Alvarez", "Languages", "Spanish (Native or Bilingual)"]);
+  assert.deepEqual(first("roommate"), ["Liam Walsh", "Notes", "Old roommate"]);
+  assert.equal(searchMap(g, m.people, "deloitte")[0].id, "company:deloitte");
+  assert.deepEqual(searchMap(g, m.people, "zzzz"), []);
 });

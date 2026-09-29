@@ -64,7 +64,7 @@ export const DEFAULT_INVITE = "Hi {first name}, looking forward to our chat on {
 // [row label on the Settings sheet, settings field, default]
 const SETTING_ROWS = [["Your email", "email", ""], ["Meeting length (minutes)", "meetingLength", 30],
   ["Zoom link", "zoomLink", ""], ["Check-in every (days)", "checkInDays", 60],
-  ["Invite message", "inviteTemplate", DEFAULT_INVITE], ["Group size (people)", "groupSize", 3], ["Demo base date", "demoBaseDate", ""]];
+  ["Invite message", "inviteTemplate", DEFAULT_INVITE], ["Group size (people)", "groupSize", 3], ["Group by", "groupBy", "company, school"], ["Demo base date", "demoBaseDate", ""]];
 
 export const defaultSettings = () => Object.fromEntries(SETTING_ROWS.map(([, f, d]) => [f, d]));
 
