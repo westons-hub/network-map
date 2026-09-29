@@ -457,7 +457,7 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a571
 3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(dc94e2b … 5af12f2)*:
    1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
-3e. **Round 2 (W), one local commit per group A–F, then a "Round 2 done" commit; push only when asked.**
+3e. ✅ **Round 2 (W)** *(2c4b957 A · 3fd45cc B · 9c1af0d C · c668a80 D · 48dbe9d E · 10332c4 F)*; push only when asked.
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
