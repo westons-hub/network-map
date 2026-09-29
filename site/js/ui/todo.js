@@ -3,6 +3,7 @@
 import { normalizeName } from "../core/org.js";
 import { groupTasks, newId, todayIso, toDate } from "../core/schedule.js";
 import { el } from "./dom.js";
+import { attachTypeahead } from "./typeahead.js";
 
 const GROUPS = [["overdue", "Overdue"], ["today", "Today"], ["week", "This week"], ["later", "Later"], ["done", "Done"]];
 const prettyDate = d => (d ? toDate(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "No due date");
@@ -20,13 +21,10 @@ export function createTodo(root, { getModel, onAdd, onToggle, onEdit, onPerson }
     // Quick add: task, person, due date.
     const form = el("form", undefined, { class: "quick-add" });
     const text = el("input", undefined, { placeholder: "Add a task…", "aria-label": "New task", required: true });
-    const listId = "todo-people";
-    const people = el("datalist", undefined, { id: listId });
-    for (const p of [...model.people].sort((a, b) => a.name.localeCompare(b.name))) people.append(el("option", undefined, { value: p.name }));
     const who = el("input", undefined, { placeholder: "Person (optional)", "aria-label": "Person", autocomplete: "off" });
-    who.setAttribute("list", listId);
+    attachTypeahead(who, "person");
     const due = el("input", undefined, { type: "date", value: today, "aria-label": "Due date" });
-    form.append(text, who, people, due, el("button", "Add", { class: "btn primary small", type: "submit" }));
+    form.append(text, who, due, el("button", "Add", { class: "btn primary small", type: "submit" }));
     form.addEventListener("submit", e => {
       e.preventDefault();
       if (!text.value.trim()) return;

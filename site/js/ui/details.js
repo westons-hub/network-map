@@ -9,6 +9,7 @@ import { meetingDate, meetingsFor, tasksFor, todayIso, toDate } from "../core/sc
 import { STAGES } from "../core/workbook.js";
 import { el } from "./dom.js";
 import { inlineField } from "./inline.js";
+import { attachTypeahead } from "./typeahead.js";
 import { statusColor } from "./map.js";
 
 const isWebUrl = u => /^https?:\/\//i.test(u ?? "");
@@ -102,9 +103,6 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       : inlineField({ value: Array.isArray(p[field]) ? p[field].join(", ") : p[field] ?? "", onSave: save(field),
                       label: opts.label ?? field, ...opts });
 
-    const companies = unique([...model.people.map(x => x.company), ...model.pool.map(e => e.company)]);
-    const schools = unique(model.people.flatMap(x => entryNames(x.school)));
-    const names = unique(model.people.map(x => x.name).filter(n => normalizeName(n) !== key));
 
     // Header: photo, name, role @ company, status pill.
     const pic = images.forPerson(node);
@@ -118,8 +116,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const title = el("div", undefined, { class: "card-name" });
     title.append(edit("name", { label: "name", placeholder: "Name" }));
     const sub = el("div", undefined, { class: "card-sub" });
-    sub.append(edit("role", { label: "role", placeholder: "Add role" }), el("span", " @ ", { class: "muted" }),
-               edit("company", { label: "company", placeholder: "Add company", suggestions: companies }));
+    sub.append(edit("role", { label: "role", placeholder: "Add role", kind: "role" }), el("span", " @ ", { class: "muted" }),
+               edit("company", { label: "company", placeholder: "Add company", kind: "company" }));
     const extra = placeholder ? el("div", "Added automatically because someone was connected through them.", { class: "muted small" })
       : statusPill(p);
     card.append(header(photo, title, sub, extra));
@@ -191,14 +189,14 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const md = meetingDate(model, p.name);
     info.append(
       row("Email", edit("email", { type: "email", placeholder: "Add email" })),
-      row("Schools", edit("school", { suggestions: schools, placeholder: "Add school(s)", label: "schools" })),
-      row("Past companies", edit("pastCompanies", { suggestions: companies, placeholder: "e.g. Deloitte (2019–2021)",
+      row("Schools", edit("school", { kind: "school", multi: true, placeholder: "Add school(s)", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { kind: "company", multi: true, placeholder: "e.g. Deloitte (2019–2021)",
                                                      label: "past companies" })),
       row("Connected on", edit("connectedOn", { type: "date", placeholder: "Add date", display: v => prettyDate(v, false) || v })),
       row("Meeting date", el("span", md ? `${prettyDate(md.meeting.date)}${md.upcoming ? " (upcoming)" : ""}` : "—")),
       row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste profile link",
         display: v => v ? "Profile link" : "" })),
-      row("Tags", edit("tags", { placeholder: "Add tags" })),
+      row("Tags", edit("tags", { placeholder: "Add tags", kind: "tag", multi: true })),
     );
     card.append(info);
 
@@ -237,10 +235,7 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const toggle = el("button", "+ Connect to someone", { class: "linklike small", type: "button" });
     const form = el("div", undefined, { class: "conn-add", hidden: true });
     const who = el("input", undefined, { placeholder: "Person", autocomplete: "off", "aria-label": "Person" });
-    const listId = `conn-people-${Math.random().toString(36).slice(2, 7)}`;
-    const dl = el("datalist", undefined, { id: listId });
-    for (const x of model.people) if (normalizeName(x.name) !== normalizeName(p.name)) dl.append(el("option", undefined, { value: x.name }));
-    who.setAttribute("list", listId);
+    attachTypeahead(who, "person");
     const type = el("select", undefined, { "aria-label": "How they're connected" });
     for (const t of CONNECTION_TYPES) type.append(el("option", t === INTRODUCED ? `Introduced me to ${p.name.split(" ")[0]}` : t, { value: t }));
     const other = el("input", undefined, { class: "other", placeholder: "How do they know each other?", hidden: true });
@@ -252,7 +247,7 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       // "Introduced me": the person you picked introduced you to this person.
       handlers.addConnection(t === INTRODUCED ? { a: name, b: p.name, type: t } : { a: p.name, b: name, type: t });
     } });
-    form.append(who, type, other, dl, add);
+    form.append(who, type, other, add);
     toggle.addEventListener("click", () => { form.hidden = !form.hidden; toggle.hidden = true; who.focus(); });
     box.append(toggle, form);
     return box;
@@ -265,8 +260,6 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const prof = model.profile ?? {};
     const save = field => value => handlers.setProfile({ [field]: value });
     const edit = (field, opts = {}) => inlineField({ value: prof[field] ?? "", onSave: save(field), label: opts.label ?? field, ...opts });
-    const companies = unique([...model.people.map(x => x.company), ...model.pool.map(e => e.company)]);
-    const schools = unique(model.people.flatMap(x => entryNames(x.school)));
 
     const pic = images.forPerson({ ...node, label: model.me || "You" });
     const photo = el("button", undefined, { class: "card-photo me", type: "button", title: "Change photo",
@@ -276,8 +269,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const title = el("div", undefined, { class: "card-name" });
     title.append(inlineField({ value: model.me, label: "your name", placeholder: "Your name", onSave: v => handlers.setProfile({ name: v }) }));
     const sub = el("div", undefined, { class: "card-sub" });
-    sub.append(edit("role", { placeholder: "Your role (e.g. MBA Candidate)" }));
-    sub.append(el("span", " @ ", { class: "muted" }), edit("company", { suggestions: companies, placeholder: "add company" }));
+    sub.append(edit("role", { placeholder: "Your role (e.g. MBA Candidate)", kind: "role" }));
+    sub.append(el("span", " @ ", { class: "muted" }), edit("company", { kind: "company", placeholder: "add company" }));
     const extra = el("div", undefined, { class: "headline" });
     extra.append(edit("headline", { placeholder: "Add a headline" }));
     card.append(header(photo, title, sub, extra));
@@ -285,8 +278,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
 
     const info = el("div", undefined, { class: "card-info" });
     info.append(
-      row("Schools", edit("school", { suggestions: schools, placeholder: "e.g. BYU (2022–2026)", label: "schools" })),
-      row("Past companies", edit("pastCompanies", { suggestions: companies, placeholder: "e.g. Deloitte (2019–2021)", label: "past companies" })),
+      row("Schools", edit("school", { kind: "school", multi: true, placeholder: "e.g. BYU (2022–2026)", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { kind: "company", multi: true, placeholder: "e.g. Deloitte (2019–2021)", label: "past companies" })),
       row("Email", edit("email", { type: "email", placeholder: "Add email" })),
       row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste your profile link", display: v => (v ? "Profile link" : "") })),
       row("Location", edit("location", { placeholder: "Add location" })),

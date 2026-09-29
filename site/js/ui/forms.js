@@ -7,6 +7,7 @@ import {
 } from "../core/schedule.js";
 import { MEETING_TYPES, METHODS, PRIORITIES, STAGES } from "../core/workbook.js";
 import { ask, toast } from "./dialog.js";
+import { attachTypeahead } from "./typeahead.js";
 import { el } from "./dom.js";
 
 function field(label, input, hint) {
@@ -53,17 +54,15 @@ export function companySuggestions(model, graph) {
 export async function targetForm({ target, suggestions, company = "" }) {
   const editing = !!target;
   const body = el("div", undefined, { class: "form" });
-  const list = el("datalist", undefined, { id: "company-suggestions" });
-  for (const s of suggestions) list.append(el("option", undefined, { value: s }));
   const name = el("input", undefined, { name: "company", required: true, autocomplete: "off",
     value: target?.company ?? company, placeholder: "e.g. Delta Air Lines", maxLength: 120 });
-  name.setAttribute("list", "company-suggestions");
+  attachTypeahead(name, "company");
   const priority = select("priority", [["", "—"], ...PRIORITIES.map(p => [p, `P${p}`])], target?.priority ?? "");
   const stage = select("stage", [["", "—"], ...STAGES.map(s => [s, s])], target?.stage ?? (editing ? "" : "Researching"));
   const notes = el("textarea", undefined, { name: "notes", rows: 3, value: target?.notes ?? "", maxLength: 2000 });
   const row = el("div", undefined, { class: "row2" });
   row.append(field("Priority", priority), field("Stage", stage));
-  body.append(list, field("Company", name, "Pick from your people and LinkedIn pool, or type any company."), row,
+  body.append(field("Company", name, "Pick from your people and LinkedIn pool, or type any company."), row,
               field("Notes", notes));
 
   const buttons = [{ label: "Cancel", value: "" }, { label: editing ? "Save" : "Add target", value: "save", primary: true }];
@@ -112,13 +111,6 @@ export async function photoForm({ name, current }) {
 
 // ---- meetings ---------------------------------------------------------------------------
 
-let listIds = 0;
-function datalist(values) {
-  const id = `form-list-${++listIds}`;
-  const list = el("datalist", undefined, { id });
-  for (const v of values) list.append(el("option", undefined, { value: v }));
-  return { id, list };
-}
 
 const findPerson = (model, name) => model.people.find(p => normalizeName(p.name) === normalizeName(name));
 
@@ -132,10 +124,9 @@ export async function meetingForm({ model, meeting, person = "", date = "", star
   const m = meeting ?? { id: newId("m"), person, date: date || todayIso(), start: startAt || "10:00", end: "", type: "Coffee Chat",
                          method: "Zoom", link: s.zoomLink || "", notes: "", nextStep: "", eventId: "" };
   const body = el("div", undefined, { class: "form" });
-  const people = datalist(model.people.map(p => p.name).sort());
   const who = el("input", undefined, { name: "person", required: true, value: m.person, autocomplete: "off",
                                         placeholder: "Start typing a name" });
-  who.setAttribute("list", people.id);
+  attachTypeahead(who, "person");
   const emailWarn = el("div", undefined, { class: "warn", hidden: true });
   const email = el("input", undefined, { type: "email", name: "email", placeholder: "their@email.com" });
   emailWarn.append(el("span", "No email on file for this person. Add one so the invite can reach them:"), email);
@@ -170,7 +161,7 @@ export async function meetingForm({ model, meeting, person = "", date = "", star
   const next = el("input", undefined, { name: "nextStep", value: m.nextStep, placeholder: "e.g. Send resume" });
 
   const row = (...fields) => { const r = el("div", undefined, { class: "row3" }); r.append(...fields); return r; };
-  body.append(people.list, field("Who", who), emailWarn, row(field("Date", day), field("Time", start), field("Length", length)),
+  body.append(field("Who", who), emailWarn, row(field("Date", day), field("Time", start), field("Length", length)),
               row(field("Type", type), field("How", method)), field("Link / place", link, ""), linkHint,
               field("Notes", notes), field("Next step", next));
   body.append(el("p", "A past date logs a meeting that happened (status becomes Met). A future date schedules one (status becomes Scheduled). Either way, a \"Send thank-you\" task is added for the next day.",
@@ -242,17 +233,15 @@ export async function taskForm({ model, task, person = "", date = "" }) {
   const t = task ?? { id: newId("t"), task: "", person, company: "", due: date, done: false, created: todayIso(), source: "" };
   const body = el("div", undefined, { class: "form" });
   const text = el("input", undefined, { name: "task", required: true, value: t.task, placeholder: "e.g. Send resume to Jordan" });
-  const people = datalist(model.people.map(p => p.name).sort());
   const who = el("input", undefined, { name: "person", value: t.person, autocomplete: "off", placeholder: "Optional" });
-  who.setAttribute("list", people.id);
-  const companies = datalist([...new Set([...model.targets.map(x => x.company), ...model.people.map(p => p.company)].filter(Boolean))].sort());
+  attachTypeahead(who, "person");
   const company = el("input", undefined, { name: "company", value: t.company, autocomplete: "off", placeholder: "Optional" });
-  company.setAttribute("list", companies.id);
+  attachTypeahead(company, "company");
   who.addEventListener("change", () => { if (!company.value) company.value = findPerson(model, who.value)?.company ?? ""; });
   const due = el("input", undefined, { type: "date", name: "due", value: t.due });
   const row = el("div", undefined, { class: "row2" });
   row.append(field("Person", who), field("Company", company));
-  body.append(people.list, companies.list, field("Task", text), row, field("Due", due));
+  body.append(field("Task", text), row, field("Due", due));
   const buttons = [{ label: "Cancel", value: "" }, { label: editing ? "Save" : "Add task", value: "save", primary: true }];
   if (editing) buttons.unshift({ label: "Delete", value: "delete", danger: true, left: true });
   const choice = await ask(editing ? "Edit task" : "Add a task", body, buttons);
@@ -268,7 +257,6 @@ export async function taskForm({ model, task, person = "", date = "" }) {
 export async function personForm({ model, person }) {
   const body = el("div", undefined, { class: "form" });
   const input = (name, value, attrs = {}) => el("input", undefined, { name, value: value ?? "", autocomplete: "off", ...attrs });
-  const names = datalist(model.people.map(p => p.name).filter(n => n !== person.name).sort());
   const fields = {
     name: input("name", person.name, { required: true }),
     role: input("role", person.role),
@@ -284,9 +272,14 @@ export async function personForm({ model, person }) {
     tags: input("tags", person.tags.join(", "), { placeholder: "Comma-separated" }),
     notes: el("textarea", undefined, { name: "notes", rows: 4, value: person.notes }),
   };
-  fields.connectedThrough.setAttribute("list", names.id);
+  attachTypeahead(fields.connectedThrough, "person");
+  attachTypeahead(fields.company, "company");
+  attachTypeahead(fields.role, "role");
+  attachTypeahead(fields.school, "school", { multi: true });
+  attachTypeahead(fields.pastCompanies, "company", { multi: true });
+  attachTypeahead(fields.tags, "tag", { multi: true });
   const two = (a, b) => { const r = el("div", undefined, { class: "row2" }); r.append(a, b); return r; };
-  body.append(names.list,
+  body.append(
     el("div", "Basics", { class: "form-section" }), field("Name", fields.name), two(field("Role", fields.role), field("Company", fields.company)),
     two(field("Email", fields.email), field("LinkedIn", fields.linkedinUrl)),
     el("div", "Connection", { class: "form-section" }), two(field("Schools", fields.school), field("Past companies", fields.pastCompanies)),

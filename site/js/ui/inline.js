@@ -2,15 +2,15 @@
 // Esc cancels. Multi-line fields save on blur or Cmd/Ctrl+Enter.
 
 import { el } from "./dom.js";
-
-let listCounter = 0;
+import { attachTypeahead } from "./typeahead.js";
 
 /**
- * opts: { value, placeholder, multiline, type ("text"|"date"|"email"|"url"), suggestions: [..],
+ * opts: { value, placeholder, multiline, type ("text"|"date"|"email"|"url"),
+ *         kind: type-ahead kind (company, school, role, tag, person…), multi: several entries (Schools, Past Companies, Tags),
  *         display: value -> string|Node, onSave: newValue -> void, label }
  */
 export function inlineField(opts) {
-  const { value = "", placeholder = "Add…", multiline = false, type = "text", suggestions, display, onSave, label } = opts;
+  const { value = "", placeholder = "Add…", multiline = false, type = "text", kind, multi = false, display, onSave, label } = opts;
   const wrap = el("span", undefined, { class: `inline${multiline ? " multiline" : ""}` });
 
   function show() {
@@ -29,13 +29,8 @@ export function inlineField(opts) {
     input.value = value;
     input.className = "inline-input";
     if (label) input.setAttribute("aria-label", label);
-    if (suggestions?.length) {
-      const id = `inline-list-${++listCounter}`;
-      const list = el("datalist", undefined, { id });
-      for (const s of suggestions) list.append(el("option", undefined, { value: s }));
-      input.setAttribute("list", id);
-      wrap.replaceChildren(input, list);
-    } else wrap.replaceChildren(input);
+    wrap.replaceChildren(input);
+    if (kind) attachTypeahead(input, kind, { multi });
     input.focus();
     if (!multiline && type === "text") input.select();
 

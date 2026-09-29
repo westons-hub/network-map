@@ -21,6 +21,8 @@ import { createImages } from "./ui/images.js";
 import { createMap } from "./ui/map.js";
 import { el, renderOverview, renderTargets } from "./ui/panels.js";
 import { createTodo } from "./ui/todo.js";
+import { buildSuggestions } from "./core/suggest.js";
+import { setSuggestionSource } from "./ui/typeahead.js";
 import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
 import { isPdf } from "./ui/pdf.js";
@@ -224,8 +226,16 @@ const todo = createTodo($("todo-view"), {
   onPerson: name => openPerson(name),
 });
 
+// Type-ahead everywhere: suggestions from everything entered, rebuilt when the data changes.
+let suggestions = null;
+setSuggestionSource({
+  suggestions: () => (suggestions ??= buildSuggestions(state.doc.model)),
+  logo: (name, kind) => images.forOrg({ label: name, key: normalizeOrg(name), kind }).image,
+});
+
 function render() {
   const { model } = state.doc;
+  suggestions = null;
   const me = model.me || "You";
   state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));

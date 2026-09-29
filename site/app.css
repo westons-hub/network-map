@@ -446,3 +446,14 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .conn-rows { display: grid; gap: 6px; }
 .conn-row { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 6px; }
 .conn-row input, .conn-row select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+
+/* ---- type-ahead ---- */
+.typeahead { position: fixed; z-index: 50; list-style: none; margin: 0; padding: 4px; max-height: 280px; overflow-y: auto;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+             box-shadow: 0 10px 28px rgba(16, 24, 40, .16); font-size: 13px; }
+.typeahead li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+.typeahead li.active, .typeahead li:hover { background: #eef4ff; }
+.typeahead img { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); object-fit: cover; flex: none; }
+.typeahead .value { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.typeahead .meta { margin-left: auto; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.typeahead li.add { color: var(--accent); font-weight: 600; }

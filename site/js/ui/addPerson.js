@@ -13,6 +13,7 @@ import { isLinkedInUrl, matchLinkedInUrl, onMapIndex, searchPool } from "../core
 import { ask, toast } from "./dialog.js";
 import { el } from "./dom.js";
 import { resizeImage } from "./forms.js";
+import { attachTypeahead } from "./typeahead.js";
 import { isPdf, readProfilePdf } from "./pdf.js";
 
 const TIP = "For full history, open their LinkedIn profile → More → Save to PDF, then drop it here.";
@@ -24,14 +25,6 @@ function field(label, input, { hint, needs } = {}) {
   return wrap;
 }
 
-let listIds = 0;
-function withList(input, values) {
-  const id = `add-list-${++listIds}`;
-  const list = el("datalist", undefined, { id });
-  for (const v of values) list.append(el("option", undefined, { value: v }));
-  input.setAttribute("list", id);
-  return list;
-}
 
 /**
  * Step 1: the one box. Resolves with { draft, source, note } or { open: name } (already on the map) or null.
@@ -168,19 +161,19 @@ async function reviewPerson({ model, draft, note, existing }) {
     notes: el("textarea", undefined, { name: "notes", rows: 3, value: val("notes") }),
   };
   for (const s of ["", ...STATUSES]) f.status.append(el("option", s || "Choose…", { value: s, selected: s === (draft.status ?? "") }));
-  const companies = [...new Set([...model.people.map(p => p.company), ...model.pool.map(e => e.company)].filter(Boolean))].sort();
-  const schools = [...new Set(model.people.flatMap(p => entryNames(p.school)))].sort();
-  const lists = [withList(f.company, companies), withList(f.school, schools), withList(f.pastCompanies, companies)];
+  attachTypeahead(f.company, "company");
+  attachTypeahead(f.role, "role");
+  attachTypeahead(f.school, "school", { multi: true });
+  attachTypeahead(f.pastCompanies, "company", { multi: true });
+  attachTypeahead(f.tags, "tag", { multi: true });
+  const lists = [];
 
   // Connections: who introduced you, and who they know (coworker, classmate, friend, mentor, other).
-  const peopleList = el("datalist", undefined, { id: `add-people-${++listIds}` });
-  for (const p of [...model.people].sort((a, b) => a.name.localeCompare(b.name))) peopleList.append(el("option", undefined, { value: p.name }));
-  lists.push(peopleList);
   const rows = el("div", undefined, { class: "conn-rows" });
   const addRow = (person = "", type = INTRODUCED) => {
     const row = el("div", undefined, { class: "conn-row" });
     const who = el("input", undefined, { placeholder: "Person on your map", autocomplete: "off", value: person, "aria-label": "Person" });
-    who.setAttribute("list", peopleList.id);
+    attachTypeahead(who, "person");
     const kind = el("select", undefined, { "aria-label": "How you're connected" });
     for (const t of CONNECTION_TYPES) kind.append(el("option", t === INTRODUCED ? "Introduced me" : t, { value: t, selected: t === type }));
     if (!CONNECTION_TYPES.includes(type)) kind.append(el("option", type, { value: type, selected: true }));
