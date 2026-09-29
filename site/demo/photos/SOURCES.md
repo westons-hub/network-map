@@ -30,3 +30,4 @@ which keeps SFHQ's original file names. The names attached to them in the demo a
 | ben-foster.jpg | SFHQ_pt3_00018105.jpg |
 | zoe-adams.jpg | SFHQ_pt3_00021468.jpg |
 | sam-rivera.jpg | SFHQ_pt3_00010564.jpg |
+| alex-rivera.jpg (you, the center of the demo) | SFHQ_pt3_00019950.jpg |

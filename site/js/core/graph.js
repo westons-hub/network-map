@@ -53,7 +53,7 @@ export function graphStats(g) {
            gaps: g.targets.filter(t => !t.direct.length && !t.second.length).length };
 }
 
-export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
+export function buildGraph(people, { me = "Me", profile = {}, minGroupSize = MIN_GROUP_SIZE,
                                      groupBy = ["company", "school"], targets = [] } = {}) {
   const g = { nodes: [], edges: [], groups: {}, targets: [] };
   const meKey = normalizeName(me);
@@ -73,7 +73,7 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
   const direct = [...byKey.values()].filter(isDirect);
   const second = [...byKey.values()].filter(p => !isDirect(p));
 
-  g.nodes.push({ id: "me", label: me, kind: "me" });
+  g.nodes.push({ id: "me", label: me, kind: "me", ...profile });
 
   // ---- find groups among direct connections ----------------------------
   const labels = { company: displayNames(direct, "company"), school: displayNames(direct, "school") };

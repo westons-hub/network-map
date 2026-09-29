@@ -1,7 +1,7 @@
 // Details for whatever you clicked on the map (a person, group, target, or you), shown as a page in the left
 // sidebar with a back arrow. Every field is click-to-edit. On phones the sidebar is the bottom sheet.
 
-import { entryNames } from "../core/history.js";
+import { entryNames, sharedWithMe } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES, personKey, poolName } from "../core/people.js";
 import { meetingDate, meetingsFor, tasksFor, todayIso, toDate } from "../core/schedule.js";
@@ -122,6 +122,13 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const extra = placeholder ? el("div", "Added automatically because someone was connected through them.", { class: "muted small" })
       : statusPill(p);
     card.append(header(photo, title, sub, extra));
+    const shared = sharedWithMe(model.profile, p, normalizeOrg);
+    if (shared.schools.length || shared.companies.length) {
+      const b = el("div", undefined, { class: "shared-badges" });
+      for (const sname of shared.schools) b.append(el("span", `Same school · ${sname}`, { class: "badge shared" }));
+      for (const c of shared.companies) b.append(el("span", `Former coworker · ${c}`, { class: "badge shared" }));
+      card.append(b);
+    }
 
     // Quick links.
     const links = el("div", undefined, { class: "quick-links" });
@@ -208,6 +215,70 @@ export function createDetails({ sidebar, getCtx, handlers }) {
                   el("button", "Remove person", { class: "btn small danger", type: "button",
                                                   onclick: () => handlers.removePerson(key, p.name) }));
       card.append(foot);
+    }
+  }
+
+  // ---- you (the center node) ----------------------------------------------------------------
+
+  function meCard(node, ctx) {
+    const { model, images, graph } = ctx;
+    const prof = model.profile ?? {};
+    const save = field => value => handlers.setProfile({ [field]: value });
+    const edit = (field, opts = {}) => inlineField({ value: prof[field] ?? "", onSave: save(field), label: opts.label ?? field, ...opts });
+    const companies = unique([...model.people.map(x => x.company), ...model.pool.map(e => e.company)]);
+    const schools = unique(model.people.flatMap(x => entryNames(x.school)));
+
+    const pic = images.forPerson({ ...node, label: model.me || "You" });
+    const photo = el("button", undefined, { class: "card-photo me", type: "button", title: "Change photo",
+                                            onclick: () => handlers.editMyPhoto() });
+    photo.append(el("img", undefined, { src: pic.image, alt: "", onerror: e => { e.target.src = pic.brokenImage; } }),
+                 el("span", "Change", { class: "photo-hint" }));
+    const title = el("div", undefined, { class: "card-name" });
+    title.append(inlineField({ value: model.me, label: "your name", placeholder: "Your name", onSave: v => handlers.setProfile({ name: v }) }));
+    const sub = el("div", undefined, { class: "card-sub" });
+    sub.append(edit("role", { placeholder: "Your role (e.g. MBA Candidate)" }));
+    sub.append(el("span", " @ ", { class: "muted" }), edit("company", { suggestions: companies, placeholder: "add company" }));
+    const extra = el("div", undefined, { class: "headline" });
+    extra.append(edit("headline", { placeholder: "Add a headline" }));
+    card.append(header(photo, title, sub, extra));
+    card.append(el("div", model.me ? "That's you · the center of your map" : "That's you · add your name", { class: "you-tag" }));
+
+    const info = el("div", undefined, { class: "card-info" });
+    info.append(
+      row("Schools", edit("school", { suggestions: schools, placeholder: "e.g. BYU (2022–2026)", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { suggestions: companies, placeholder: "e.g. Deloitte (2019–2021)", label: "past companies" })),
+      row("Email", edit("email", { type: "email", placeholder: "Add email" })),
+      row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste your profile link", display: v => (v ? "Profile link" : "") })),
+      row("Location", edit("location", { placeholder: "Add location" })),
+    );
+    card.append(info);
+    card.append(section("What I'm looking for", inlineField({ value: prof.lookingFor ?? "", multiline: true,
+      label: "what you're looking for", placeholder: "Roles, companies, timing…", onSave: save("lookingFor") })));
+
+    // People you share a school or an employer with (from your profile).
+    const sameSchool = [], coworkers = [];
+    for (const p of model.people) {
+      const s = sharedWithMe(prof, p, normalizeOrg);
+      if (s.schools.length) sameSchool.push(p.name);
+      if (s.companies.length) coworkers.push(p.name);
+    }
+    const chips = (title2, names) => {
+      if (!names.length) return;
+      const list = el("div", undefined, { class: "people-chips" });
+      for (const name of names) {
+        const n = graph.nodes.find(x => x.id === personId(name));
+        const chip = el("button", undefined, { class: "person-chip", type: "button", onclick: () => handlers.focus(personId(name)) });
+        if (n) chip.append(el("img", undefined, { src: images.forPerson(n).image, alt: "" }));
+        chip.append(name);
+        list.append(chip);
+      }
+      card.append(section(`${title2} (${names.length})`, list));
+    };
+    chips("Same school", sameSchool);
+    chips("Former coworkers", coworkers);
+    if (!prof.school && !prof.pastCompanies) {
+      card.append(el("p", "Add your schools and past companies to see who you share them with (\"Same school\" and \"Former coworker\" badges).",
+                     { class: "muted small" }));
     }
   }
 
@@ -298,7 +369,7 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const scroll = pane.scrollTop;
     card.replaceChildren();
     card.classList.toggle("org", !["person", "second", "me"].includes(node.kind));
-    if (node.kind === "me") (handlers.renderMe ?? (() => close()))(card, ctx, { header, section, row, statusPill });
+    if (node.kind === "me") meCard(node, ctx);
     else if (node.kind === "person" || node.kind === "second") personCard(node, ctx);
     else orgCard(node, ctx);
     if (!openId) return;

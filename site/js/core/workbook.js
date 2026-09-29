@@ -2,7 +2,7 @@
 // bytes and a plain model, and back. It uses SheetJS, so it runs the same in the
 // browser and in Node tests.
 //
-// Model: { me, avatarStyle, settings, people, targets, companies, pool, meetings, tasks, layout, notices }
+// Model: { me, profile, avatarStyle, settings, people, targets, companies, pool, meetings, tasks, layout, notices }
 //
 // Sheets you add yourself (and extra columns on ours) are kept when saving.
 // Old files (a "Contacts" sheet, Targets with only Company/Notes) are migrated.
@@ -12,7 +12,13 @@ import { clean } from "./org.js";
 import { POOL_COLUMNS, makePerson, parseDate, poolEntry } from "./people.js";
 
 export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
-                        meetings: "Meetings", tasks: "Tasks", layout: "Layout", settings: "Settings" };
+                        meetings: "Meetings", tasks: "Tasks", me: "Me", layout: "Layout", settings: "Settings" };
+
+// The Me sheet: your own profile, one "Field | Value" row each (Name is kept in sync with Settings → Your name).
+export const PROFILE_ROWS = [["Photo", "photo"], ["Role", "role"], ["Headline", "headline"], ["Company", "company"],
+  ["Schools", "school"], ["Past Companies", "pastCompanies"], ["Email", "email"], ["LinkedIn URL", "linkedinUrl"],
+  ["Location", "location"], ["What I'm looking for", "lookingFor"]];
+export const emptyProfile = () => Object.fromEntries(PROFILE_ROWS.map(([, f]) => [f, ""]));
 
 // [column header, model field]. Headers are matched case-insensitively.
 export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["Schools", "school"], ["Role", "role"],
@@ -46,7 +52,8 @@ const SETTING_ROWS = [["Your email", "email", ""], ["Meeting length (minutes)", 
 export const defaultSettings = () => Object.fromEntries(SETTING_ROWS.map(([, f, d]) => [f, d]));
 
 export function emptyModel(me = "") {
-  return { me, avatarStyle: "initials", settings: defaultSettings(), people: [], targets: [], companies: [], pool: [],
+  return { me, profile: emptyProfile(), avatarStyle: "initials", settings: defaultSettings(), people: [], targets: [],
+           companies: [], pool: [],
            meetings: [], tasks: [], layout: {}, notices: [] };
 }
 
@@ -151,6 +158,14 @@ export function readWorkbook(bytes) {
       source: text(known.source), extra });
   });
 
+  // ---- Me (your profile) ----
+  for (const rec of findSheet(wb, SHEETS.me)?.rows ?? []) {
+    const label = lower(rec.Field);
+    const row = PROFILE_ROWS.find(([l]) => lower(l) === label);
+    if (row) model.profile[row[1]] = row[1] === "lookingFor" ? String(rec.Value ?? "").trim() : text(rec.Value);
+    if (label === "name" && text(rec.Value)) model.meFromProfile = text(rec.Value);
+  }
+
   // ---- Settings ----
   for (const rec of findSheet(wb, SHEETS.settings)?.rows ?? []) {
     const row = SETTING_ROWS.find(([label]) => lower(label) === lower(rec.Setting));
@@ -163,6 +178,9 @@ export function readWorkbook(bytes) {
     if (lower(rec.Setting) === "your name") model.me = text(rec.Value);
     if (lower(rec.Setting) === "avatar style" && AVATAR_STYLES.includes(lower(rec.Value))) model.avatarStyle = lower(rec.Value);
   }
+  // A name typed on the Me sheet wins over Settings (it's where you'd look for it in Excel).
+  if (model.meFromProfile) model.me = model.meFromProfile;
+  delete model.meFromProfile;
   return model;
 }
 
@@ -214,6 +232,8 @@ export function writeWorkbook(model, base) {
     [SHEETS.tasks]: sheetFrom(tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>
       f === "due" || f === "created" ? dateCell(t[f]) : f === "done" ? (t.done ? "Yes" : "") : t[f] ?? "")),
       [40, 22, 20, 12, 8, 12, 20, 16]),
+    [SHEETS.me]: sheetFrom([["Field", "Value"], ["Name", model.me ?? ""],
+                            ...PROFILE_ROWS.map(([label, f]) => [label, model.profile?.[f] ?? ""])], [22, 70]),
     [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],
                                   ["Avatar style", model.avatarStyle ?? "initials"],
                                   ...SETTING_ROWS.map(([label, field, fallback]) => [label, model.settings?.[field] ?? fallback])],

@@ -306,7 +306,7 @@ export async function personForm({ model, person }) {
 // ---- settings -----------------------------------------------------------------------------
 
 /** Resolves with { me, avatarStyle, settings } or null. */
-export async function settingsForm({ model, demo, calendar }) {
+export async function settingsForm({ model, demo, calendar, onProfile }) {
   const s = model.settings;
   const body = el("div", undefined, { class: "form" });
   const me = el("input", undefined, { value: model.me, autocomplete: "name" });
@@ -319,6 +319,13 @@ export async function settingsForm({ model, demo, calendar }) {
   avatarLabel.append(avatars, " Illustrated avatars (DiceBear) for people without a photo");
   const two = (a, b) => { const r = el("div", undefined, { class: "row2" }); r.append(a, b); return r; };
   if (demo) body.append(el("p", "You're in the demo, so these only change the in-browser demo copy.", { class: "muted small" }));
+  if (onProfile) {
+    const row = el("div", undefined, { class: "quick-links" });
+    row.append(el("button", "Edit my profile…", { class: "btn small", type: "button", onclick: () => {
+      document.getElementById("dialog").close(""); onProfile(); } }),
+      el("span", "Your photo, schools, past jobs and what you're looking for.", { class: "muted small" }));
+    body.append(row);
+  }
   body.append(two(field("Your name", me), field("Your email", email, "Used as the organizer in .ics invites.")),
               two(field("Default meeting length (min)", length), field("Zoom link", zoom, "Your personal room or scheduling link.")),
               field("Invite message", template, "Placeholders: {first name}, {name}, {date}, {time}, {link}, {my name}"),

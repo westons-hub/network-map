@@ -23,3 +23,19 @@ export function addEntry(text, entry) {
   if (!entry?.name || list.some(e => e.name.toLowerCase() === entry.name.toLowerCase())) return formatEntries(list);
   return formatEntries([...list, entry]);
 }
+
+/**
+ * What you have in common with someone, from your profile: schools you both went to, and companies where you
+ * both worked (your past/current employers vs theirs). Drives the "Same school" / "Former coworker" badges.
+ */
+export function sharedWithMe(profile, person, normalize) {
+  if (!profile || !person) return { schools: [], companies: [] };
+  const mySchools = new Map(parseEntries(profile.school).map(e => [normalize(e.name), e.name]));
+  const myJobs = new Map([...parseEntries(profile.pastCompanies), ...(profile.company ? [{ name: profile.company }] : [])]
+    .map(e => [normalize(e.name), e.name]));
+  const theirJobs = [...parseEntries(person.pastCompanies), ...(person.company ? [{ name: person.company }] : [])];
+  return {
+    schools: [...new Set(parseEntries(person.school).map(e => mySchools.get(normalize(e.name))).filter(Boolean))],
+    companies: [...new Set(theirJobs.map(e => myJobs.get(normalize(e.name))).filter(Boolean))],
+  };
+}

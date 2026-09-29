@@ -428,3 +428,8 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 @media (max-width: 760px) {
   .details-pane .card, .details-pane .card.org { position: static; box-shadow: none; max-height: none; z-index: auto; }
 }
+.card-photo.me { border-color: var(--me); }
+.you-tag { margin: 6px 0 2px; font-size: 12px; color: var(--muted); }
+.headline { font-size: 12.5px; color: var(--text); }
+.shared-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.badge.shared { background: #f0f7ff; border-color: #c7dcfd; color: #1d4ed8; }

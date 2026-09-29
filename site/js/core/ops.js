@@ -15,6 +15,10 @@ export function applyOp(model, op) {
     case "setMe":
       m.me = op.name;
       break;
+    case "setProfile": // your own profile (the center node); a name change also renames "me"
+      m.profile = { ...(m.profile ?? {}), ...op.fields };
+      if (op.fields.name !== undefined) { m.me = op.fields.name; delete m.profile.name; }
+      break;
     case "setAvatarStyle":
       m.avatarStyle = op.style;
       break;

@@ -63,6 +63,13 @@ const details = createDetails({
     close: clearSelection,
     focus,
     patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); details.saved(); },
+    setProfile: fields => { edit({ type: "setProfile", fields }); details.saved(); },
+    editMyPhoto: async () => {
+      try {
+        const result = await photoForm({ name: state.doc.model.me || "you", current: state.doc.model.profile?.photo });
+        if (result) { edit({ type: "setProfile", fields: { photo: result.photo } }); toast(result.photo ? "Your photo is saved." : "Photo removed."); }
+      } catch (e) { toast(`Couldn't use that image: ${e.message}`); }
+    },
     editPhoto,
     editAll,
     removePerson,
@@ -210,7 +217,7 @@ const todo = createTodo($("todo-view"), {
 function render() {
   const { model } = state.doc;
   const me = model.me || "You";
-  state.graph = buildGraph(model.people, { me, targets: model.targets });
+  state.graph = buildGraph(model.people, { me, profile: model.profile, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; details.close(); }
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
@@ -455,7 +462,8 @@ function toggleTask(task) {
 }
 
 async function openSettings() {
-  const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo", calendar: calendars });
+  const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo", calendar: calendars,
+                                     onProfile: () => focus("me") });
   if (!result) return;
   const ops = [{ type: "setSettings", settings: result.settings }];
   if (result.me !== state.doc.model.me) ops.push({ type: "setMe", name: result.me });

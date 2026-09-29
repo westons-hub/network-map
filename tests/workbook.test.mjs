@@ -177,3 +177,19 @@ test("download mode (no way to re-read the file) still saves", async () => {
   assert.equal(readWorkbook(written).me, "Me");
   assert.equal(saved.lastModified, null);
 });
+
+test("your profile round-trips through the Me sheet, and a name typed there wins", async () => {
+  const { sharedWithMe } = await import("../site/js/core/history.js");
+  const { normalizeOrg } = await import("../site/js/core/org.js");
+  let m = { ...fullModel(), profile: { photo: "demo/photos/x.jpg", role: "MBA Candidate", headline: "Looking for PM roles",
+    company: "", school: "Stanford University (2025–2027)", pastCompanies: "Delta Air Lines (2020–2022)", email: "me@x.com",
+    linkedinUrl: "https://www.linkedin.com/in/me", location: "Provo, UT", lookingFor: "Strategy roles.\nHappy to chat." } };
+  const back = readWorkbook(writeWorkbook(m));
+  assert.deepEqual(back.profile, m.profile);
+  assert.equal(back.me, "Weston Jackson");
+  m = applyOp(m, { type: "setProfile", fields: { name: "W. Jackson", location: "SLC" } });
+  assert.deepEqual([m.me, m.profile.location, "name" in m.profile], ["W. Jackson", "SLC", false]);
+  // Badges: same school (aliases count) and former coworker.
+  const shared = sharedWithMe(m.profile, makePerson({ name: "X", school: "Stanford (2019–2023)", company: "Delta Air Lines, Inc." }), normalizeOrg);
+  assert.deepEqual(shared, { schools: ["Stanford University"], companies: ["Delta Air Lines"] });
+});

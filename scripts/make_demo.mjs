@@ -129,7 +129,22 @@ const people = PEOPLE.map(([name, company, school, role, connectedThrough, statu
 // LinkedIn data fills gaps (URL, Connected On) for people who are in the pool; your rows win.
 const onMap = new Set(people.map(p => p.name));
 const fromPool = pool.map(personFromPool).filter(p => onMap.has(p.name));
-const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists",
+// You, in the center: a fictional student profile (headshot: an AI-generated face, see site/demo/photos/SOURCES.md).
+const PROFILE = {
+  photo: "demo/photos/alex-rivera.jpg",
+  role: "MBA Candidate",
+  headline: "Stanford MBA '27 · Looking for strategy & product roles",
+  company: "",
+  school: "Stanford University (2025–2027); University of Utah (2016–2020)",
+  pastCompanies: "Delta Air Lines (2020–2022); Adobe (2022–2025)",
+  email: "alex.rivera@example.com",
+  linkedinUrl: "https://www.linkedin.com/in/alex-rivera-demo",
+  location: "Palo Alto, California",
+  lookingFor: "Summer 2027 internships in strategy or product at consumer-tech and airline companies.\n" +
+              "Happy to swap notes on case prep and product sense interviews.",
+};
+
+const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists", profile: PROFILE,
   people: mergePeople(fromPool, people).map(p => ({ ...p, source: "",
     photo: `demo/photos/${p.name.toLowerCase().replaceAll(" ", "-")}.jpg` })),
   // Crisp vector logos stored in the repo (see site/demo/logos/SOURCES.md); the Website stays as a fallback.

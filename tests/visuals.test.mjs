@@ -140,7 +140,10 @@ test("every demo person has a small headshot file in the repo", () => {
     const bytes = readFileSync(new URL(p.photo, dir));
     assert.ok(bytes.length > 1000 && bytes.length < 20000, `${p.photo}: ${bytes.length} bytes`);
   }
-  assert.equal(readdirSync(new URL("demo/photos/", dir)).filter(f => f.endsWith(".jpg")).length, demo.people.length);
+  // Plus one for you (Alex, the center of the demo).
+  assert.equal(demo.profile.photo, "demo/photos/alex-rivera.jpg");
+  assert.ok(readFileSync(new URL(demo.profile.photo, dir)).length > 1000);
+  assert.equal(readdirSync(new URL("demo/photos/", dir)).filter(f => f.endsWith(".jpg")).length, demo.people.length + 1);
 });
 
 // ---- logos --------------------------------------------------------------------------

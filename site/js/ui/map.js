@@ -96,8 +96,13 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
     const base = { id: n.id, label: n.label, opacity: alpha, font, hidden: n.kind === "second" && !options.showSecond };
 
     if (n.kind === "me") {
-      return { ...base, shape: "dot", size: 26, color: { background: c("me"), border: c("me") }, borderWidth: 3,
-               font: { ...font, size: 18 }, mass: 6 };
+      const ring = { border: c("me"), background: "#ffffff", highlight: { border: c("me"), background: "#ffffff" },
+                     hover: { border: c("me"), background: "#ffffff" } };
+      return n.photo
+        ? { ...base, ...images.forPerson(n), shape: "circularImage", size: 30, borderWidth: 5, borderWidthSelected: 6, color: ring,
+            shapeProperties: { useBorderWithImage: true, interpolation: true }, font: { ...font, size: 18 }, mass: 6 }
+        : { ...base, shape: "dot", size: 26, color: { background: c("me"), border: c("me") }, borderWidth: 3,
+            font: { ...font, size: 18 }, mass: 6 };
     }
     if (GROUP_KINDS.includes(n.kind)) {
       const target = n.target;
