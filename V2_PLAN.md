@@ -407,10 +407,10 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
    no-connection targets on a capped outer ring; **LinkedIn pool** tab; crisp repo logos + logo.dev/Brandfetch support;
    **one "+ Add person" box** (name / LinkedIn link / profile PDF) with a review card; Schools + Past Companies +
    alumni links (D.1, D.2, D.6)
-3c. **Next update (NEXT_UPDATE.md), one local commit per part:**
+3c. ✅ **Next update (NEXT_UPDATE.md), one local commit per part** *(01a2199 … d5f7a1d)*:
    1) demo dates always current (O) · 2) details back in the sidebar (K) · 3) my profile (N) · 4) connections between
    people (M) · 5) autofill everywhere (L) · 6) Orbit rebrand + welcome intro (J)
-3d. **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part:**
+3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(0e74a39 … this commit)*:
    1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own

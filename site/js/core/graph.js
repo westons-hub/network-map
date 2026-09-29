@@ -5,8 +5,10 @@
 // * Anyone with a blank "Connected Through" is a direct (1st-degree) connection.
 // * Anyone whose "Connected Through" names another person hangs off that person
 //   (2nd-degree). If the connector isn't in your list yet, a placeholder is added.
-// * When minGroupSize or more direct connections share a company or school,
-//   they collapse into a group bubble: you -> group -> each member.
+// * When minGroupSize or more people on the map share a company (current or past, through the name
+//   aliases) or a school, that company / school gets its own node: you -> group -> each direct member;
+//   2nd-degree members get a secondary ("also") link and past employees a faint alumni link.
+//   Below the threshold the node goes away again (targets always stay).
 //   Someone who belongs to two groups gets a solid line to one and a dashed line
 //   to the other.
 // * Every target company is its own node (a company group that is a target just
@@ -24,7 +26,9 @@ const asTarget = t => (typeof t === "string" ? { company: t } : t);
 
 /** A person's schools: the Schools cell can hold several ("BYU (2022–2026); Lakeview High"). */
 export const schoolsOf = p => parseEntries(p.school).map(e => e.name);
-const valuesOf = (p, attr) => (attr === "school" ? schoolsOf(p) : p[attr] ? [p[attr]] : []);
+const valuesOf = (p, attr) => (attr === "school" ? schoolsOf(p)
+  : attr === "company" ? [p.company, ...parseEntries(p.pastCompanies).map(e => e.name)].filter(Boolean)
+  : p[attr] ? [p[attr]] : []);
 
 /** Pick the most common original spelling as the label for each normalized org. */
 function displayNames(people, attr) {
@@ -42,6 +46,15 @@ function displayNames(people, attr) {
     out[key] = [...counts].sort((a, b) => b[1] - a[1])[0][0];
   }
   return out;
+}
+
+/** Company / school groups that appeared since the last graph: [{ id, label, count }] (for "Created … group"). */
+export function newGroups(before, after) {
+  if (!before) return [];
+  const had = new Set(before.nodes.filter(n => n.kind === "company" || n.kind === "school").map(n => n.id));
+  return after.nodes.filter(n => (n.kind === "company" || n.kind === "school") && !had.has(n.id)
+    && !before.nodes.some(b => b.kind === "target" && b.key === n.key))
+    .map(n => ({ id: n.id, label: n.label, count: n.count }));
 }
 
 export function graphStats(g) {
@@ -75,20 +88,21 @@ export function buildGraph(people, { me = "Me", profile = {}, connections = [], 
 
   g.nodes.push({ id: "me", label: me, kind: "me", ...profile });
 
-  // ---- find groups among direct connections ----------------------------
-  const labels = { company: displayNames(direct, "company"), school: displayNames(direct, "school") };
-  const counts = new Map(); // "kind|key" -> members
+  // ---- find groups: everyone on the map, current and past companies, all schools ----------------
+  const everyone = [...direct, ...second];
+  const labels = { company: displayNames(everyone, "company"), school: displayNames(everyone, "school") };
+  const counts = new Map(); // "kind|key" -> members (each person once)
   const add = (kind, key, p) => {
     const k = `${kind}|${key}`;
     if (!counts.has(k)) counts.set(k, []);
-    counts.get(k).push(p);
+    if (!counts.get(k).includes(p)) counts.get(k).push(p);
   };
-  for (const p of direct) {
-    if (groupBy.includes("company") && p.company) add("company", normalizeOrg(p.company), p);
+  for (const p of everyone) {
+    if (groupBy.includes("company")) for (const key of new Set(valuesOf(p, "company").map(normalizeOrg))) if (key) add("company", key, p);
     if (groupBy.includes("school")) {
       for (const key of new Set(schoolsOf(p).map(normalizeOrg))) if (key) add("school", key, p);
     }
-    if (groupBy.includes("tags")) for (const t of p.tags) add("tag", t.toLowerCase(), p);
+    if (groupBy.includes("tags") && isDirect(p)) for (const t of p.tags) add("tag", t.toLowerCase(), p);
   }
 
   const groupIds = new Map();

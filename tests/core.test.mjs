@@ -124,10 +124,10 @@ test("demo workbook builds: only the people you added are on the map", () => {
   const m = demo();
   assert.equal(m.me, "Alex Rivera");
   const g = buildGraph(m.people, { me: m.me, targets: m.targets });
-  assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 4, targets: 6, gaps: 2 });
+  assert.deepEqual({ ...g.stats }, { people: 22, direct: 14, second_degree: 8, groups: 5, targets: 6, gaps: 2 });
   // Deloitte is a group; the other five targets are their own nodes.
   assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(),
-    ["company:deloitte", "target:apple", "target:delta air lines", "target:goldman sachs", "target:nike", "target:qualtrics"]);
+    ["company:deloitte", "company:delta air lines", "target:apple", "target:goldman sachs", "target:nike", "target:qualtrics"]);
   assert.equal(m.avatarStyle, "notionists");
   assert.equal(g.nodes.find(n => n.id === "school:stanford").label, "Stanford University");
   assert.equal(m.pool.length, 26); // LinkedIn connections stay in the pool, off the map
@@ -238,4 +238,26 @@ test("past employers get a dotted alumni link, count on targets, and give a path
 test("notes keep their line breaks (other fields are tidied to one line)", () => {
   const p = P("  Ana  ", { notes: "Line one  \r\n  Line   two\n\n", role: "PM\nLead" });
   assert.deepEqual([p.name, p.notes, p.role], ["Ana", "Line one\nLine two", "PM Lead"]);
+});
+
+test("company and school dots appear live at the threshold (current or past, via aliases) and go away below it", async () => {
+  const { buildGraph, newGroups } = await import("../site/js/core/graph.js");
+  const { makePerson: mp } = await import("../site/js/core/people.js");
+  const ppl = [mp({ name: "A", company: "Delta Air Lines" }), mp({ name: "B", company: "Delta Air Lines Inc" }),
+               mp({ name: "C", pastCompanies: "Delta Air Lines, Inc. (2019–2021)", company: "Acme" }),
+               mp({ name: "D", school: "U of U" }), mp({ name: "E", school: "University of Utah (2014–2018)" })];
+  const two = buildGraph(ppl.slice(0, 2));
+  assert.ok(!two.nodes.some(n => n.kind === "company"), "2 people: no dot");
+  const three = buildGraph(ppl);
+  const delta = three.nodes.find(n => n.kind === "company");
+  assert.equal(delta.count, 3);
+  assert.ok(three.edges.some(e => e.from === delta.id && e.to === "p:c" && e.kind === "alumni"), "past employee: alumni link");
+  assert.deepEqual(newGroups(two, three).map(n => [n.label, n.count]), [["Delta Air Lines", 3]]);
+  assert.ok(!three.nodes.some(n => n.kind === "school"), "2 at the school: no dot yet");
+  const withF = buildGraph([...ppl, mp({ name: "F", school: "University of Utah" })]);
+  assert.ok(withF.nodes.some(n => n.kind === "school" && n.count === 3), "3rd person at the school: dot");
+  assert.ok(buildGraph(ppl, { minGroupSize: 4 }).nodes.every(n => n.kind !== "company"), "threshold is a setting");
+  const target = buildGraph(ppl.slice(0, 1), { targets: [{ company: "Delta Air Lines" }] });
+  assert.ok(target.nodes.some(n => n.id === "target:delta air lines"), "a target stays below the threshold");
+  assert.deepEqual(newGroups(null, three), [], "opening a file doesn't announce anything");
 });

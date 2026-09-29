@@ -1,7 +1,7 @@
 // Orbit: app wiring. The demo loads by default; "Use my own data" opens a
 // workbook or a LinkedIn CSV. Everything happens in this browser tab.
 
-import { buildGraph } from "./core/graph.js";
+import { buildGraph, newGroups } from "./core/graph.js";
 import { replay } from "./core/ops.js";
 import { normalizeName, normalizeOrg } from "./core/org.js";
 import { exportWorkbook } from "./core/export.js";
@@ -239,7 +239,17 @@ function render() {
   const { model } = state.doc;
   suggestions = null;
   const me = model.me || "You";
-  state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets });
+  const before = state.announceGroups ? state.graph : null;
+  state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets,
+                                           minGroupSize: Number(model.settings.groupSize) || 3 });
+  // Company / school dots appear live once enough people share one; say so.
+  const created = newGroups(before, state.graph);
+  if (created.length) {
+    const said = created.slice(0, 2).map(n => `Created ${n.label} group (${n.count} ${n.count === 1 ? "person" : "people"})`);
+    const note = `${said.join(" · ")}${created.length > 2 ? ` and ${created.length - 2} more` : ""}.`;
+    // After the edit's own message ("Added …"), so both show.
+    setTimeout(() => { const t = $("toast"); toast(t.hidden ? note : `${t.textContent} ${note}`, 7000); }, 0);
+  }
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; details.close(); }
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
@@ -366,7 +376,8 @@ function edit(opOrOps) {
   const doc = state.doc;
   state.doc = { ...doc, model: replay(doc.model, ops), pending: [...doc.pending, ...ops] };
   persistDraft();
-  render();
+  state.announceGroups = true; // only edits announce new company/school dots (not opening a file)
+  try { render(); } finally { state.announceGroups = false; }
 }
 
 /** Unsaved edits are kept in this browser so a refresh doesn't lose them. */

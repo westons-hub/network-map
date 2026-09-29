@@ -43,7 +43,7 @@ test("among equally short paths, the warmest contact wins", () => {
 test("a target reached through someone sits next to them in the ring", () => {
   const pos = ringLayout(graph);
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
-  assert.ok(d("target:qualtrics", "p:liam walsh") < d("target:qualtrics", "target:delta air lines"));
+  assert.ok(d("target:qualtrics", "p:liam walsh") < d("target:qualtrics", "company:delta air lines"));
 });
 
 test("no path to a target with no one there", () => {

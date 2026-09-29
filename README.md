@@ -42,6 +42,8 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Calendar and to-dos:** the Calendar tab has a month view and a week view with times (drag a meeting to move it, click an empty slot to book one), and the To-Do tab (Overdue / Today / This week / Later) keeps you on track.
 - **LinkedIn profile PDFs, fully read:** drop someone's "Save to PDF" profile and Orbit reads everything in your browser: contact info, skills, languages, certifications, every role (including several roles at one company) and education. It shows a review screen first, and merges into someone already on your map without overwriting your edits. Their jobs and schools show as a timeline in their details.
 - **Export to Excel (⌘E):** everything, just what you're looking at, or one person, with the People sheet in a networking-tracker layout, frozen headers, clickable links and dropdowns.
+- **Company and school dots appear on their own:** once 3 people on your map share a company (now or in the past, matched through name aliases) or a school, it gets its own dot with its logo; you can change the number in Settings.
+- **Light and dark mode:** System / Light / Dark from the top bar, in the Orbit brand colors, checked for WCAG AA contrast.
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
