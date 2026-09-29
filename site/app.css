@@ -607,3 +607,9 @@ dialog:has(.event-editor) { width: min(640px, 96vw); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) { --bg: #131A26; --panel: #1A2332; --text: #F4F6FA; --muted: #A3AEBF; --line: #2C3749; color-scheme: dark; }
 }
+
+/* ---- Orbit sign-off at the bottom of the LinkedIn Pool and To-Do views (in the flow, never over content) ---- */
+.brand-footer { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 28px 0 4px; padding-top: 14px;
+  border-top: 1px solid var(--line); color: var(--muted); font: 700 13px var(--font); letter-spacing: -.01em; max-width: 860px; }
+.brand-footer img { width: 18px; height: 18px; }
+#pool-view .brand-footer { max-width: none; }

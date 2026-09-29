@@ -6,6 +6,7 @@ import { poolName } from "../core/people.js";
 import { onMapIndex, searchPool } from "../core/pool.js";
 import { toDate } from "../core/schedule.js";
 import { el } from "./dom.js";
+import { brandFooter } from "./theme.js";
 
 const pretty = d => (d ? toDate(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "");
 
@@ -30,7 +31,7 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
                           "Import the Connections.csv here. It stays in your browser and your workbook."]) {
         empty.lastChild.append(el("li", step));
       }
-      root.replaceChildren(head, empty);
+      root.replaceChildren(head, empty, brandFooter());
       return;
     }
 
@@ -53,8 +54,8 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
 
     const actions = el("div", undefined, { class: "pool-actions" });
     const table = el("table", undefined, { class: "pool-table" });
-    root.replaceChildren(head, bar, actions, el("div", undefined, { class: "table-wrap" }));
-    root.lastChild.append(table);
+    root.replaceChildren(head, bar, actions, el("div", undefined, { class: "table-wrap" }), brandFooter());
+    root.querySelector(".table-wrap").append(table);
 
     function renderRows() {
       const isOnMap = onMapIndex(getModel().people);

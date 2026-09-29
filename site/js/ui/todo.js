@@ -3,6 +3,7 @@
 import { normalizeName } from "../core/org.js";
 import { groupTasks, newId, todayIso, toDate } from "../core/schedule.js";
 import { el } from "./dom.js";
+import { brandFooter } from "./theme.js";
 import { attachTypeahead } from "./typeahead.js";
 
 const GROUPS = [["overdue", "Overdue"], ["today", "Today"], ["week", "This week"], ["later", "Later"], ["done", "Done"]];
@@ -65,7 +66,7 @@ export function createTodo(root, { getModel, onAdd, onToggle, onEdit, onPerson }
       }
       body.append(section);
     }
-    root.replaceChildren(head, body);
+    root.replaceChildren(head, body, brandFooter());
   }
 
   return { render };
