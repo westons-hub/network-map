@@ -395,27 +395,27 @@ says "Created Delta Air Lines group (3 people)".
 ## 9. README (portfolio-first)
 
 Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
-and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e74).
+and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a57181).
 
 ## Phases (commit locally after each; screenshots after each)
 
-1. ✅ App skeleton *(8a6afe5)* · 1b. ✅ Readability + Add target *(f9b85e2)* · 2. ✅ Pictures *(2edc770)* ·
-   2b. ✅ School edges, Stanford, AI headshots *(1b4c1a2)*
-3. ✅ To-Do + Calendar + meetings + invites, person popover card, Gravatar removed *(ce61e04)*
+1. ✅ App skeleton *(9bb2cab)* · 1b. ✅ Readability + Add target *(bbf1c67)* · 2. ✅ Pictures *(65884e6)* ·
+   2b. ✅ School edges, Stanford, AI headshots *(29579cd)*
+3. ✅ To-Do + Calendar + meetings + invites, person popover card, Gravatar removed *(2c72e54)*
 3b. ✅ **Fixes + features:** always-fresh demo dates; modals close on backdrop/Esc with "Discard changes?"; week view
    with times, drag to move, click a slot to book; **calendar connections (H)** + add-to-calendar on every meeting;
    no-connection targets on a capped outer ring; **LinkedIn pool** tab; crisp repo logos + logo.dev/Brandfetch support;
    **one "+ Add person" box** (name / LinkedIn link / profile PDF) with a review card; Schools + Past Companies +
    alumni links (D.1, D.2, D.6)
-3c. ✅ **Next update (NEXT_UPDATE.md), one local commit per part** *(01a2199 … d5f7a1d)*:
+3c. ✅ **Next update (NEXT_UPDATE.md), one local commit per part** *(c6c4c08 … 2971400)*:
    1) demo dates always current (O) · 2) details back in the sidebar (K) · 3) my profile (N) · 4) connections between
    people (M) · 5) autofill everywhere (L) · 6) Orbit rebrand + welcome intro (J)
-3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(0e74a39 … this commit)*:
+3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(dc94e2b … 5af12f2)*:
    1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
 6. **Calendar connections, verified for real** (create the Google/Azure client IDs per docs/CALENDAR_SETUP.md and test)
-7. **Polish + deploy:** saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with
+7. ✅ **Polish + deploy** *(ca9a4aa, 4256843; done before Phase 4)*: saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with
    live link + GIF, demo polish (I)
