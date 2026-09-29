@@ -13,9 +13,12 @@ async function load() {
 
 export const isPdf = file => /\.pdf$/i.test(file?.name ?? "") || file?.type === "application/pdf";
 
-/** A File/Blob or bytes -> { person (fields for the review form), profile (everything parsed) }. */
+/**
+ * A File/Blob or bytes -> { person (fields for the review form), experience, education, currentOptions, unsure,
+ * profile (everything parsed) }.
+ */
 export async function readProfilePdf(fileOrBytes) {
   const bytes = fileOrBytes instanceof Uint8Array ? fileOrBytes : new Uint8Array(await fileOrBytes.arrayBuffer());
   const profile = parseLinkedInProfile(await pdfItems(await load(), bytes));
-  return { person: profileToPerson(profile), profile };
+  return { ...profileToPerson(profile), profile };
 }

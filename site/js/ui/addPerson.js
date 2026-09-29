@@ -6,9 +6,10 @@
 // Every path ends in the same prefilled review card, with the fields only you know highlighted.
 
 import { CONNECTION_TYPES, INTRODUCED } from "../core/connections.js";
-import { entryNames } from "../core/history.js";
+import { entryNames, rowKey } from "../core/history.js";
 import { normalizeName } from "../core/org.js";
-import { STATUSES, personFromPool, poolName } from "../core/people.js";
+import { profileToPerson } from "../core/linkedinPdf.js";
+import { PDF_FIELDS, STATUSES, fillPerson, personFromPool, poolName } from "../core/people.js";
 import { isLinkedInUrl, matchLinkedInUrl, onMapIndex, searchPool } from "../core/pool.js";
 import { ask, toast } from "./dialog.js";
 import { el } from "./dom.js";
@@ -19,7 +20,8 @@ import { isPdf, readProfilePdf } from "./pdf.js";
 const TIP = "For full history, open their LinkedIn profile → More → Save to PDF, then drop it here.";
 
 function field(label, input, { hint, needs } = {}) {
-  const wrap = el("label", undefined, { class: `field${needs ? " needs" : ""}` });
+  // A group of inputs (connections, history rows) sits in a div: a <label> would send clicks to its first input.
+  const wrap = el(input.tagName === "DIV" ? "div" : "label", undefined, { class: `field${needs ? " needs" : ""}` });
   wrap.append(el("span", label), input);
   if (hint) wrap.append(el("span", hint, { class: "muted small" }));
   return wrap;
@@ -135,9 +137,11 @@ async function findPerson({ model, demo, pdf }) {
 
 async function fromPdf(fileOrBytes, label) {
   try {
-    const { person } = await readProfilePdf(fileOrBytes);
-    return { draft: person, source: "pdf",
-             note: `Read from ${label ?? fileOrBytes.name ?? "their LinkedIn PDF"} on your computer: current role, past companies, schools and summary.` };
+    const pdf = await readProfilePdf(fileOrBytes);
+    return { draft: pdf.person, source: "pdf", pdf,
+             note: `Read from ${label ?? fileOrBytes.name ?? "their LinkedIn PDF"} on your computer: ${pdf.experience.length} ` +
+                   `${pdf.experience.length === 1 ? "role" : "roles"}, ${pdf.education.length} ${pdf.education.length === 1 ? "school" : "schools"}` +
+                   `${pdf.person.skills ? ", skills" : ""}${pdf.person.about ? ", About" : ""}. Check anything highlighted.` };
   } catch (e) {
     console.error(e);
     toast(`Couldn't read that PDF: ${e.message}`, 7000);
@@ -145,8 +149,29 @@ async function fromPdf(fileOrBytes, label) {
   }
 }
 
-/** Step 2: the review card. Resolves with person fields (+ photo) or null. */
-async function reviewPerson({ model, draft, note, existing }) {
+/** Editable rows for the Experience / Education parsed from a PDF. Each row has a checkbox to leave it out. */
+function historyRows(rows, columns, { onFile = () => false, newTag = "" } = {}) {
+  const box = el("div", undefined, { class: "history-rows" });
+  for (const r of rows) {
+    const have = onFile(r);
+    const row = el("div", undefined, { class: `history-row${have ? " have" : ""}`, title: have ? "Already on file" : "" });
+    const keep = el("input", undefined, { type: "checkbox", checked: true, "aria-label": "Include this row", title: "Include" });
+    const inputs = columns.map(([f, label, width]) => el("input", undefined, { value: r[f] ?? "", placeholder: label,
+      "aria-label": label, title: label, style: `flex:${width}` }));
+    row.append(keep, ...inputs, el("span", have ? "on file" : newTag, { class: "row-tag" }));
+    keep.addEventListener("change", () => row.classList.toggle("off", !keep.checked));
+    row.read = () => (keep.checked ? { ...r, ...Object.fromEntries(columns.map(([f], i) => [f, inputs[i].value.trim()])) } : null);
+    box.append(row);
+  }
+  box.read = () => [...box.children].map(r => r.read()).filter(Boolean);
+  return box;
+}
+
+const EXPERIENCE_FIELDS = [["company", "Company", 3], ["title", "Title", 4], ["start", "Start", 1.6], ["end", "End", 1.6], ["location", "Location", 2.6]];
+const EDUCATION_FIELDS = [["school", "School", 4], ["degree", "Degree", 3], ["field", "Field", 3], ["start", "Start", 1.6], ["end", "End", 1.6]];
+
+/** Step 2: the review card. Resolves with person fields (+ photo, + history from a PDF) or null. */
+async function reviewPerson({ model, draft, note, existing, pdf, filled = [] }) {
   const body = el("div", undefined, { class: "form review" });
   const val = k => draft[k] ?? "";
   const input = (name, attrs = {}) => el("input", undefined, { name, value: val(name), autocomplete: "off", ...attrs });
@@ -160,6 +185,12 @@ async function reviewPerson({ model, draft, note, existing }) {
     tags: input("tags", { placeholder: "Comma-separated" }),
     notes: el("textarea", undefined, { name: "notes", rows: 3, value: val("notes") }),
   };
+  // From a profile PDF: the rest of what LinkedIn shows.
+  if (pdf || PDF_FIELDS.some(k => val(k))) {
+    Object.assign(f, { headline: input("headline"), location: input("location"), website: input("website", { type: "url" }),
+      skills: input("skills", { placeholder: "; separated" }), languages: input("languages"), certifications: input("certifications"),
+      honors: input("honors"), about: el("textarea", undefined, { name: "about", rows: 3, value: val("about") }) });
+  }
   for (const s of ["", ...STATUSES]) f.status.append(el("option", s || "Choose…", { value: s, selected: s === (draft.status ?? "") }));
   attachTypeahead(f.company, "company");
   attachTypeahead(f.role, "role");
@@ -194,16 +225,76 @@ async function reviewPerson({ model, draft, note, existing }) {
 
   const needs = k => !val(k); // the fields only you know are highlighted while empty
   const two = (a, b) => { const r = el("div", undefined, { class: "row2" }); r.append(a, b); return r; };
+  // Anything the PDF reader had to guess is highlighted, with why.
+  const unsure = pdf?.unsure ?? [];
+  const doubt = k => unsure.filter(u => u.field === k).map(u => u.message).join(" ");
+  const pdfField = (label, key, input) => {
+    const w = field(label, input, { hint: doubt(key) || undefined });
+    if (doubt(key)) w.classList.add("unsure");
+    if (filled.includes(key)) w.classList.add("new");
+    return w;
+  };
   body.append(...lists, el("p", note, { class: `source-note ${draft.company || draft.role ? "ok" : ""}` }));
-  if (existing) body.append(el("p", `${existing.name} is already on your map. Saving updates their row.`, { class: "warn" }));
+  if (existing) {
+    body.append(el("p", pdf
+      ? `${existing.name} is already on your map. Saving merges: empty fields are filled in and new jobs and schools are added ` +
+        `(marked "new"); nothing you've entered is overwritten.`
+      : `${existing.name} is already on your map. Saving updates their row.`, { class: "warn" }));
+  }
+  if (unsure.length) {
+    const list = el("ul", undefined, { class: "unsure-list" });
+    for (const u of unsure) list.append(el("li", u.message));
+    body.append(el("div", "Double-check", { class: "form-section" }), list);
+  }
+
+  // Several current roles: pick the main one; the others stay linked as current employers.
+  const options = pdf?.currentOptions ?? [];
+  let picker = null;
+  if (options.length > 1 && !existing?.company) {
+    picker = el("div", undefined, { class: "role-picker", role: "radiogroup", "aria-label": "Main current role" });
+    options.forEach((o, i) => {
+      const id = `cur-${i}`;
+      const radio = el("input", undefined, { type: "radio", name: "current-role", id, checked: i === 0 });
+      radio.addEventListener("change", () => {
+        const next = profileToPerson(pdf.profile, { current: i }).person;
+        f.company.value = next.company; f.role.value = next.role; f.pastCompanies.value = next.pastCompanies;
+      });
+      const lab = el("label", undefined, { for: id });
+      lab.append(radio, el("strong", o.role || o.title), el("span", ` · ${o.company} · since ${o.start.slice(0, 4)}`, { class: "muted" }));
+      picker.append(lab);
+    });
+  }
+  const onFile = kind => {
+    const keys = new Set((model[kind] ?? []).filter(r => normalizeName(r.person) === normalizeName(existing?.name ?? "")).map(rowKey[kind]));
+    return r => keys.has(rowKey[kind](r));
+  };
+  const exp = pdf ? historyRows(pdf.experience, EXPERIENCE_FIELDS, { onFile: onFile("experience"), newTag: existing ? "new" : "" }) : null;
+  const edu = pdf ? historyRows(pdf.education, EDUCATION_FIELDS, { onFile: onFile("education"), newTag: existing ? "new" : "" }) : null;
+
   body.append(
-    field("Name", f.name), two(field("Role", f.role), field("Company", f.company)),
-    two(field("Email", f.email), field("LinkedIn", f.linkedinUrl)),
+    pdfField("Name", "name", f.name),
+    ...(f.headline ? [pdfField("Headline", "headline", f.headline)] : []),
+    ...(picker ? [field("Main current role", picker, { hint: "They list several current roles. The others are kept as current employers." })] : []),
+    two(pdfField("Role", "role", f.role), pdfField("Company", "company", f.company)),
+    two(pdfField("Email", "email", f.email), pdfField("LinkedIn", "linkedinUrl", f.linkedinUrl)),
+    ...(f.location ? [two(pdfField("Location", "location", f.location), pdfField("Company website", "website", f.website))] : []),
+  );
+  if (pdf) {
+    body.append(el("div", "History", { class: "form-section" }),
+      pdfField(`Experience (${pdf.experience.length})`, "experience", exp),
+      pdfField(`Education (${pdf.education.length})`, "education", edu),
+      two(pdfField("Past companies", "pastCompanies", f.pastCompanies), pdfField("Schools", "school", f.school)),
+      el("div", "Skills and more", { class: "form-section" }),
+      two(pdfField("Skills", "skills", f.skills), pdfField("Languages", "languages", f.languages)),
+      two(pdfField("Certifications", "certifications", f.certifications), pdfField("Honors, publications, patents", "honors", f.honors)),
+      pdfField("About", "about", f.about));
+  }
+  body.append(
     el("div", "What only you know", { class: "form-section" }),
     field("Connections", connBox, { needs: true, hint: "\"Introduced me\" makes them 2nd-degree through that person; " +
       "coworker / classmate / friend / mentor just links them. Leave the name blank if you know them directly." }),
     field("Status", f.status, { needs: needs("status") }),
-    field("Schools", f.school, { needs: needs("school") }), field("Past companies", f.pastCompanies),
+    ...(pdf ? [] : [field("Schools", f.school, { needs: needs("school") }), field("Past companies", f.pastCompanies)]),
     two(field("Connected on", f.connectedOn), field("Tags", f.tags)),
     field("Notes", f.notes, { needs: needs("notes") }),
     field("Photo (optional)", photo, { needs: true, hint: "LinkedIn doesn't share photos; upload one or paste a link." }),
@@ -216,6 +307,10 @@ async function reviewPerson({ model, draft, note, existing }) {
   if (choice !== "save" || !f.name.value.trim()) return null;
   const out = {};
   for (const [k, input] of Object.entries(f)) out[k] = input.value.trim();
+  if (pdf) {
+    const name = out.name;
+    out.history = { experience: exp.read().map(r => ({ ...r, person: name })), education: edu.read().map(r => ({ ...r, person: name })) };
+  }
   if (photoFile.files[0]) out.photo = await resizeImage(photoFile.files[0]);
   else if (/^https?:\/\//i.test(photoUrl.value.trim())) out.photo = photoUrl.value.trim();
   else if (draft.photo) out.photo = draft.photo;
@@ -236,8 +331,10 @@ export async function addPersonFlow({ model, demo, pdf, entry }) {
   if (!found) return null;
   if (found.open) return found;
   const existing = model.people.find(p => normalizeName(p.name) === normalizeName(found.draft.name));
-  const person = await reviewPerson({ model, draft: { ...(existing ?? {}), ...found.draft,
-    notes: existing?.notes || found.draft.notes || "" }, note: found.note, existing });
+  // Someone already on the map: fill their empty fields from what we found, never overwrite what's there.
+  const merged = existing ? fillPerson(existing, found.draft) : { person: found.draft, filled: [] };
+  const person = await reviewPerson({ model, draft: merged.person, note: found.note, existing, pdf: found.pdf,
+                                      filled: existing ? merged.filled : [] });
   return person ? { person, existingKey: existing ? normalizeName(existing.name) : undefined } : null;
 }
 

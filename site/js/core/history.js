@@ -39,3 +39,26 @@ export function sharedWithMe(profile, person, normalize) {
     companies: [...new Set(theirJobs.map(e => myJobs.get(normalize(e.name))).filter(Boolean))],
   };
 }
+
+// ---- Experience and Education sheets (one row per job / school, from a LinkedIn profile PDF) ----
+
+export const rowKey = {
+  experience: r => [r.company, r.title, r.start].map(v => clean(v).toLowerCase()).join("|"),
+  education: r => [r.school, r.degree, r.start].map(v => clean(v).toLowerCase()).join("|"),
+};
+
+/** Add a person's new history rows; rows already there (same company + title + start, or school + degree + start) stay as they are. */
+export function mergeHistoryRows(rows, incoming, kind) {
+  const key = rowKey[kind];
+  const have = new Set(rows.map(r => `${clean(r.person).toLowerCase()}#${key(r)}`));
+  const added = incoming.filter(r => !have.has(`${clean(r.person).toLowerCase()}#${key(r)}`));
+  return { rows: [...rows, ...added.map(r => ({ extra: {}, ...r }))], added: added.length };
+}
+
+/** A person's rows, newest first ("Present" first, then by start). */
+export function historyOf(rows = [], name, normalize) {
+  const k = normalize(name);
+  const rank = v => (v === "Present" ? "9999" : String(v ?? ""));
+  return rows.filter(r => normalize(r.person) === k)
+    .sort((a, b) => rank(b.end).localeCompare(rank(a.end)) || String(b.start ?? "").localeCompare(String(a.start ?? "")));
+}

@@ -271,6 +271,14 @@ export async function personForm({ model, person }) {
     status: select("status", [["", "No status"], ...STATUSES.map(x => [x, x])], person.status),
     tags: input("tags", person.tags.join(", "), { placeholder: "Comma-separated" }),
     notes: el("textarea", undefined, { name: "notes", rows: 4, value: person.notes }),
+    headline: input("headline", person.headline),
+    location: input("location", person.location),
+    website: input("website", person.website, { type: "url" }),
+    skills: input("skills", person.skills, { placeholder: "; separated" }),
+    languages: input("languages", person.languages, { placeholder: "e.g. Spanish (Professional Working)" }),
+    certifications: input("certifications", person.certifications),
+    honors: input("honors", person.honors),
+    about: el("textarea", undefined, { name: "about", rows: 3, value: person.about ?? "" }),
   };
   attachTypeahead(fields.connectedThrough, "person");
   attachTypeahead(fields.company, "company");
@@ -282,9 +290,13 @@ export async function personForm({ model, person }) {
   body.append(
     el("div", "Basics", { class: "form-section" }), field("Name", fields.name), two(field("Role", fields.role), field("Company", fields.company)),
     two(field("Email", fields.email), field("LinkedIn", fields.linkedinUrl)),
+    field("Headline", fields.headline), two(field("Location", fields.location), field("Website", fields.website)),
     el("div", "Connection", { class: "form-section" }), two(field("Schools", fields.school), field("Past companies", fields.pastCompanies)),
     field("Introduced by", fields.connectedThrough, "Who introduced you? Coworker/classmate/friend/mentor links are in Connections."),
     two(field("Connected on", fields.connectedOn), field("Status", fields.status)),
+    el("div", "Skills and more", { class: "form-section" }), two(field("Skills", fields.skills), field("Languages", fields.languages)),
+    two(field("Certifications", fields.certifications), field("Honors, publications, patents", fields.honors)),
+    field("About", fields.about),
     el("div", "Notes", { class: "form-section" }), field("Tags", fields.tags), field("Notes", fields.notes));
   const choice = await ask(`Edit ${person.name}`, body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
   if (choice !== "save" || !fields.name.value.trim()) return null;

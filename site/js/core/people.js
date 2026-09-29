@@ -1,22 +1,27 @@
 // People records, merging, and parsing LinkedIn's Connections.csv.
 
+import { formatEntries, parseEntries } from "./history.js";
 import { clean, normalizeName } from "./org.js";
+
+/** What a LinkedIn profile PDF adds (skills, languages, certifications and honors are "; "-separated lists). */
+export const PDF_FIELDS = ["headline", "location", "website", "skills", "languages", "certifications", "honors", "about"];
 
 /** Every field a person can have. Blank "connectedThrough" = you know them directly. */
 export const PERSON_FIELDS = ["name", "company", "school", "pastCompanies", "role", "email", "linkedinUrl", "photo",
-                              "connectedThrough", "connectedOn", "status", "tags", "notes"];
+                              "connectedThrough", "connectedOn", "status", "tags", "notes", ...PDF_FIELDS];
 
 export const STATUSES = ["To Reach Out", "Contacted", "Scheduled", "Met", "Follow Up", "Referral"];
 
 export function makePerson(fields = {}) {
   // school holds one or more schools ("BYU (2022–2026); Lakeview High"); pastCompanies works the same way.
   const p = { name: "", company: "", school: "", pastCompanies: "", role: "", email: "", linkedinUrl: "", photo: "",
-              connectedThrough: "", connectedOn: "", status: "", tags: [], notes: "", source: "", extra: {} };
+              connectedThrough: "", connectedOn: "", status: "", tags: [], notes: "", source: "", extra: {},
+              headline: "", location: "", website: "", skills: "", languages: "", certifications: "", honors: "", about: "" };
   for (const [k, v] of Object.entries(fields)) {
     if (k === "tags") p.tags = Array.isArray(v) ? v.map(clean).filter(Boolean) : splitTags(v);
     else if (k === "extra") p.extra = { ...v };
     else if (k === "connectedOn") p.connectedOn = parseDate(v);
-    else if (k === "notes") p.notes = String(v ?? "").replace(/\r\n?/g, "\n").split("\n").map(clean).join("\n").trim();
+    else if (k === "notes" || k === "about") p[k] = String(v ?? "").replace(/\r\n?/g, "\n").split("\n").map(clean).join("\n").trim();
     else if (k in p) p[k] = k === "photo" ? String(v ?? "").trim() : clean(v);
   }
   return p;
@@ -56,6 +61,41 @@ export function parseDate(value) {
   if ((m = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return iso(m[1], m[2], m[3]);
   if ((m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return iso(m[3], m[1], m[2]);
   return text;
+}
+
+/**
+ * Merge a newly read profile into someone already on your map without overwriting your edits: empty fields are
+ * filled in, new schools / past companies / tags are added, and everything you already have stays.
+ * Returns { person, filled: [field names that changed] }.
+ */
+export function fillPerson(existing, incoming) {
+  const person = makePerson({ ...existing });
+  person.extra = { ...existing.extra };
+  person.source = existing.source;
+  const filled = [];
+  const incomingP = makePerson(incoming);
+  for (const f of PERSON_FIELDS) {
+    if (f === "name") continue;
+    if (f === "tags") {
+      const tags = [...new Set([...person.tags, ...incomingP.tags])];
+      if (tags.length !== person.tags.length) { person.tags = tags; filled.push(f); }
+    } else if ((f === "school" || f === "pastCompanies") && person[f] && incomingP[f]) {
+      const merged = mergeEntryLists(person[f], incomingP[f]);
+      if (merged !== person[f]) { person[f] = merged; filled.push(f); }
+    } else if (!person[f] && incomingP[f]) { person[f] = incomingP[f]; filled.push(f); }
+  }
+  return { person, filled };
+}
+
+/** "A (2019–2021); B" + "B (2018–2020); C" -> "A (2019–2021); B (2018–2020); C": new names are added, and years fill in. */
+function mergeEntryLists(mine, theirs) {
+  const list = parseEntries(mine);
+  for (const e of parseEntries(theirs)) {
+    const same = list.find(x => normalizeName(x.name) === normalizeName(e.name));
+    if (!same) list.push(e);
+    else if (!same.years && e.years) same.years = e.years;
+  }
+  return formatEntries(list);
 }
 
 /**

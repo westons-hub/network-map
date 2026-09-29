@@ -13,7 +13,8 @@ import { makeConnection, reconcile } from "./connections.js";
 import { POOL_COLUMNS, makePerson, parseDate, poolEntry } from "./people.js";
 
 export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
-                        meetings: "Meetings", tasks: "Tasks", connections: "Connections", me: "Me", layout: "Layout",
+                        meetings: "Meetings", tasks: "Tasks", connections: "Connections", experience: "Experience",
+                        education: "Education", me: "Me", layout: "Layout",
                         settings: "Settings" };
 export const CONNECTION_COLUMNS = [["Person A", "a"], ["Person B", "b"], ["Type", "type"], ["Notes", "notes"]];
 
@@ -27,7 +28,15 @@ export const emptyProfile = () => Object.fromEntries(PROFILE_ROWS.map(([, f]) =>
 export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["Schools", "school"], ["Role", "role"],
   ["Email", "email"], ["LinkedIn URL", "linkedinUrl"], ["Photo", "photo"],
   ["Connected Through", "connectedThrough"], ["Connected On", "connectedOn"], ["Status", "status"],
-  ["Tags", "tags"], ["Notes", "notes"], ["Past Companies", "pastCompanies"]];
+  ["Tags", "tags"], ["Notes", "notes"], ["Past Companies", "pastCompanies"],
+  // From a LinkedIn profile PDF:
+  ["Headline", "headline"], ["Location", "location"], ["Website", "website"], ["Skills", "skills"], ["Languages", "languages"],
+  ["Certifications", "certifications"], ["Honors", "honors"], ["About", "about"]];
+// One row per job / school (from LinkedIn profile PDFs); shown as a timeline in the person's details.
+export const EXPERIENCE_COLUMNS = [["Person", "person"], ["Company", "company"], ["Title", "title"], ["Start", "start"],
+  ["End", "end"], ["Location", "location"], ["Description", "description"]];
+export const EDUCATION_COLUMNS = [["Person", "person"], ["School", "school"], ["Degree", "degree"], ["Field", "field"],
+  ["Start", "start"], ["End", "end"]];
 const PEOPLE_ALIASES = { "email address": "email", "url": "linkedinUrl", "linkedin": "linkedinUrl",
                          "title": "role", "position": "role", "school": "school", "past company": "pastCompanies" };
 export const TARGET_COLUMNS = [["Company", "company"], ["Priority", "priority"], ["Stage", "stage"], ["Notes", "notes"]];
@@ -56,7 +65,7 @@ export const defaultSettings = () => Object.fromEntries(SETTING_ROWS.map(([, f, 
 
 export function emptyModel(me = "") {
   return { me, profile: emptyProfile(), avatarStyle: "initials", settings: defaultSettings(), people: [], connections: [], targets: [],
-           companies: [], pool: [],
+           companies: [], pool: [], experience: [], education: [],
            meetings: [], tasks: [], layout: {}, notices: [] };
 }
 
@@ -168,6 +177,20 @@ export function readWorkbook(bytes) {
   }
   reconcile(model);
 
+  // ---- Experience & Education ----
+  // Start/End stay text ("2021-03", "2019", "Present"); Excel may turn "2021-03" into a date, so read those back.
+  const monthText = v => (v instanceof Date ? `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}` : text(v));
+  for (const [sheet, columns, list, required] of [[SHEETS.experience, EXPERIENCE_COLUMNS, model.experience, "company"],
+                                                  [SHEETS.education, EDUCATION_COLUMNS, model.education, "school"]]) {
+    for (const rec of findSheet(wb, sheet)?.rows ?? []) {
+      const { known, extra } = pick(rec, columns);
+      if (!text(known.person) || !text(known[required])) continue;
+      const row = { extra };
+      for (const [, f] of columns) row[f] = f === "start" || f === "end" ? monthText(known[f]) : f === "description" ? String(known[f] ?? "").trim() : text(known[f]);
+      list.push(row);
+    }
+  }
+
   // ---- Me (your profile) ----
   for (const rec of findSheet(wb, SHEETS.me)?.rows ?? []) {
     const label = lower(rec.Field);
@@ -229,7 +252,7 @@ export function writeWorkbook(model, base) {
   const sheets = {
     [SHEETS.people]: sheetFrom(tableRows(model.people, PEOPLE_COLUMNS, p => PEOPLE_COLUMNS.map(([, f]) =>
       f === "tags" ? p.tags.join(", ") : f === "connectedOn" ? dateCell(p.connectedOn) : p[f] ?? "")),
-      [22, 24, 30, 24, 28, 36, 14, 22, 14, 14, 20, 40, 36]),
+      [22, 24, 30, 24, 28, 36, 14, 22, 14, 14, 20, 40, 36, 34, 24, 28, 30, 26, 30, 30, 50]),
     [SHEETS.targets]: sheetFrom(tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
       [28, 10, 14, 40]),
     [SHEETS.companies]: sheetFrom(tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),
@@ -244,6 +267,10 @@ export function writeWorkbook(model, base) {
       [40, 22, 20, 12, 8, 12, 20, 16]),
     [SHEETS.connections]: sheetFrom(tableRows(model.connections ?? [], CONNECTION_COLUMNS,
       c => CONNECTION_COLUMNS.map(([, f]) => c[f] ?? "")), [24, 24, 16, 40]),
+    [SHEETS.experience]: sheetFrom(tableRows(model.experience ?? [], EXPERIENCE_COLUMNS,
+      r => EXPERIENCE_COLUMNS.map(([, f]) => r[f] ?? "")), [22, 26, 34, 10, 10, 26, 60]),
+    [SHEETS.education]: sheetFrom(tableRows(model.education ?? [], EDUCATION_COLUMNS,
+      r => EDUCATION_COLUMNS.map(([, f]) => r[f] ?? "")), [22, 30, 34, 26, 10, 10]),
     [SHEETS.me]: sheetFrom([["Field", "Value"], ["Name", model.me ?? ""],
                             ...PROFILE_ROWS.map(([label, f]) => [label, model.profile?.[f] ?? ""])], [22, 70]),
     [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],

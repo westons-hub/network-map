@@ -493,3 +493,38 @@ a { color: #2e5b93; }
               color: #A3AEBF; font: 600 13px var(--font); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
 .orbit-intro-skip:hover { color: #fff; border-color: rgba(255, 255, 255, .6); }
 @media (max-width: 760px) { .orbit-intro svg { height: auto; align-self: center; } }
+
+/* ---- PDF review: history rows, unsure fields, current-role picker ---- */
+.history-rows { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.history-row { display: flex; gap: 4px; align-items: center; }
+.field .history-row input:not([type=checkbox]) { width: auto; min-width: 0; flex-basis: 0; padding: 5px 7px; font-size: 12.5px; }
+.field .history-row input[type=checkbox], .field .role-picker input { width: auto; flex: none; padding: 0; margin: 0; }
+.history-row.off input:not([type=checkbox]) { opacity: .45; text-decoration: line-through; }
+.field.unsure > input, .field.unsure > textarea, .field.unsure > .history-rows { outline: 2px solid #fdb022; outline-offset: 1px; border-radius: 6px; }
+.field.unsure > .muted { color: #b54708; }
+.field.new > span:first-child::after { content: " · new"; font-weight: 600; color: #067647; font-size: 11px; }
+.unsure-list { margin: 4px 0 0; padding: 7px 10px 7px 26px; background: #fffaeb; border: 1px solid #fedf89; border-radius: 8px;
+  font-size: 12.5px; color: #93370d; }
+.role-picker { display: grid; gap: 4px; }
+.field .role-picker label { display: flex; gap: 6px; align-items: center; justify-content: flex-start; font-size: 13px; cursor: pointer; }
+.field .role-picker label > * { flex: none; }
+
+/* ---- person timeline (Experience + Education) ---- */
+.timeline { display: grid; gap: 10px; border-left: 2px solid var(--line); margin-left: 5px; padding-left: 12px; }
+.tl-item { position: relative; }
+.tl-item::before { content: ""; position: absolute; left: -18px; top: 4px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--panel, #fff); border: 2px solid var(--muted); }
+.tl-item.now::before { border-color: var(--orbit-orange); background: var(--orbit-orange); }
+.tl-item.school::before { border-radius: 3px; background: var(--muted); }
+.tl-org { font-weight: 700; font-size: 13px; }
+.tl-role { margin-top: 3px; }
+.tl-title { font-size: 13px; }
+.tl-desc summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.pre { white-space: pre-line; }
+.card-headline { margin-top: 2px; }
+.history-row .row-tag { flex: none; min-width: 38px; font-size: 11px; font-weight: 600; color: #067647; }
+.history-row.have .row-tag { color: var(--muted); font-weight: 400; }
+.history-row.have input:not([type=checkbox]) { color: var(--muted); }
+.field > .history-rows, .field > .role-picker { min-width: 0; }
+.history-row { min-width: 0; }
+dialog:has(.history-rows) { width: min(760px, 96vw); }

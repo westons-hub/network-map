@@ -5,6 +5,7 @@
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
 import { INTRODUCED, reconcile, withConnection, withoutConnection } from "./connections.js";
+import { mergeHistoryRows } from "./history.js";
 import { mergePool } from "./pool.js";
 
 const clone = m => structuredClone(m);
@@ -50,8 +51,14 @@ export function applyOp(model, op) {
       }
       break;
     }
+    case "addHistory": // rows from a LinkedIn profile PDF: { experience: [...], education: [...] }; duplicates are skipped
+      m.experience = mergeHistoryRows(m.experience ?? [], op.experience ?? [], "experience").rows;
+      m.education = mergeHistoryRows(m.education ?? [], op.education ?? [], "education").rows;
+      break;
     case "removePerson":
       m.people = m.people.filter(p => personKey(p) !== op.key);
+      m.experience = (m.experience ?? []).filter(r => normalizeName(r.person) !== op.key);
+      m.education = (m.education ?? []).filter(r => normalizeName(r.person) !== op.key);
       m.connections = (m.connections ?? []).filter(c => normalizeName(c.a) !== op.key && normalizeName(c.b) !== op.key);
       break;
     case "addConnection": { // { a, b, type, notes } — "Introduced me" also sets b's Connected Through
@@ -133,9 +140,9 @@ function syncIntroducer(m, name) {
 
 export const replay = (model, ops) => ops.reduce(applyOp, model);
 
-/** Someone was renamed: their meetings and tasks follow them. */
+/** Someone was renamed: their meetings, tasks and history follow them. */
 function renameInLogs(m, newName, oldKey) {
-  for (const x of [...m.meetings, ...m.tasks]) if (normalizeName(x.person) === oldKey) x.person = newName;
+  for (const x of [...m.meetings, ...m.tasks, ...(m.experience ?? []), ...(m.education ?? [])]) if (normalizeName(x.person) === oldKey) x.person = newName;
   for (const c of m.connections ?? []) {
     if (normalizeName(c.a) === oldKey) c.a = newName;
     if (normalizeName(c.b) === oldKey) c.b = newName;

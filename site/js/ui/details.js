@@ -2,7 +2,7 @@
 // sidebar with a back arrow. Every field is click-to-edit. On phones the sidebar is the bottom sheet.
 
 import { CONNECTION_TYPES, INTRODUCED, connectionsOf } from "../core/connections.js";
-import { entryNames, sharedWithMe } from "../core/history.js";
+import { entryNames, historyOf, sharedWithMe } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES, personKey, poolName } from "../core/people.js";
 import { meetingDate, meetingsFor, tasksFor, todayIso, toDate } from "../core/schedule.js";
@@ -16,6 +16,48 @@ const isWebUrl = u => /^https?:\/\//i.test(u ?? "");
 const isEmail = e => /^[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]+$/.test(e ?? "");
 const personId = name => `p:${normalizeName(name)}`;
 const unique = list => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+/** "2022-03" -> "Mar 2022", "2019" -> "2019", "Present" stays. */
+function prettyMonth(v) {
+  const m = /^(\d{4})-(\d{2})$/.exec(v ?? "");
+  return m ? `${new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString("en-US", { month: "short" })} ${m[1]}` : v ?? "";
+}
+const span = r => [prettyMonth(r.start), prettyMonth(r.end)].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(" – ");
+
+/** Jobs grouped by company (several roles at one company sit together), then schools. */
+function timeline(experience, education) {
+  const box = el("div", undefined, { class: "timeline" });
+  const groups = [];
+  for (const r of experience) {
+    const last = groups.at(-1);
+    if (last && normalizeOrg(last.company) === normalizeOrg(r.company)) last.roles.push(r);
+    else groups.push({ company: r.company, roles: [r] });
+  }
+  for (const g of groups) {
+    const item = el("div", undefined, { class: `tl-item${g.roles.some(r => r.end === "Present") ? " now" : ""}` });
+    item.append(el("div", g.company, { class: "tl-org" }));
+    for (const r of g.roles) {
+      const role = el("div", undefined, { class: "tl-role" });
+      role.append(el("div", r.title || "Role", { class: "tl-title" }),
+                  el("div", [span(r), r.location].filter(Boolean).join(" · "), { class: "muted small" }));
+      if (r.description) {
+        const d = el("details", undefined, { class: "tl-desc" });
+        d.append(el("summary", "Description"), el("div", r.description, { class: "small pre" }));
+        role.append(d);
+      }
+      item.append(role);
+    }
+    box.append(item);
+  }
+  for (const e of education) {
+    const item = el("div", undefined, { class: "tl-item school" });
+    item.append(el("div", e.school, { class: "tl-org" }),
+                el("div", [e.degree, e.field].filter(Boolean).join(", "), { class: "tl-title" }),
+                el("div", span(e), { class: "muted small" }));
+    box.append(item);
+  }
+  return box;
+}
 
 function prettyDate(date, withWeekday = true) {
   if (!date) return "";
@@ -118,6 +160,10 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const sub = el("div", undefined, { class: "card-sub" });
     sub.append(edit("role", { label: "role", placeholder: "Add role", kind: "role" }), el("span", " @ ", { class: "muted" }),
                edit("company", { label: "company", placeholder: "Add company", kind: "company" }));
+    if (p.headline && normalizeName(p.headline) !== normalizeName(`${p.role} at ${p.company}`)) {
+      sub.append(el("div", p.headline, { class: "card-headline muted small" }));
+    }
+    if (p.location) sub.append(el("div", `📍 ${p.location}`, { class: "muted small" }));
     const extra = placeholder ? el("div", "Added automatically because someone was connected through them.", { class: "muted small" })
       : statusPill(p);
     card.append(header(photo, title, sub, extra));
@@ -198,7 +244,18 @@ export function createDetails({ sidebar, getCtx, handlers }) {
         display: v => v ? "Profile link" : "" })),
       row("Tags", edit("tags", { placeholder: "Add tags", kind: "tag", multi: true })),
     );
+    // From a LinkedIn profile PDF (shown once there's something to show).
+    for (const [label, f] of [["Location", "location"], ["Website", "website"], ["Skills", "skills"], ["Languages", "languages"],
+                              ["Certifications", "certifications"], ["Honors", "honors"]]) {
+      if (p[f]) info.append(row(label, edit(f, { label: label.toLowerCase(), type: f === "website" ? "url" : "text" })));
+    }
     card.append(info);
+    if (p.about) {
+      card.append(section("About", placeholder ? el("div", p.about, { class: "pre" })
+        : inlineField({ value: p.about, multiline: true, label: "about", onSave: save("about") })));
+    }
+    const jobs = historyOf(model.experience, p.name, normalizeName), schools = historyOf(model.education, p.name, normalizeName);
+    if (jobs.length || schools.length) card.append(section("Timeline", timeline(jobs, schools)));
 
     // Connections: who introduced you, and coworker / classmate / friend / mentor links. Shown on both people.
     if (!placeholder) card.append(connectionsSection(p, model));

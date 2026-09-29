@@ -186,12 +186,13 @@ async function addPerson({ pdf, entry } = {}) {
   const result = await addPersonFlow({ model: state.doc.model, demo: state.mode === "demo", pdf, entry });
   if (!result) return;
   if (result.open) return openPerson(result.open);
-  const { person: { links = [], ...person }, existingKey } = result;
+  const { person: { links = [], history, ...person }, existingKey } = result;
   const people = state.doc.model.people;
   const known = name => people.find(p => normalizeName(p.name) === normalizeName(name))?.name ?? name;
   edit([{ type: "upsertPerson", key: existingKey, person: { ...person, connectedThrough: person.connectedThrough ? known(person.connectedThrough) : "",
                                                              source: person.source || "excel" } },
-        ...links.map(l => ({ type: "addConnection", connection: { a: person.name, b: known(l.other), type: l.type } }))]);
+        ...links.map(l => ({ type: "addConnection", connection: { a: person.name, b: known(l.other), type: l.type } })),
+        ...(history ? [{ type: "addHistory", ...history }] : [])]);
   focus(`p:${normalizeName(person.name)}`, { follow: !existingKey });
   toast(existingKey ? `Updated ${person.name}.` : `Added ${person.name} to your map.`);
 }

@@ -23,13 +23,20 @@ function fullModel() {
     people: [makePerson({ name: "Ana Díaz", company: "Acme", school: "BYU", role: "PM", email: "ana@example.com",
                           linkedinUrl: "https://example.com/in/ana", photo: "data:image/jpeg;base64,AAAA",
                           connectedThrough: "", connectedOn: "2026-03-12", status: "Met", tags: "a, b",
-                          notes: "Line one, \"quoted\"", extra: { Birthday: "May 4" } }),
+                          notes: "Line one, \"quoted\"", extra: { Birthday: "May 4" },
+                          headline: "PM at Acme", location: "Provo, Utah", website: "https://acme.example",
+                          skills: "SQL; Pricing", languages: "Spanish (Professional Working)", certifications: "CSPO",
+                          honors: "Dean's List", about: "First paragraph.\nSecond paragraph." }),
              makePerson({ name: "Bo", connectedThrough: "Ana Díaz" })],
     connections: [makeConnection({ a: "Ana Díaz", b: "Bo" }), makeConnection({ a: "Ana Díaz", b: "Bo", type: "Coworker", notes: "Acme 2021" })],
     targets: [{ company: "Acme", priority: "1", stage: "Applied", notes: "", extra: {} }],
     companies: [{ company: "Acme", website: "acme.example", logo: "data:image/svg+xml;charset=utf-8,%3Csvg%3E", extra: {} }],
     pool: [{ firstName: "Cy", lastName: "Z", url: "u", email: "", company: "Acme", position: "Eng", connectedOn: "2025-01-02" }],
     layout: { "me": { x: 0, y: 0 }, "p:ana díaz": { x: 120, y: -40 } },
+    experience: [{ person: "Ana Díaz", company: "Acme", title: "PM", start: "2021-03", end: "Present", location: "Provo",
+                   description: "Line one.\nLine two.", extra: {} },
+                 { person: "Ana Díaz", company: "Globex", title: "Analyst", start: "2018", end: "2021", location: "", description: "", extra: {} }],
+    education: [{ person: "Ana Díaz", school: "BYU", degree: "BS", field: "Economics", start: "2014-08", end: "2018-04", extra: {} }],
   };
 }
 
@@ -106,8 +113,14 @@ test("edits: add, rename (keeps connections), remove, targets and layout", () =>
   assert.equal(m.people[0].name, "Ana Diaz-Lopez");
   assert.equal(m.people[0].extra.Birthday, "May 4");
   assert.equal(m.people[1].connectedThrough, "Ana Diaz-Lopez");
+  assert.deepEqual(m.experience.map(r => r.person), ["Ana Diaz-Lopez", "Ana Diaz-Lopez"], "history follows a rename");
+  m = applyOp(m, { type: "addHistory", experience: [
+    { person: "New Person", company: "Acme", title: "Intern", start: "2020", end: "2020" },
+    { person: "Ana Diaz-Lopez", company: "Acme", title: "PM", start: "2021-03", end: "Present" }] }); // the 2nd is a duplicate
+  assert.deepEqual(m.experience.map(r => `${r.person}/${r.title}`), ["Ana Diaz-Lopez/PM", "Ana Diaz-Lopez/Analyst", "New Person/Intern"]);
   m = applyOp(m, { type: "removePerson", key: "new person" });
   assert.equal(m.people.length, 2);
+  assert.equal(m.experience.length, 2, "removing someone removes their history");
   m = applyOp(m, { type: "upsertTarget", target: { company: "Globex" } });
   m = applyOp(m, { type: "upsertTarget", key: "acme", target: { company: "Acme", stage: "Interviewing" } });
   assert.deepEqual(m.targets.map(t => [t.company, t.stage]), [["Acme", "Interviewing"], ["Globex", ""]]);
