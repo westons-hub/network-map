@@ -26,6 +26,7 @@ import { createTodo } from "./ui/todo.js";
 import { buildSuggestions } from "./core/suggest.js";
 import { setSuggestionSource } from "./ui/typeahead.js";
 import { introSeen, playIntro } from "./ui/intro.js";
+import { isDark, nextThemeMode, onThemeChange, setTheme, themeMode } from "./ui/theme.js";
 import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
 import { isPdf } from "./ui/pdf.js";
@@ -825,6 +826,19 @@ $("show-alumni").addEventListener("change", e => map.set({ showAlumni: e.target.
   });
 }
 $("fit").addEventListener("click", () => map.fit());
+
+// System / Light / Dark (remembered in this browser). The map redraws with the new colors.
+const THEME_LABEL = { system: ["◐", "System"], light: ["☀", "Light"], dark: ["☾", "Dark"] };
+function renderThemeButton() {
+  const [icon, label] = THEME_LABEL[themeMode()];
+  const btn = $("theme-btn");
+  btn.textContent = icon;
+  btn.setAttribute("aria-label", `Theme: ${label}${themeMode() === "system" ? ` (${isDark() ? "dark" : "light"} now)` : ""}. Click to change.`);
+  btn.title = `Theme: ${label}. Click for ${THEME_LABEL[nextThemeMode()][1]}.`;
+}
+$("theme-btn").addEventListener("click", () => { setTheme(nextThemeMode()); toast(`Theme: ${THEME_LABEL[themeMode()][1]}`); });
+onThemeChange(() => { renderThemeButton(); map.refresh(); if (state.doc) renderViews(); });
+renderThemeButton();
 $("illustrated").addEventListener("change", e => edit({ type: "setAvatarStyle", style: e.target.checked ? "notionists" : "initials" }));
 
 // Free | Ring layout switch (remembered in this browser).

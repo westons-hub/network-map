@@ -1,4 +1,4 @@
-// The Orbit welcome intro: a recreation of "Orbit Welcome Short.mp4" (6.5 s) in SVG, driven by one
+// The Orbit welcome intro (it follows the light/dark theme): a recreation of "Orbit Welcome Short.mp4" (6.5 s) in SVG, driven by one
 // timeline function (no video file, no animation library). Laid out on the video's 1920×1080 frame.
 //
 //   0.0–0.35 the white core pops in
@@ -47,6 +47,10 @@ const markSeen = () => { try { localStorage.setItem(SEEN_KEY, "1"); } catch { /*
 
 /** Build the intro and play it. Resolves when it's gone (finished or skipped). */
 export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, freezeAt } = {}) {
+  // Follows the theme: white on the brand's dark navy (like the video), or navy on light.
+  const dark = document.documentElement.dataset.theme === "dark";
+  const INK = dark ? [255, 255, 255] : [30, 58, 95], INK_HEX = dark ? "#FFFFFF" : "#1E3A5F";
+  const START = dark ? [91, 107, 128] : [163, 174, 191];
   if (freezeAt === undefined) markSeen();
   const overlay = document.createElement("div");
   overlay.className = "orbit-intro";
@@ -82,8 +86,8 @@ export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion:
   const arrow = svg("path", { d: ARROW, fill: "none", stroke: "#F43F5E", "stroke-width": "7", "stroke-linecap": "round",
                               "stroke-linejoin": "round", opacity: "0" }, mark);
   const sat = svg("circle", { cx: "78", cy: "28.82", r: "0", fill: "#F97316" }, mark);
-  const core = svg("circle", { cx: "60", cy: "60", r: "0", fill: "#FFFFFF" }, mark);
-  const word = svg("path", { d: WORDMARK, fill: "#FFFFFF", "clip-path": "url(#intro-wordclip)" }, mark);
+  const core = svg("circle", { cx: "60", cy: "60", r: "0", fill: INK_HEX }, mark);
+  const word = svg("path", { d: WORDMARK, fill: INK_HEX, "clip-path": "url(#intro-wordclip)" }, mark);
 
   const skip = document.createElement("button");
   skip.className = "orbit-intro-skip";
@@ -120,7 +124,7 @@ export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion:
     letters.forEach((l, i) => {
       const q = easeOut(span(t, 1.84 + i * 0.06, 2.04 + i * 0.06));
       l.setAttribute("opacity", String(q));
-      l.setAttribute("fill", mix([91, 107, 128], [255, 255, 255], q));
+      l.setAttribute("fill", mix(START, INK, q));
     });
     sub.setAttribute("opacity", String(easeOut(span(t, 2.95, 3.35))));
     // 4. Ellipse draws; wordmark revealed left to right.
