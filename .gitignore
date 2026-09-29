@@ -20,6 +20,8 @@ my_*/
 backups/
 logos/
 photos/
+# ...except the demo's AI-generated headshots of people who don't exist (see site/vendor/ATTRIBUTION.md)
+!site/demo/photos/
 layout.json
 
 # Tooling

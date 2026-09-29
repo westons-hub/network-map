@@ -122,8 +122,6 @@ function renderChrome() {
     banner.hidden = false;
   } else banner.hidden = true;
 
-  $("demo-note").hidden = state.mode !== "demo";
-
   const reopenItem = document.querySelector('[data-action="reopen"]');
   reopenItem.hidden = !state.lastHandle || state.mode === "file";
   reopenItem.textContent = state.lastHandle ? `Reopen ${state.lastHandle.name}` : "";

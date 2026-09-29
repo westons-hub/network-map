@@ -1,8 +1,9 @@
 // Regenerate the demo workbook and the blank template.
 //   node scripts/make_demo.mjs
-// The people (names, emails, relationships) are fictional. The companies and schools are real, well-known
-// organizations so the demo shows real logos; logos are loaded at runtime from each organization's
-// domain (listed below), never stored in the repo.
+// The people (names, emails, relationships) are fictional. Their headshots in site/demo/photos are
+// AI-generated faces of people who don't exist (SFHQ dataset, MIT license; see site/vendor/ATTRIBUTION.md).
+// The companies and schools are real, well-known organizations so the demo shows real logos; logos are
+// loaded at runtime from each organization's domain (listed below), never stored in the repo.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -15,16 +16,16 @@ const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
 
 // Name, Company, School, Role, Connected Through, Status, Tags, Notes
 const PEOPLE = [
-  ["Jordan Lee", "Deloitte", "BYU", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
+  ["Jordan Lee", "Deloitte", "Stanford University", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
   ["Priya Shah", "Deloitte", "University of Utah", "Manager", "", "Contacted", "", ""],
-  ["Marcus Bell", "Deloitte", "Brigham Young University", "Analyst", "", "Met", "Consulting club", ""],
+  ["Marcus Bell", "Deloitte", "Stanford", "Analyst", "", "Met", "Consulting club", ""],
   ["Hana Kim", "Deloitte LLP", "", "Partner", "", "To Reach Out", "", "Leads the strategy practice"],
-  ["Sofia Alvarez", "Microsoft", "BYU", "Product Manager", "", "Met", "Product", "Owns the marketplace roadmap"],
+  ["Sofia Alvarez", "Microsoft", "Stanford University", "Product Manager", "", "Met", "Product", "Owns the marketplace roadmap"],
   ["Ethan Brooks", "Microsoft", "", "Data Analyst", "", "Follow Up", "Product", ""],
   ["Lena Novak", "Microsoft", "University of Utah", "Program Manager", "", "To Reach Out", "Product", ""],
-  ["Noah Carter", "Delta Air Lines", "BYU", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
+  ["Noah Carter", "Delta Air Lines", "Stanford University", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
   ["Grace Owens", "Delta Air Lines", "", "Recruiter", "", "Contacted", "", ""],
-  ["Daniel Ortiz", "Goldman Sachs", "BYU", "Strategy Associate", "", "Met", "", ""],
+  ["Daniel Ortiz", "Goldman Sachs", "Stanford University", "Strategy Associate", "", "Met", "", ""],
   ["Mia Chen", "Google", "University of Utah", "Product Lead", "", "Met", "", ""],
   ["Owen Price", "Google", "University of Utah", "Associate Product Manager", "", "To Reach Out", "", ""],
   ["Ava Thompson", "Adobe", "University of Utah", "Operations Lead", "", "Met", "", ""],
@@ -34,7 +35,7 @@ const PEOPLE = [
   ["Isla Moore", "Microsoft", "", "UX Researcher", "Sofia Alvarez", "", "Product", ""],
   ["Victor Hale", "Delta Air Lines", "", "VP Network Planning", "Noah Carter", "", "", ""],
   ["Chloe Park", "Adobe", "", "Design Manager", "Mia Chen", "", "", ""],
-  ["Ben Foster", "BYU", "", "Career Coach", "Daniel Ortiz", "", "", ""],
+  ["Ben Foster", "Stanford University", "", "Career Coach", "Daniel Ortiz", "", "", ""],
   ["Zoe Adams", "Qualtrics", "", "Director of Strategy", "Liam Walsh", "", "", ""],
   ["Sam Rivera", "Qualtrics", "", "Head of Growth", "Zoe Adams", "", "", "3rd-degree example"],
 ];
@@ -53,7 +54,7 @@ const TARGETS = [
 const COMPANIES = [
   ["Deloitte", "deloitte.com"], ["Delta Air Lines", "delta.com"], ["Goldman Sachs", "goldmansachs.com"],
   ["Qualtrics", "qualtrics.com"], ["Microsoft", "microsoft.com"], ["Google", "google.com"], ["Adobe", "adobe.com"],
-  ["Apple", "apple.com"], ["Nike", "nike.com"], ["BYU", "byu.edu"],
+  ["Apple", "apple.com"], ["Nike", "nike.com"], ["Stanford University", "stanford.edu"],
   ["University of Utah", "admissions.utah.edu"], // utah.edu itself has no favicon
 ];
 
@@ -61,7 +62,7 @@ const HOW_TO = [
   ["Sheet / column", "What to put there"],
   ["People", "Everyone on your map. Only Name is required."],
   ["  Name", "Full name, spelled the same way everywhere."],
-  ["  Company / School", "3+ direct connections at one company or school become a group bubble. 'BYU' and 'Brigham Young University' count as the same."],
+  ["  Company / School", "3+ direct connections at one company or school become a group bubble. 'Stanford' and 'Stanford University' count as the same."],
   ["  Email", "Shown in the details panel with a copy button."],
   ["  LinkedIn URL", "Their profile link. Double-click them on the map to open it."],
   ["  Photo", "An image link, or use 'Add photo' in the app (it stores a small picture here). LinkedIn exports don't include photos."],
@@ -95,7 +96,8 @@ const people = PEOPLE.map(([name, company, school, role, connectedThrough, statu
 const onMap = new Set(people.map(p => p.name));
 const fromPool = pool.map(personFromPool).filter(p => onMap.has(p.name));
 const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists",
-  people: mergePeople(fromPool, people).map(p => ({ ...p, source: "" })),
+  people: mergePeople(fromPool, people).map(p => ({ ...p, source: "",
+    photo: `demo/photos/${p.name.toLowerCase().replaceAll(" ", "-")}.jpg` })),
   companies: COMPANIES.map(([company, website]) => ({ company, website, logo: "", extra: {} })),
   targets: TARGETS.map(([company, priority, stage, notes]) => ({ company, priority, stage, notes, extra: {} })),
   pool };

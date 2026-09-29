@@ -129,7 +129,7 @@ test("demo workbook builds: only the people you added are on the map", () => {
   assert.deepEqual(g.nodes.filter(n => n.target).map(n => n.id).sort(),
     ["company:deloitte", "target:apple", "target:delta air lines", "target:goldman sachs", "target:nike", "target:qualtrics"]);
   assert.equal(m.avatarStyle, "notionists");
-  assert.equal(g.nodes.find(n => n.id === "school:brigham young university").label, "BYU");
+  assert.equal(g.nodes.find(n => n.id === "school:stanford").label, "Stanford University");
   assert.equal(m.pool.length, 7); // LinkedIn connections stay in the pool, off the map
 });
 

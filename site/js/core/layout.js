@@ -45,7 +45,11 @@ export function ringLayout(graph) {
     const anchor = reached && hubOf(reached);
     if (anchor && anchor !== id && sorted.includes(anchor)) anchorOf[id] = anchor;
   }
-  const hubs = sorted.filter(id => !anchorOf[id]);
+  // A group whose people all sit under other bubbles (e.g. a school whose alumni are in company groups) floats
+  // inside the ring, toward its people, instead of taking a slot on it and sending lines across the map.
+  const floating = sorted.filter(id => ["school", "tag"].includes(byId[id]?.kind)
+    && !(children[id] ?? []).some(k => parent[k].kind === "member"));
+  const hubs = sorted.filter(id => !anchorOf[id] && !floating.includes(id));
   for (const [id, anchor] of Object.entries(anchorOf)) hubs.splice(hubs.indexOf(anchor) + 1, 0, id);
 
   // How much of the ring each hub needs: its fan of members plus room for their 2nd-degree people.
@@ -92,6 +96,15 @@ export function ringLayout(graph) {
     const angle = Math.atan2(pos[id].y - from.y, pos[id].x - from.x);
     fan(pos[id], kids, angle, CHILD_R, Math.min(Math.PI * 0.9, kids.length * 0.55));
     queue.push(...kids);
+  }
+
+  for (const id of floating) {
+    const members = graph.edges.filter(e => e.from === id && pos[e.to]).map(e => pos[e.to]);
+    if (!members.length) continue;
+    const x = members.reduce((a, p) => a + p.x, 0) / members.length;
+    const y = members.reduce((a, p) => a + p.y, 0) / members.length;
+    const angle = Math.atan2(y, x);
+    place(id, 0.55 * R1 * Math.cos(angle), 0.55 * R1 * Math.sin(angle));
   }
 
   // Targets with nobody yet: an outer ring beyond everything else, in the spaces

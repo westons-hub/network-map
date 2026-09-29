@@ -13,13 +13,15 @@ instantly**, with nothing to install and no sign-up.
 
 - **Browser-only** web app on **GitHub Pages**: plain HTML/CSS/JS ES modules in `site/`, no server, no backend, no build step.
 - **All data stays in the browser. Nothing is uploaded**, and there are no analytics or trackers. Say so on the page.
-  The only outside requests are company logos (the logo service sees a domain) and opt-in Gravatar (it sees an email hash).
-  Section H adds optional calendar sign-in, which sends only the events I create.
+  The only outside requests are company logos (the logo service sees a domain). Section H adds optional calendar
+  sign-in, which sends only the events I create. (Gravatar was removed.)
 - **No LinkedIn scraping:** only my own data exports plus manual entry.
 - **Never commit real data.** `.gitignore` blocks `.xlsx`, `.csv`, `.html` exports and intro reports, except the demo
-  (`site/demo/`), the blank template and test fixtures. Demo **people** are fictional.
+  (`site/demo/`), the blank template and test fixtures. Demo **people** are fictional; their photos are AI-generated
+  faces of people who don't exist.
 - Vendor third-party JS into `site/vendor/` (vis-network, SheetJS, DiceBear) so the site has no CDN dependency.
-  `site/vendor/ATTRIBUTION.md` lists each one with its license.
+  Attribution lives **only** in `site/vendor/ATTRIBUTION.md` and a short "Credits" section at the bottom of the README —
+  no credits/trademark footer on the page.
 - Tests: `node --test` over the DOM-free logic in `site/js/core/`. Nothing needs `npm install` to *run* the site;
   dev-only packages (DiceBear) are used just to vendor files.
 - **Deploy:** `.github/workflows/pages.yml` publishes `site/` to Pages on push to `main`; tests run first and block the deploy.
@@ -67,22 +69,35 @@ instantly**, with nothing to install and no sign-up.
 - **Domain:** the Companies sheet's Website wins; otherwise guess it from the name with aliases (BYU → byu.edu).
 - **Demo:** uses **real, well-known companies and schools** with their real logos, via **explicit domains in the demo
   Companies sheet** (no logo files committed). Fallback: a generated initials logo.
-- Footer note (demo): **"Company names and logos are trademarks of their owners; demo people are fictional."**
 
 ## 5. Profile pictures
 
-- LinkedIn's export has **no photos**, and we don't scrape. **No photos of real people in the demo.**
-- **Demo people:** illustrated **DiceBear avatars in the CC0 "Notionists" style**, generated locally in the browser
-  (vendored library, seeded by name). Attribution in `site/vendor/ATTRIBUTION.md`. Controlled by a Settings value
-  "Avatar style" (the demo workbook sets it; my own data defaults to initials, and I can turn it on too).
-- **My own data:** the Photo field. "Add photo" picks an image file (resized in the browser to ~96×96, stored as a data
-  URI in the Photo cell) or pastes an image URL. Real uploaded photos are only for my own data.
-- Optional, **off by default**: Gravatar by email (SHA-256 via Web Crypto).
-- Fallback: an initials avatar. A person's **status shows as the colored border ring**.
+- LinkedIn's export has **no photos**, and we don't scrape. **No photos of real people anywhere in the demo.**
+- **Demo people:** photorealistic **AI-generated headshots of people who do not exist**, from the SFHQ dataset
+  (MIT license; no on-page attribution required), resized to 128px and stored in `site/demo/photos/` (one per person,
+  matched to the name's apparent gender/age; sources in `SOURCES.md`).
+- **My own data:** the Photo field only — "Change photo" picks an image file (resized in the browser to ~96×96, stored
+  as a data URI in the Photo cell) or pastes an image URL. **No Gravatar** (removed: setting, code and docs).
+- Fallback: DiceBear "Notionists" (CC0, generated locally, seeded by name; the "Avatar style" setting) or initials.
+- A person's **status shows as the colored border ring**.
 
-## 6. Details panel ✅
+## 6. Person popover card (replaces person details in the sidebar)
 
-- Email as a `mailto:` link plus a copy button; role, company, schools, Connected On, status, tags, notes, LinkedIn link.
+- Clicking a person on the map opens a **floating card next to their node** (not in the sidebar). It stays attached to
+  the node when I pan/zoom, flips side/position to stay fully on screen, and never covers the node. Highlight-on-click
+  still happens behind it.
+- Layout (compact; scrolls internally if long):
+  - Header: photo/avatar, name, role @ company, **status pill** (click → small dropdown to change status), close ×.
+  - Quick links: LinkedIn (opens profile), Email (mailto) + copy, **Schedule meeting**, **Add task**.
+  - Info: company, schools, past companies, how we're connected / connected through, connected on.
+  - Notes: shown in full, **editable inline** (click to edit, autosaves).
+  - Next steps + upcoming meetings/tasks for this person; latest meeting summary.
+- Easy editing: every field is **click-to-edit inline** (type-ahead for company/school/connected-through); Enter/blur
+  saves, Esc cancels, a small "Saved" confirmation. "Edit all" opens the full form; "Change photo" on the avatar (upload
+  or paste URL); "Remove person" at the bottom with a confirm.
+- Close with ×, Esc, or clicking empty map space. Clicking another person moves the card to them.
+- Group/company/target nodes get a similar, smaller card (logo, who I know there, best path, "Make target"/target stage).
+- Mobile: the card becomes a bottom sheet. Demo mode: edits work on the in-browser copy.
 
 ## 7. Dragging the map
 
@@ -98,10 +113,14 @@ instantly**, with nothing to install and no sign-up.
   groups spread far apart; people link only to their primary group; no-connection targets on the outer edge;
   **Free | Ring** switch (animated, remembered, "Fit" in both); slower eased zoom; labels with a white halo that hide
   when zoomed out; red ring only on targets.
-- **Edge styles**, all darker than the grid: solid dark gray = I know them; dashed gray = through someone;
-  **faint dotted = alumni link** (past company or shared school, see D; a toggle shows/hides them);
-  red = only a highlighted path to a target.
-- View tabs at the top of the right pane: **Map | People | Calendar | To-Do** (see F). The sidebar stays.
+- **Edge styles**, all darker than the grid: solid dark gray = I know them (company membership **and current school**);
+  dashed gray = through someone; **faint dotted = alumni link** (past company or past school, see D; a toggle
+  shows/hides them); red = only a highlighted path to a target.
+- **School connections:** people link to their school node(s) with an edge, like company membership (solid for a
+  current school, dotted for a past one). School edges are drawn but don't pull on the layout; they're part of
+  highlight-on-click and paths.
+- View tabs at the top of the right pane: **Map | Calendar | To-Do** now, **People** added with the tracker (see E/F).
+  The sidebar stays.
 
 ## D. Work history and schools
 
@@ -198,7 +217,7 @@ returning as Growth Associate | BYU; 11 mutual connections (Casey, Morgan) | Pro
 
 ## I. Demo data shows everything off
 
-Realistic tracker rows; real company/school logos and DiceBear avatars; past companies and schools with alumni links;
+Realistic tracker rows; real company/school logos and AI-generated headshots; past companies and schools with alumni links;
 6 targets (some with no connections: Apple, Nike); meetings spread across this month and next; open, overdue and done
 tasks. Every view should look alive for a recruiter.
 
@@ -206,7 +225,8 @@ tasks. Every view should look alive for a recruiter.
 Northwind Consulting → **Deloitte** (P1 target) · Summit Airlines → **Delta Air Lines** (P1 target) ·
 Brightline Bank → **Goldman Sachs** (target) · Pinecrest Labs → **Qualtrics** (target, reached through Liam → Zoe) ·
 Contoso Games → **Microsoft** · Fieldstone Capital → **Google** · Keystone Health and Harbor Ventures → **Adobe** ·
-Riverbend University → **BYU** · Lakeview State University and Harbor Tech Institute → **University of Utah** ·
+Riverbend University → **Stanford University** (BYU is not used in the demo) ·
+Lakeview State University and Harbor Tech Institute → **University of Utah** ·
 new no-connection targets **Apple** and **Nike** (replacing Granite Peak Partners and Harborview Media).
 
 ## 9. README (portfolio-first)
@@ -219,12 +239,17 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
 1. ✅ App skeleton: full-screen layout, graph paper, demo by default, SheetJS open/save, backups, conflict reload,
    migration, JS tests *(8a6afe5)*
 1b. ✅ Map readability (A) + Add target (C) + first pictures pass *(f9b85e2)*
-2. **Pictures (B, revised):** real companies/schools with real logos in the demo (explicit domains), DiceBear Notionists
-   avatars (vendored, CC0, attribution), "Avatar style" setting, trademark footer note
-3. **LinkedIn import + lookup Add/Edit/Remove person** (original Phase 2) **+ work history and schools (D)**, including
-   alumni edges, alumni on target cards, pool suggestions with one-click add, and the intro report download
-4. **Tracker format + Excel import/export (E) + full person editing, Meetings log, People/Calendar/To-Do views (F)**
-   — confirm the tracker headers first
-5. **Meeting invites (G) + calendar connections (H)**
-6. **Saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with live link + GIF,
-   demo polish (I)**
+2. ✅ Pictures (B, revised): real companies/schools with real logos, DiceBear fallback, attribution *(2edc770)*
+2b. ✅ School edges; Stanford replaces BYU in the demo; AI-generated demo headshots (SFHQ, MIT); page footer note
+   removed (credits only in ATTRIBUTION.md + README); phases reordered
+3. **To-Do + Calendar + meetings + invites (F views/meetings log/tasks, G)** using the current People fields
+   (tracker-only fields come in Phase 5): Map | Calendar | To-Do tabs; Meetings and Tasks sheets; automatic tasks;
+   Schedule meeting with my Zoom link and the invite options (Google/Outlook links, Gmail/mailto draft, .ics);
+   Settings (my name, email, default length, Zoom link). Also: **remove Gravatar** and the **person popover card**
+   (section 6) with inline editing.
+4. **LinkedIn import + lookup Add/Edit person + work history and schools (D)**: pool import, past companies and
+   schools with alumni edges, pool suggestions with one-click add, intro report download
+5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
+6. **Google/Outlook calendar connections (H)**
+7. **Polish + deploy:** saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with
+   live link + GIF, demo polish (I)

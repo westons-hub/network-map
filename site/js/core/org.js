@@ -7,6 +7,7 @@ export const ALIASES = {
   "byu marriott": "brigham young university",
   "byu marriott school of business": "brigham young university",
   "marriott school of business": "brigham young university",
+  "stanford university": "stanford",
   "u of u": "university of utah",
   "uofu": "university of utah",
   "the church of jesus christ of latterday saints": "church of jesus christ",

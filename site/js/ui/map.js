@@ -128,8 +128,9 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor }) 
     const to = nodeIndex.get(e.to), from = nodeIndex.get(e.from);
     const viaSomeone = e.kind === "intro" || e.kind === "gap" || (e.kind === "also" && to?.kind === "second");
     const toTarget = from?.target || from?.kind === "target";
-    // Secondary memberships stay hidden (fewer crossings) unless highlighted or pointing at a target.
-    const alsoHidden = e.kind === "also" && !toTarget && !(focus && focus.edges.has(edgeId(e)));
+    // Secondary memberships (a person's school, or a target they're reachable at) are drawn. Tag groups stay
+    // hidden unless highlighted.
+    const alsoHidden = e.kind === "also" && from?.kind === "tag" && !(focus && focus.edges.has(edgeId(e)));
     const onPath = focus?.path.has(edgeId(e));
     const faded = focus && !focus.edges.has(edgeId(e));
     const alpha = faded ? focus.fade * 0.8 : 1;
@@ -141,7 +142,10 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor }) 
       width: onPath ? 4.5 : e.kind === "group" ? 2.2 : viaSomeone ? 1.5 : 1.7,
       dashes: onPath ? false : viaSomeone ? [6, 6] : false,
       color: { color, highlight: color, hover: color, opacity: alpha },
-      physics: e.kind !== "also" || !!toTarget, length: e.kind === "also" ? 90 : length,
+      // School links pull gently (long springs) so a school settles near its people without tearing company
+      // clusters apart; tag links never pull.
+      physics: e.kind !== "also" || from?.kind !== "tag", length: e.kind === "also" ? (toTarget ? 90 : 240) : length,
+      smooth: e.kind === "also" ? { type: "curvedCW", roundness: 0.12 } : undefined,
     };
   }
 

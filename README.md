@@ -6,7 +6,7 @@ You sit at the center, and your connections branch out from you. When 3 or more 
 
 ![Network map screenshot](docs/screenshot.png)
 
-*The people in the demo are fictional. Company names and logos are trademarks of their owners.*
+*The people in the demo are fictional, and their photos are AI-generated faces of people who don't exist. Company names and logos are trademarks of their owners.*
 
 ## Why I built this
 
@@ -83,4 +83,12 @@ Network Map has no backend. Your workbook is read and written by JavaScript in y
 
 ## License
 
-MIT. Third-party code and art are listed in [`site/vendor/ATTRIBUTION.md`](site/vendor/ATTRIBUTION.md): vis-network (MIT), SheetJS Community Edition (Apache 2.0) and DiceBear (MIT code; the Notionists design by Zoish is CC0). Company names and logos are trademarks of their owners.
+MIT.
+
+## Credits
+
+- [vis-network](https://github.com/visjs/vis-network) (MIT), [SheetJS Community Edition](https://sheetjs.com) (Apache 2.0), [DiceBear](https://www.dicebear.com) (MIT; "Notionists" avatar design by Zoish, CC0).
+- Demo headshots: AI-generated faces from the [SFHQ dataset](https://github.com/SelfishGene/SFHQ-dataset) by David Beniaguev (MIT). The demo people are fictional.
+- Company names and logos are trademarks of their owners. Logos are loaded from Google's favicon service and aren't stored in this repo.
+
+Details and license texts: [`site/vendor/ATTRIBUTION.md`](site/vendor/ATTRIBUTION.md).

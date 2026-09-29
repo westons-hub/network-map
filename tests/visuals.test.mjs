@@ -51,7 +51,7 @@ test("no path to a target with no one there", () => {
 });
 
 test("neighborhood includes secondary links", () => {
-  const n = neighborhood(graph, "school:brigham young university");
+  const n = neighborhood(graph, "school:stanford");
   for (const id of ["me", "p:jordan lee", "p:noah carter", "p:sofia alvarez"]) assert.ok(n.nodes.has(id), id);
 });
 
@@ -68,8 +68,9 @@ test("ring layout: you at the center, everyone placed, gap targets outermost, me
   const d = (a, b) => Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
   assert.ok(d("company:deloitte", "p:jordan lee") < 140);
   assert.ok(d("p:sofia alvarez", "p:tom nguyen") < 100); // 2nd-degree next to their connector
-  // Hubs sit on one circle.
-  const hubs = graph.edges.filter(e => e.from === "me" && e.kind !== "gap").map(e => r(e.to));
+  // Hubs sit on one circle; a school whose alumni all sit under company bubbles floats inside it.
+  assert.ok(r("school:stanford") < r("company:deloitte") * 0.7);
+  const hubs = graph.edges.filter(e => e.from === "me" && e.kind !== "gap" && e.to !== "school:stanford").map(e => r(e.to));
   assert.ok(Math.max(...hubs) - Math.min(...hubs) < 1);
 });
 
@@ -123,6 +124,17 @@ test("the demo names an explicit logo domain for every organization on the map",
   for (const o of orgs) assert.ok(withSite.has(o), o);
   assert.ok(demo.companies.every(c => !c.logo)); // logos load at runtime; none stored
   assert.ok(!readdirSync(new URL("../site/demo/", import.meta.url)).some(f => /\.(png|jpe?g|svg|ico|webp)$/i.test(f)));
+  assert.ok(!JSON.stringify(demo).match(/\bBYU\b|Brigham Young/));
+});
+
+test("every demo person has a small headshot file in the repo", () => {
+  const dir = new URL("../site/", import.meta.url);
+  for (const p of demo.people) {
+    assert.match(p.photo, /^demo\/photos\/[a-z-]+\.jpg$/, p.name);
+    const bytes = readFileSync(new URL(p.photo, dir));
+    assert.ok(bytes.length > 1000 && bytes.length < 20000, `${p.photo}: ${bytes.length} bytes`);
+  }
+  assert.equal(readdirSync(new URL("demo/photos/", dir)).filter(f => f.endsWith(".jpg")).length, demo.people.length);
 });
 
 // ---- logos --------------------------------------------------------------------------

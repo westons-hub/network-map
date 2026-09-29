@@ -133,7 +133,6 @@ h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .05e
 .line.dashed { border-top: 2px dashed var(--edge-dashed); }
 .line.path { border-top: 3px solid var(--target); }
 .privacy { margin-top: auto; }
-.demo-note { display: block; margin-top: 6px; }
 
 /* ---- map ---- */
 #map-wrap { position: relative; min-width: 0; min-height: 0; background: var(--paper); }
