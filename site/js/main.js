@@ -64,6 +64,12 @@ const details = createDetails({
     focus,
     patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); details.saved(); },
     setProfile: fields => { edit({ type: "setProfile", fields }); details.saved(); },
+    addConnection: connection => {
+      if (!connection.b || !connection.a || normalizeName(connection.a) === normalizeName(connection.b)) return;
+      edit({ type: "addConnection", connection });
+      details.saved();
+    },
+    removeConnection: connection => { edit({ type: "removeConnection", connection }); toast("Connection removed."); },
     editMyPhoto: async () => {
       try {
         const result = await photoForm({ name: state.doc.model.me || "you", current: state.doc.model.profile?.photo });
@@ -177,8 +183,12 @@ async function addPerson({ pdf, entry } = {}) {
   const result = await addPersonFlow({ model: state.doc.model, demo: state.mode === "demo", pdf, entry });
   if (!result) return;
   if (result.open) return openPerson(result.open);
-  const { person, existingKey } = result;
-  edit({ type: "upsertPerson", key: existingKey, person: { ...person, source: person.source || "excel" } });
+  const { person: { links = [], ...person }, existingKey } = result;
+  const people = state.doc.model.people;
+  const known = name => people.find(p => normalizeName(p.name) === normalizeName(name))?.name ?? name;
+  edit([{ type: "upsertPerson", key: existingKey, person: { ...person, connectedThrough: person.connectedThrough ? known(person.connectedThrough) : "",
+                                                             source: person.source || "excel" } },
+        ...links.map(l => ({ type: "addConnection", connection: { a: person.name, b: known(l.other), type: l.type } }))]);
   focus(`p:${normalizeName(person.name)}`, { follow: !existingKey });
   toast(existingKey ? `Updated ${person.name}.` : `Added ${person.name} to your map.`);
 }
@@ -217,7 +227,7 @@ const todo = createTodo($("todo-view"), {
 function render() {
   const { model } = state.doc;
   const me = model.me || "You";
-  state.graph = buildGraph(model.people, { me, profile: model.profile, targets: model.targets });
+  state.graph = buildGraph(model.people, { me, profile: model.profile, connections: model.connections, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; details.close(); }
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });

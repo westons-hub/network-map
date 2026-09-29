@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "../site/vendor/xlsx.mjs";
 import { applyOp, replay } from "../site/js/core/ops.js";
+import { makeConnection } from "../site/js/core/connections.js";
 import { makePerson } from "../site/js/core/people.js";
 import { saveDoc } from "../site/js/core/sync.js";
 import { emptyModel, readWorkbook, writeWorkbook } from "../site/js/core/workbook.js";
@@ -24,6 +25,7 @@ function fullModel() {
                           connectedThrough: "", connectedOn: "2026-03-12", status: "Met", tags: "a, b",
                           notes: "Line one, \"quoted\"", extra: { Birthday: "May 4" } }),
              makePerson({ name: "Bo", connectedThrough: "Ana Díaz" })],
+    connections: [makeConnection({ a: "Ana Díaz", b: "Bo" }), makeConnection({ a: "Ana Díaz", b: "Bo", type: "Coworker", notes: "Acme 2021" })],
     targets: [{ company: "Acme", priority: "1", stage: "Applied", notes: "", extra: {} }],
     companies: [{ company: "Acme", website: "acme.example", logo: "data:image/svg+xml;charset=utf-8,%3Csvg%3E", extra: {} }],
     pool: [{ firstName: "Cy", lastName: "Z", url: "u", email: "", company: "Acme", position: "Eng", connectedOn: "2025-01-02" }],

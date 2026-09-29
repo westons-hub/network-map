@@ -2,17 +2,20 @@
 // bytes and a plain model, and back. It uses SheetJS, so it runs the same in the
 // browser and in Node tests.
 //
-// Model: { me, profile, avatarStyle, settings, people, targets, companies, pool, meetings, tasks, layout, notices }
+// Model: { me, profile, avatarStyle, settings, people, connections, targets, companies, pool, meetings, tasks, layout, notices }
 //
 // Sheets you add yourself (and extra columns on ours) are kept when saving.
 // Old files (a "Contacts" sheet, Targets with only Company/Notes) are migrated.
 
 import * as XLSX from "../../vendor/xlsx.mjs";
 import { clean } from "./org.js";
+import { makeConnection, reconcile } from "./connections.js";
 import { POOL_COLUMNS, makePerson, parseDate, poolEntry } from "./people.js";
 
 export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
-                        meetings: "Meetings", tasks: "Tasks", me: "Me", layout: "Layout", settings: "Settings" };
+                        meetings: "Meetings", tasks: "Tasks", connections: "Connections", me: "Me", layout: "Layout",
+                        settings: "Settings" };
+export const CONNECTION_COLUMNS = [["Person A", "a"], ["Person B", "b"], ["Type", "type"], ["Notes", "notes"]];
 
 // The Me sheet: your own profile, one "Field | Value" row each (Name is kept in sync with Settings → Your name).
 export const PROFILE_ROWS = [["Photo", "photo"], ["Role", "role"], ["Headline", "headline"], ["Company", "company"],
@@ -52,7 +55,7 @@ const SETTING_ROWS = [["Your email", "email", ""], ["Meeting length (minutes)", 
 export const defaultSettings = () => Object.fromEntries(SETTING_ROWS.map(([, f, d]) => [f, d]));
 
 export function emptyModel(me = "") {
-  return { me, profile: emptyProfile(), avatarStyle: "initials", settings: defaultSettings(), people: [], targets: [],
+  return { me, profile: emptyProfile(), avatarStyle: "initials", settings: defaultSettings(), people: [], connections: [], targets: [],
            companies: [], pool: [],
            meetings: [], tasks: [], layout: {}, notices: [] };
 }
@@ -158,6 +161,13 @@ export function readWorkbook(bytes) {
       source: text(known.source), extra });
   });
 
+  // ---- Connections (the old Connected Through column migrates in; see core/connections.js) ----
+  for (const rec of findSheet(wb, SHEETS.connections)?.rows ?? []) {
+    const { known, extra } = pick(rec, CONNECTION_COLUMNS);
+    if (text(known.a) && text(known.b)) model.connections.push(makeConnection({ ...known, extra }));
+  }
+  reconcile(model);
+
   // ---- Me (your profile) ----
   for (const rec of findSheet(wb, SHEETS.me)?.rows ?? []) {
     const label = lower(rec.Field);
@@ -232,6 +242,8 @@ export function writeWorkbook(model, base) {
     [SHEETS.tasks]: sheetFrom(tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>
       f === "due" || f === "created" ? dateCell(t[f]) : f === "done" ? (t.done ? "Yes" : "") : t[f] ?? "")),
       [40, 22, 20, 12, 8, 12, 20, 16]),
+    [SHEETS.connections]: sheetFrom(tableRows(model.connections ?? [], CONNECTION_COLUMNS,
+      c => CONNECTION_COLUMNS.map(([, f]) => c[f] ?? "")), [24, 24, 16, 40]),
     [SHEETS.me]: sheetFrom([["Field", "Value"], ["Name", model.me ?? ""],
                             ...PROFILE_ROWS.map(([label, f]) => [label, model.profile?.[f] ?? ""])], [22, 70]),
     [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],

@@ -2,7 +2,6 @@
 // edges along your best path to a target, and a node's neighborhood for highlighting.
 
 import { parseEntries } from "./history.js";
-import { whoCanIntro } from "./intro.js";
 import { normalizeName, normalizeOrg } from "./org.js";
 
 export const edgeId = e => `${e.from}>${e.to}>${e.kind}`;
@@ -12,25 +11,49 @@ const WARMTH = { "met": 0, "referral": 1, "follow up": 2, "contacted": 3, "": 4,
 const warmth = status => WARMTH[String(status ?? "").trim().toLowerCase()] ?? 4;
 
 /**
- * Your best (shortest) way into a target company.
- * Returns { names: [me, ..., person], ask, person, nodes: [ids], edges: [edge ids] }, or null if no one is there.
+ * Your best (shortest) way into a target company: a breadth-first search from you over everyone you know directly,
+ * "Introduced me" links (introducer → the person they introduced) and person-to-person connections (Coworker,
+ * Classmate, Friend, Mentor, Other; both ways). Among equally short paths, the one that starts with the contact you're
+ * warmest with wins. People who currently work there come first; if none is reachable, someone who used to (alumni).
+ * Returns { names: [me, ..., person], ask, person, nodes: [ids], edges: [edge ids], alumni } or null.
  */
 export function bestPath(graph, people, target, me) {
   const key = normalizeOrg(target.label ?? target.company ?? target);
-  const byKey = new Map(people.map(p => [normalizeName(p.name), p]));
-  const best = whoCanIntro(people, target.label ?? target.company ?? target, me)
-    .filter(p => p.person.company && normalizeOrg(p.person.company) === key)
-    .sort((a, b) => a.degree - b.degree
-                    || warmth(byKey.get(normalizeName(a.ask))?.status) - warmth(byKey.get(normalizeName(b.ask))?.status))[0]
-    ?? alumniPath(people, key, me, byKey);
+  const byId = new Map(graph.nodes.map(n => [n.id, n]));
+  const status = new Map(people.map(p => [`p:${normalizeName(p.name)}`, p.status]));
+
+  // Adjacency between you and people.
+  const adj = new Map();
+  const link = (a, b) => { if (!adj.has(a)) adj.set(a, []); if (!adj.get(a).includes(b)) adj.get(a).push(b); };
+  for (const n of graph.nodes) if (n.kind === "person") link("me", n.id);
+  for (const e of graph.edges) {
+    if (e.kind === "intro") link(e.from, e.to);
+    if (e.kind === "link") { link(e.from, e.to); link(e.to, e.from); }
+  }
+  // Warmest first, so breadth-first search prefers them among equally short paths.
+  for (const list of adj.values()) list.sort((a, b) => warmth(status.get(a)) - warmth(status.get(b)) || a.localeCompare(b));
+
+  const parent = new Map([["me", null]]);
+  const queue = ["me"];
+  while (queue.length) {
+    const id = queue.shift();
+    for (const next of adj.get(id) ?? []) if (!parent.has(next)) { parent.set(next, id); queue.push(next); }
+  }
+  const route = id => { const out = []; for (let x = id; x && x !== "me"; x = parent.get(x)) out.unshift(x); return out; };
+
+  const pick = ids => ids.filter(id => parent.has(id)).map(id => ({ id, route: route(id) }))
+    .sort((a, b) => a.route.length - b.route.length || warmth(status.get(a.route[0])) - warmth(status.get(b.route[0])))[0];
+  const current = people.filter(p => p.company && normalizeOrg(p.company) === key).map(p => `p:${normalizeName(p.name)}`);
+  const former = people.filter(p => parseEntries(p.pastCompanies).some(e => normalizeOrg(e.name) === key))
+    .map(p => `p:${normalizeName(p.name)}`);
+  let best = pick(current), alumni = false;
+  if (!best) { best = pick(former); alumni = !!best; }
   if (!best) return null;
 
   const focus = graph.targets.find(t => t.key === key)?.focus;
-  const seq = ["me", ...best.chain.map(n => `p:${normalizeName(n)}`)];
-  const edges = [];
-  const nodes = ["me"];
   const find = (a, b) => graph.edges.find(e => (e.from === a && e.to === b) || (e.from === b && e.to === a));
-
+  const seq = ["me", ...best.route];
+  const nodes = ["me"], edges = [];
   for (let i = 1; i < seq.length; i++) {
     const a = seq[i - 1], b = seq[i];
     let e = find(a, b);
@@ -44,21 +67,12 @@ export function bestPath(graph, people, target, me) {
     nodes.push(b);
   }
   if (focus && !nodes.includes(focus)) {
-    const last = seq[seq.length - 1];
-    const e = find(focus, last);
+    const e = find(focus, seq.at(-1));
     if (e) edges.push(edgeId(e));
     nodes.push(focus);
   }
-  return { names: [me, ...best.chain], ask: best.ask, person: best.person.name, nodes, edges, alumni: !!best.alumni };
-}
-
-/** Nobody works there now: the best path to someone who used to (ranked below current employees). */
-function alumniPath(people, key, me, byKey) {
-  const candidates = people.filter(p => parseEntries(p.pastCompanies).some(e => normalizeOrg(e.name) === key));
-  return candidates.flatMap(p => whoCanIntro(people, p.name, me).filter(x => x.person === p))
-    .sort((a, b) => a.degree - b.degree
-                    || warmth(byKey.get(normalizeName(a.ask))?.status) - warmth(byKey.get(normalizeName(b.ask))?.status))
-    .map(x => ({ ...x, alumni: true }))[0];
+  const names = [me, ...best.route.map(id => byId.get(id)?.label ?? id)];
+  return { names, ask: names[1], person: names.at(-1), nodes, edges, alumni };
 }
 
 /** A node plus everything one edge away (including secondary "also" links). */

@@ -135,6 +135,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
     const to = nodeIndex.get(e.to), from = nodeIndex.get(e.from);
     const viaSomeone = e.kind === "intro" || e.kind === "gap" || (e.kind === "also" && to?.kind === "second");
     const alumni = e.kind === "alumni";
+    const personLink = e.kind === "link"; // Coworker / Classmate / Friend / Mentor / Other
     const toTarget = from?.target || from?.kind === "target";
     const onPath = focus?.path.has(edgeId(e));
     // Tag-group links stay hidden unless highlighted; alumni links follow the "Show alumni links" toggle.
@@ -142,20 +143,21 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       || (alumni && !options.showAlumni && !onPath);
     const faded = focus && !focus.edges.has(edgeId(e));
     const alpha = faded ? focus.fade * 0.8 : alumni && !onPath ? 0.75 : 1;
-    const color = onPath ? c("target") : viaSomeone || alumni ? c("edge-dashed") : c("edge");
+    const color = onPath ? c("target") : viaSomeone || alumni ? c("edge-dashed") : personLink ? c("link") : c("edge");
     const length = { group: 210 + Math.min(to?.count ?? 0, 12) * 10, gap: to?.gap ? 400 : 260, member: 85,
                      direct: 190, intro: 85 }[e.kind];
     return {
       id: edgeId(e), from: e.from, to: e.to, kind: e.kind, hidden,
-      title: alumni ? `Used to work here${e.years ? ` (${e.years})` : ""}` : undefined,
-      width: onPath ? 4.5 : e.kind === "group" ? 2.2 : alumni ? 1.2 : viaSomeone ? 1.5 : 1.7,
+      title: alumni ? `Used to work here${e.years ? ` (${e.years})` : ""}` : personLink ? `${e.type}${e.notes ? `: ${e.notes}` : ""}` : undefined,
+      width: onPath ? 4.5 : e.kind === "group" ? 2.2 : alumni || personLink ? 1.3 : viaSomeone ? 1.5 : 1.7,
       dashes: onPath ? false : alumni ? [1.5, 5] : viaSomeone ? [6, 6] : false,
       color: { color, highlight: color, hover: color, opacity: alpha },
       // School links pull gently (long springs) so a school settles near its people without tearing company
       // clusters apart; tag and alumni links never pull.
-      physics: e.kind !== "gap" && !alumni && (e.kind !== "also" || from?.kind !== "tag"),
+      physics: e.kind !== "gap" && !alumni && !personLink && (e.kind !== "also" || from?.kind !== "tag"),
       length: e.kind === "also" ? (toTarget ? 90 : 240) : length,
-      smooth: e.kind === "also" || alumni ? { type: "curvedCW", roundness: 0.12 } : undefined,
+      smooth: e.kind === "also" || alumni ? { type: "curvedCW", roundness: 0.12 }
+        : personLink ? { type: "curvedCCW", roundness: 0.2 } : undefined,
     };
   }
 

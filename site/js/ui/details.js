@@ -1,6 +1,7 @@
 // Details for whatever you clicked on the map (a person, group, target, or you), shown as a page in the left
 // sidebar with a back arrow. Every field is click-to-edit. On phones the sidebar is the bottom sheet.
 
+import { CONNECTION_TYPES, INTRODUCED, connectionsOf } from "../core/connections.js";
 import { entryNames, sharedWithMe } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES, personKey, poolName } from "../core/people.js";
@@ -193,10 +194,6 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       row("Schools", edit("school", { suggestions: schools, placeholder: "Add school(s)", label: "schools" })),
       row("Past companies", edit("pastCompanies", { suggestions: companies, placeholder: "e.g. Deloitte (2019–2021)",
                                                      label: "past companies" })),
-      row("Connected via", placeholder ? el("span", "—") : inlineField({ value: p.connectedThrough, suggestions: names,
-        label: "connected through", placeholder: "You know them directly",
-        display: v => v ? el("button", v, { class: "linklike", type: "button", onclick: () => handlers.focus(personId(v)) }) : "",
-        onSave: save("connectedThrough") })),
       row("Connected on", edit("connectedOn", { type: "date", placeholder: "Add date", display: v => prettyDate(v, false) || v })),
       row("Meeting date", el("span", md ? `${prettyDate(md.meeting.date)}${md.upcoming ? " (upcoming)" : ""}` : "—")),
       row("LinkedIn", edit("linkedinUrl", { type: "url", placeholder: "Paste profile link",
@@ -204,6 +201,9 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       row("Tags", edit("tags", { placeholder: "Add tags" })),
     );
     card.append(info);
+
+    // Connections: who introduced you, and coworker / classmate / friend / mentor links. Shown on both people.
+    if (!placeholder) card.append(connectionsSection(p, model));
 
     // Notes: full text, editable in place.
     card.append(section("Notes", placeholder ? el("span", p.notes || "—", { class: "muted" })
@@ -216,6 +216,46 @@ export function createDetails({ sidebar, getCtx, handlers }) {
                                                   onclick: () => handlers.removePerson(key, p.name) }));
       card.append(foot);
     }
+  }
+
+  function connectionsSection(p, model) {
+    const list = el("ul", undefined, { class: "conn-list" });
+    for (const c of connectionsOf(model.connections, p.name)) {
+      const li = el("li");
+      const label = c.dir === "introducedBy" ? "Introduced you" : c.dir === "introduced" ? "They introduced you to" : c.type;
+      li.append(el("span", c.dir === "introducedBy" ? "Introduced by" : label, { class: `conn-type${c.type === INTRODUCED ? " intro" : ""}` }),
+        el("button", c.other, { class: "linklike", type: "button", onclick: () => handlers.focus(personId(c.other)) }));
+      if (c.notes) li.append(el("span", `· ${c.notes}`, { class: "muted small" }));
+      li.append(el("button", "×", { class: "conn-remove", type: "button", title: "Remove this connection",
+        "aria-label": `Remove connection with ${c.other}`, onclick: () => handlers.removeConnection(c.conn) }));
+      list.append(li);
+    }
+    const box = section("Connections", list);
+    if (!list.children.length) list.append(el("li", "No connections yet. Who introduced you, or who do they know?", { class: "muted small" }));
+
+    // Add one: pick a person (type-ahead) and how they know each other.
+    const toggle = el("button", "+ Connect to someone", { class: "linklike small", type: "button" });
+    const form = el("div", undefined, { class: "conn-add", hidden: true });
+    const who = el("input", undefined, { placeholder: "Person", autocomplete: "off", "aria-label": "Person" });
+    const listId = `conn-people-${Math.random().toString(36).slice(2, 7)}`;
+    const dl = el("datalist", undefined, { id: listId });
+    for (const x of model.people) if (normalizeName(x.name) !== normalizeName(p.name)) dl.append(el("option", undefined, { value: x.name }));
+    who.setAttribute("list", listId);
+    const type = el("select", undefined, { "aria-label": "How they're connected" });
+    for (const t of CONNECTION_TYPES) type.append(el("option", t === INTRODUCED ? `Introduced me to ${p.name.split(" ")[0]}` : t, { value: t }));
+    const other = el("input", undefined, { class: "other", placeholder: "How do they know each other?", hidden: true });
+    type.addEventListener("change", () => { other.hidden = type.value !== "Other"; });
+    const add = el("button", "Add", { class: "btn small primary", type: "button", onclick: () => {
+      const name = model.people.find(x => normalizeName(x.name) === normalizeName(who.value))?.name ?? who.value.trim();
+      if (!name) return who.focus();
+      const t = type.value === "Other" ? other.value.trim() || "Other" : type.value;
+      // "Introduced me": the person you picked introduced you to this person.
+      handlers.addConnection(t === INTRODUCED ? { a: name, b: p.name, type: t } : { a: p.name, b: name, type: t });
+    } });
+    form.append(who, type, other, dl, add);
+    toggle.addEventListener("click", () => { form.hidden = !form.hidden; toggle.hidden = true; who.focus(); });
+    box.append(toggle, form);
+    return box;
   }
 
   // ---- you (the center node) ----------------------------------------------------------------

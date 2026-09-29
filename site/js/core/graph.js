@@ -53,7 +53,7 @@ export function graphStats(g) {
            gaps: g.targets.filter(t => !t.direct.length && !t.second.length).length };
 }
 
-export function buildGraph(people, { me = "Me", profile = {}, minGroupSize = MIN_GROUP_SIZE,
+export function buildGraph(people, { me = "Me", profile = {}, connections = [], minGroupSize = MIN_GROUP_SIZE,
                                      groupBy = ["company", "school"], targets = [] } = {}) {
   const g = { nodes: [], edges: [], groups: {}, targets: [] };
   const meKey = normalizeName(me);
@@ -171,6 +171,17 @@ export function buildGraph(people, { me = "Me", profile = {}, minGroupSize = MIN
     g.nodes.push(personNode(p, "second"));
     g.edges.push({ from: `p:${normalizeName(p.connectedThrough)}`, to: `p:${personKey(p)}`, kind: "intro" });
     for (const gid of memberships(p)) g.edges.push({ from: gid, to: `p:${personKey(p)}`, kind: "also" });
+  }
+
+  // ---- person-to-person links (Coworker, Classmate, Friend, Mentor, Other) ------------------------------
+  const seenLink = new Set();
+  for (const c of connections) {
+    if (c.type === "Introduced me") continue; // those already place the person (intro edge)
+    const a = `p:${normalizeName(c.a)}`, b = `p:${normalizeName(c.b)}`;
+    const key = [a, b].sort().join("|");
+    if (a === b || seenLink.has(key) || !byKey.has(normalizeName(c.a)) || !byKey.has(normalizeName(c.b))) continue;
+    seenLink.add(key);
+    g.edges.push({ from: a, to: b, kind: "link", type: c.type, notes: c.notes });
   }
 
   // ---- alumni: past employers link to that company's bubble with a faint dotted line ----------------

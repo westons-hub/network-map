@@ -278,6 +278,7 @@ export async function personForm({ model, person }) {
     email: input("email", person.email, { type: "email" }),
     linkedinUrl: input("linkedinUrl", person.linkedinUrl, { type: "url", placeholder: "https://www.linkedin.com/in/…" }),
     connectedThrough: input("connectedThrough", person.connectedThrough, { placeholder: "Blank = you know them directly" }),
+    // (Other connections — coworker, classmate, friend, mentor — are added in the Connections section.)
     connectedOn: input("connectedOn", person.connectedOn, { type: "date" }),
     status: select("status", [["", "No status"], ...STATUSES.map(x => [x, x])], person.status),
     tags: input("tags", person.tags.join(", "), { placeholder: "Comma-separated" }),
@@ -289,7 +290,7 @@ export async function personForm({ model, person }) {
     el("div", "Basics", { class: "form-section" }), field("Name", fields.name), two(field("Role", fields.role), field("Company", fields.company)),
     two(field("Email", fields.email), field("LinkedIn", fields.linkedinUrl)),
     el("div", "Connection", { class: "form-section" }), two(field("Schools", fields.school), field("Past companies", fields.pastCompanies)),
-    field("Connected through", fields.connectedThrough),
+    field("Introduced by", fields.connectedThrough, "Who introduced you? Coworker/classmate/friend/mentor links are in Connections."),
     two(field("Connected on", fields.connectedOn), field("Status", fields.status)),
     el("div", "Notes", { class: "form-section" }), field("Tags", fields.tags), field("Notes", fields.notes));
   const choice = await ask(`Edit ${person.name}`, body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);

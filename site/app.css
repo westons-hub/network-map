@@ -1,7 +1,7 @@
 :root {
   /* Map: light graph paper; edges are always darker than the grid. */
   --paper: #fcfdff; --grid-minor: rgba(80, 125, 190, 0.055); --grid-major: rgba(80, 125, 190, 0.13);
-  --edge: #4b5563; --edge-dashed: #8b95a5;
+  --edge: #4b5563; --edge-dashed: #8b95a5; --link: #7a5af8;
   --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e4e7ec;
   --me: #1f3a5f; --company: #2e6fd8; --school: #1f9d6b; --tag: #8b5cf6; --target: #d92d20;
   --met: #16a34a; --contacted: #0ba5ec; --scheduled: #0e9384; --reach: #f79009; --follow: #ee46bc; --referral: #7a5af8;
@@ -433,3 +433,16 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .headline { font-size: 12.5px; color: var(--text); }
 .shared-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .badge.shared { background: #f0f7ff; border-color: #c7dcfd; color: #1d4ed8; }
+.line.link { border-top: 2px solid var(--link); }
+.conn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.conn-list li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.conn-type { font-size: 11px; padding: 0 7px; border-radius: 999px; background: #f4f3ff; color: #5925dc; border: 1px solid #d9d6fe; }
+.conn-type.intro { background: #f2f4f7; color: #475467; border-color: #e4e7ec; }
+.conn-remove { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; margin-left: auto; }
+.conn-remove:hover { color: var(--overdue); }
+.conn-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 6px; }
+.conn-add input, .conn-add select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.conn-add .other { grid-column: 1 / -1; }
+.conn-rows { display: grid; gap: 6px; }
+.conn-row { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 6px; }
+.conn-row input, .conn-row select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }

@@ -4,6 +4,7 @@
 
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
+import { INTRODUCED, reconcile, withConnection, withoutConnection } from "./connections.js";
 import { mergePool } from "./pool.js";
 
 const clone = m => structuredClone(m);
@@ -51,7 +52,24 @@ export function applyOp(model, op) {
     }
     case "removePerson":
       m.people = m.people.filter(p => personKey(p) !== op.key);
+      m.connections = (m.connections ?? []).filter(c => normalizeName(c.a) !== op.key && normalizeName(c.b) !== op.key);
       break;
+    case "addConnection": { // { a, b, type, notes } — "Introduced me" also sets b's Connected Through
+      m.connections = withConnection(m.connections, op.connection);
+      if (op.connection.type === INTRODUCED) {
+        const p = m.people.find(x => normalizeName(x.name) === normalizeName(op.connection.b));
+        if (p) p.connectedThrough = op.connection.a;
+      }
+      break;
+    }
+    case "removeConnection": {
+      m.connections = withoutConnection(m.connections, op.connection);
+      if (op.connection.type === INTRODUCED) {
+        const p = m.people.find(x => normalizeName(x.name) === normalizeName(op.connection.b));
+        if (p && normalizeName(p.connectedThrough) === normalizeName(op.connection.a)) p.connectedThrough = "";
+      }
+      break;
+    }
     case "upsertMeeting": {
       const i = m.meetings.findIndex(x => x.id === op.meeting.id);
       const meeting = { extra: {}, ...(i >= 0 ? m.meetings[i] : {}), ...op.meeting };
@@ -98,7 +116,19 @@ export function applyOp(model, op) {
     default:
       throw new Error(`Unknown edit: ${op.type}`);
   }
+  if ((op.type === "upsertPerson" || op.type === "patchPerson") && (op.person?.connectedThrough !== undefined
+      || op.fields?.connectedThrough !== undefined)) {
+    syncIntroducer(m, op.type === "upsertPerson" ? op.person.name : (op.fields.name ?? m.people.find(p => personKey(p) === op.key)?.name));
+  }
   return m;
+}
+
+/** A person's Connected Through was edited directly: make their "Introduced me" connection match (or remove it). */
+function syncIntroducer(m, name) {
+  const p = m.people.find(x => normalizeName(x.name) === normalizeName(name));
+  if (!p) return;
+  m.connections = (m.connections ?? []).filter(c => !(c.type === INTRODUCED && normalizeName(c.b) === normalizeName(p.name)));
+  reconcile(m);
 }
 
 export const replay = (model, ops) => ops.reduce(applyOp, model);
@@ -106,6 +136,10 @@ export const replay = (model, ops) => ops.reduce(applyOp, model);
 /** Someone was renamed: their meetings and tasks follow them. */
 function renameInLogs(m, newName, oldKey) {
   for (const x of [...m.meetings, ...m.tasks]) if (normalizeName(x.person) === oldKey) x.person = newName;
+  for (const c of m.connections ?? []) {
+    if (normalizeName(c.a) === oldKey) c.a = newName;
+    if (normalizeName(c.b) === oldKey) c.b = newName;
+  }
 }
 
 /** Someone was renamed: keep people who were "Connected Through" them attached. */

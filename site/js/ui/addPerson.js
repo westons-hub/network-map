@@ -5,6 +5,7 @@
 //   • no match → a blank form with the name filled in
 // Every path ends in the same prefilled review card, with the fields only you know highlighted.
 
+import { CONNECTION_TYPES, INTRODUCED } from "../core/connections.js";
 import { entryNames } from "../core/history.js";
 import { normalizeName } from "../core/org.js";
 import { STATUSES, personFromPool, poolName } from "../core/people.js";
@@ -161,7 +162,6 @@ async function reviewPerson({ model, draft, note, existing }) {
     school: input("school", { placeholder: "e.g. BYU (2022–2026); Lakeview High" }),
     pastCompanies: input("pastCompanies", { placeholder: "e.g. Deloitte (2019–2021)" }),
     email: input("email", { type: "email" }), linkedinUrl: input("linkedinUrl", { type: "url" }),
-    connectedThrough: input("connectedThrough", { placeholder: "Blank = you know them directly" }),
     connectedOn: input("connectedOn", { type: "date" }),
     status: el("select", undefined, { name: "status" }),
     tags: input("tags", { placeholder: "Comma-separated" }),
@@ -170,8 +170,30 @@ async function reviewPerson({ model, draft, note, existing }) {
   for (const s of ["", ...STATUSES]) f.status.append(el("option", s || "Choose…", { value: s, selected: s === (draft.status ?? "") }));
   const companies = [...new Set([...model.people.map(p => p.company), ...model.pool.map(e => e.company)].filter(Boolean))].sort();
   const schools = [...new Set(model.people.flatMap(p => entryNames(p.school)))].sort();
-  const lists = [withList(f.company, companies), withList(f.school, schools), withList(f.pastCompanies, companies),
-                 withList(f.connectedThrough, model.people.map(p => p.name).sort())];
+  const lists = [withList(f.company, companies), withList(f.school, schools), withList(f.pastCompanies, companies)];
+
+  // Connections: who introduced you, and who they know (coworker, classmate, friend, mentor, other).
+  const peopleList = el("datalist", undefined, { id: `add-people-${++listIds}` });
+  for (const p of [...model.people].sort((a, b) => a.name.localeCompare(b.name))) peopleList.append(el("option", undefined, { value: p.name }));
+  lists.push(peopleList);
+  const rows = el("div", undefined, { class: "conn-rows" });
+  const addRow = (person = "", type = INTRODUCED) => {
+    const row = el("div", undefined, { class: "conn-row" });
+    const who = el("input", undefined, { placeholder: "Person on your map", autocomplete: "off", value: person, "aria-label": "Person" });
+    who.setAttribute("list", peopleList.id);
+    const kind = el("select", undefined, { "aria-label": "How you're connected" });
+    for (const t of CONNECTION_TYPES) kind.append(el("option", t === INTRODUCED ? "Introduced me" : t, { value: t, selected: t === type }));
+    if (!CONNECTION_TYPES.includes(type)) kind.append(el("option", type, { value: type, selected: true }));
+    const other = el("input", undefined, { placeholder: "How?", hidden: kind.value !== "Other", "aria-label": "Other connection" });
+    kind.addEventListener("change", () => { other.hidden = kind.value !== "Other"; });
+    row.append(who, kind, el("button", "×", { class: "conn-remove", type: "button", title: "Remove", onclick: () => row.remove() }), other);
+    row.read = () => ({ other: who.value.trim(), type: kind.value === "Other" ? other.value.trim() || "Other" : kind.value });
+    rows.append(row);
+  };
+  if (draft.connectedThrough) addRow(draft.connectedThrough, INTRODUCED);
+  else addRow();
+  const connBox = el("div");
+  connBox.append(rows, el("button", "+ Add another", { class: "linklike small", type: "button", onclick: () => addRow("", "Coworker") }));
   const photoFile = el("input", undefined, { type: "file", accept: "image/*" });
   const photoUrl = el("input", undefined, { type: "url", placeholder: "or paste an image link" });
   const photo = el("div", undefined, { class: "row2" });
@@ -185,8 +207,9 @@ async function reviewPerson({ model, draft, note, existing }) {
     field("Name", f.name), two(field("Role", f.role), field("Company", f.company)),
     two(field("Email", f.email), field("LinkedIn", f.linkedinUrl)),
     el("div", "What only you know", { class: "form-section" }),
-    two(field("Connected through", f.connectedThrough, { needs: true, hint: "Who introduced you? Blank = direct." }),
-        field("Status", f.status, { needs: needs("status") })),
+    field("Connections", connBox, { needs: true, hint: "\"Introduced me\" makes them 2nd-degree through that person; " +
+      "coworker / classmate / friend / mentor just links them. Leave the name blank if you know them directly." }),
+    field("Status", f.status, { needs: needs("status") }),
     field("Schools", f.school, { needs: needs("school") }), field("Past companies", f.pastCompanies),
     two(field("Connected on", f.connectedOn), field("Tags", f.tags)),
     field("Notes", f.notes, { needs: needs("notes") }),
@@ -204,6 +227,9 @@ async function reviewPerson({ model, draft, note, existing }) {
   else if (/^https?:\/\//i.test(photoUrl.value.trim())) out.photo = photoUrl.value.trim();
   else if (draft.photo) out.photo = draft.photo;
   if (draft.source) out.source = draft.source;
+  const conns = [...rows.children].map(r => r.read()).filter(c => c.other);
+  out.connectedThrough = conns.find(c => c.type === INTRODUCED)?.other ?? "";
+  out.links = conns.filter(c => c.type !== INTRODUCED);
   return out;
 }
 

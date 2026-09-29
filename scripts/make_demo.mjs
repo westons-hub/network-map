@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "../site/vendor/xlsx.mjs";
 import { makePerson, mergePeople, parseLinkedInCsv, personFromPool } from "../site/js/core/people.js";
+import { makeConnection, reconcile } from "../site/js/core/connections.js";
 import { emptyModel, writeWorkbook } from "../site/js/core/workbook.js";
 
 const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
@@ -105,6 +106,8 @@ const HOW_TO = [
   ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer) are optional."],
   ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong, or put an image link in Logo."],
   ["LinkedIn Pool", "Filled by 'Import LinkedIn' from your Connections.csv. These people are NOT on the map until you add them."],
+  ["Connections", "Who knows whom: Person A, Person B, Type (Introduced me, Coworker, Classmate, Friend, Mentor, or anything else), Notes. 'Introduced me' means A introduced you to B; it's kept in sync with People → Connected Through."],
+  ["Me", "Your own profile: photo, role, schools, past companies, what you're looking for."],
   ["Meetings", "One row per meeting: Person, Date, Start, End, Type, Method, Notes, Next Step. The app fills this when you schedule or log a meeting."],
   ["Tasks", "Your to-dos: Task, Person, Company, Due, Done. Scheduling a meeting adds a 'Send thank-you' task automatically."],
   ["Settings", "Your name and email, default meeting length, your Zoom link (used in invites), the invite message, and Avatar style (initials or notionists)."],
@@ -159,6 +162,14 @@ const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists", profile:
   settings: { ...emptyModel().settings, email: "alex.rivera@example.com", zoomLink: "https://zoom.us/j/0000000000",
               demoBaseDate: BASE },
   pool };
+// Connections: "Introduced me" comes from Connected Through above; plus a few links between people you know.
+reconcile(demo);
+for (const [a, b, type, notes] of [
+  ["Liam Walsh", "Mia Chen", "Friend", "Roommates' friend group"],
+  ["Sofia Alvarez", "Daniel Ortiz", "Classmate", "Stanford, same product club"],
+  ["Jordan Lee", "Owen Price", "Mentor", "Jordan mentors Owen on case interviews"],
+  ["Hana Kim", "Ethan Brooks", "Coworker", "Worked together at Deloitte"],
+]) demo.connections.push(makeConnection({ a, b, type, notes }));
 writeFileSync(join(SITE, "demo", "demo_network.xlsx"), withHowTo(writeWorkbook(demo)));
 
 // ---- blank template ----
