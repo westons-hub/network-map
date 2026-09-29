@@ -51,11 +51,11 @@ function drawGrid(network, ctx) {
   ctx.restore();
 }
 
-export function createMap(container, { images, onSelect, onDeselect, pathFor, onAfterDraw = () => {} }) {
+export function createMap(container, { images, onSelect, onDeselect, pathFor, onAfterDraw = () => {}, onMoved = () => {} }) {
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
   let graph = { nodes: [], edges: [] };
-  let options = { showSecond: true, showAlumni: true, layout: "free" };
+  let options = { showSecond: true, showAlumni: true, layout: "free", locked: false };
   let selected = null;   // clicked node id
   let hovered = null;    // hovered node id (preview only when nothing is selected)
   let smallLabels = false;
@@ -206,7 +206,8 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       else { nodes.update(Object.entries(target).map(([id, p]) => ({ id, ...p }))); network.fit(); }
     } else {
       cancelAnimationFrame(animation);
-      network.setOptions({ physics: { enabled: true } });
+      network.setOptions({ physics: { enabled: !options.locked } });
+      if (options.locked) return;
       network.once("stabilized", () => placeGaps(true)); // animateTo fits the view when it's done
       network.startSimulation();
     }
@@ -261,7 +262,22 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   network.on("hoverNode", p => { if (!selected) { hovered = p.node; restyle(); } });
   network.on("blurNode", () => { if (hovered) { hovered = null; restyle(); } });
   network.on("dragStart", p => { if (p.nodes.length) container.classList.add("dragging"); });
-  network.on("dragEnd", () => container.classList.remove("dragging"));
+  network.on("dragEnd", p => {
+    container.classList.remove("dragging");
+    // Free layout: remember where you put it (and pin it there) so it's in the same spot next time.
+    const moved = p.nodes.filter(id => id !== "me");
+    if (!moved.length || options.layout !== "free") return;
+    const pos = network.getPositions(moved);
+    nodes.update(moved.map(id => ({ id, fixed: true })));
+    onMoved(Object.fromEntries(moved.map(id => [id, { x: Math.round(pos[id].x), y: Math.round(pos[id].y) }])));
+  });
+
+  /** Locked: nothing moves (no physics, no dragging), but you can still click, pan and zoom. */
+  function applyLock() {
+    network.setOptions({ interaction: { dragNodes: !options.locked } });
+    if (options.layout === "free") network.setOptions({ physics: { enabled: !options.locked } });
+    container.classList.toggle("locked", options.locked);
+  }
 
   function clear() {
     selected = null;
@@ -285,7 +301,9 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       // New nodes start next to their parent so they grow out of the map instead of flying in.
       const parentOf = Object.fromEntries(next.edges.filter(e => e.kind !== "also").map(e => [e.to, e.from]));
       nodes.add(next.nodes.filter(n => !nodes.get(n.id)).map(n => {
-        const at = n.kind === "me" ? { x: 0, y: 0 } : layout[n.id] ?? previous[parentOf[n.id]];
+        // A position you dragged it to (saved in the Layout sheet) is kept exactly and pinned there.
+        if (n.kind !== "me" && layout[n.id]) return { id: n.id, ...layout[n.id], fixed: true };
+        const at = n.kind === "me" ? { x: 0, y: 0 } : previous[parentOf[n.id]];
         const jitter = () => (Math.random() - 0.5) * 40;
         return { id: n.id, ...(at ? { x: at.x + (n.kind === "me" ? 0 : jitter()), y: at.y + (n.kind === "me" ? 0 : jitter()) } : {}),
                  ...(n.kind === "me" ? { fixed: true } : {}) };
@@ -304,7 +322,19 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       }
     },
     set(opts) { options = { ...options, ...opts }; restyle(); },
-    setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); },
+    setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); applyLock(); },
+    setLocked(locked) { options.locked = locked; applyLock(); },
+    /** Forget dragged positions and let the physics lay the map out again. */
+    rearrange() {
+      nodes.update(nodes.getIds().filter(id => id !== "me").map(id => ({ id, fixed: false })));
+      options.locked = false;
+      applyLock();
+      if (options.layout === "free") {
+        network.setOptions({ physics: { enabled: true } });
+        network.once("stabilized", () => { placeGaps(true); network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }); });
+        network.stabilize(300);
+      } else applyLayout(true);
+    },
     /** Refresh pictures after logos/avatars finish loading. */
     refresh: restyle,
     /** follow: a just-added node is still settling, so re-center on it once the layout comes to rest. */

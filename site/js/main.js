@@ -36,7 +36,7 @@ const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
 const TEMPLATE_URL = "template/contacts_template.xlsx";
 const DEFAULT_NAME = "my_network.xlsx";
-const PREFS = { layout: "network-map:layout", view: "network-map:view" };
+const PREFS = { layout: "network-map:layout", view: "network-map:view", lock: "orbit:map-locked" };
 
 const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
 const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
@@ -60,6 +60,8 @@ const map = createMap($("map"), {
   pathFor,
   onSelect: id => { state.selected = id; details.open(id); },
   onDeselect: () => { state.selected = null; details.close(); },
+  // Dragged positions go in the Layout sheet (and, in the demo, in this browser's demo copy).
+  onMoved: positions => edit({ type: "setLayout", positions }),
 });
 
 const details = createDetails({
@@ -709,8 +711,21 @@ function viewScope() {
   return { label: `Meetings in ${label} (${meetings.length})`, scope: { kind: "meetings", meetings } };
 }
 
+async function exportOfflineMap() {
+  if (state.view !== "map") showView("map");
+  toast("Building your offline map…");
+  const { offlineMapHtml } = await import("./ui/offlineMap.js");
+  const people = Object.fromEntries(state.graph.nodes.filter(n => n.id.startsWith("p:"))
+    .map(n => [n.id, { role: n.role, company: n.company, status: n.status }]));
+  const html = await offlineMapHtml({ network: map.network, title: $("title").textContent, people, dark: isDark() });
+  const name = `Orbit-map-${todayIso()}.html`;
+  files.download(new TextEncoder().encode(html), name, "text/html");
+  toast(`Saved ${name}. It has ${state.mode === "demo" ? "the fictional demo" : "your"} data in it, so share it only with people you trust.`, 8000);
+}
+
 function runExport(scope) {
   closeExportMenu();
+  if (scope.kind === "offline") { exportOfflineMap().catch(e => { console.error(e); toast(`Couldn't build the offline map: ${e.message}`, 8000); }); return; }
   try {
     const out = exportWorkbook(state.doc.model, scope);
     files.download(out.bytes, out.name);
@@ -735,6 +750,7 @@ function openExportMenu() {
     item("Everything", "People (tracker columns), Experience, Education, Connections, Targets, Meetings, Tasks", { kind: "all" }),
     item("This view", view?.label ?? "Nothing highlighted", view?.scope),
     item("One person", person ? person.name : "Open someone's details first", person ? { kind: "people", names: [person.name] } : null),
+    item("Offline map (.html)", "The map as you see it, in one file that opens anywhere without internet", { kind: "offline" }),
   );
   exportMenu.hidden = false;
   exportBtn.setAttribute("aria-expanded", "true");
@@ -838,6 +854,24 @@ $("show-alumni").addEventListener("change", e => map.set({ showAlumni: e.target.
 }
 $("fit").addEventListener("click", () => map.fit());
 
+// Lock (nothing moves; remembered in this browser) and Re-arrange (forget dragged positions).
+function setLocked(locked) {
+  const b = $("lock");
+  b.setAttribute("aria-pressed", String(locked));
+  b.textContent = locked ? "🔒 Locked" : "🔓 Lock";
+  b.title = locked ? "Unlock to drag people around again" : "Lock the map so nothing moves";
+  setPref(PREFS.lock, locked ? "1" : "");
+  map.setLocked(locked);
+}
+$("lock").addEventListener("click", () => setLocked($("lock").getAttribute("aria-pressed") !== "true"));
+$("rearrange").addEventListener("click", () => {
+  const had = Object.keys(state.doc.model.layout ?? {}).length;
+  if (had) edit({ type: "clearLayout" });
+  setLocked(false);
+  map.rearrange();
+  toast(had ? "Re-arranged. Your dragged positions were cleared." : "Re-arranged.");
+});
+
 // System / Light / Dark (remembered in this browser). The map redraws with the new colors.
 const THEME_LABEL = { system: ["◐", "System"], light: ["☀", "Light"], dark: ["☾", "Dark"] };
 function renderThemeButton() {
@@ -878,6 +912,7 @@ window.addEventListener("beforeunload", e => {
   const layout = pref(PREFS.layout, "free") === "ring" ? "ring" : "free";
   layoutButtons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
   map.set({ layout });
+  if (pref(PREFS.lock, "") === "1") setLocked(true);
   try {
     await loadDemo();
   } catch (e) {
