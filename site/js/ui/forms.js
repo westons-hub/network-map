@@ -204,7 +204,7 @@ export async function inviteDialog({ model, meeting, download, onOpen, onEdit, s
                  { class: "meeting-summary" }));
   if (meeting.notes) body.append(el("p", meeting.notes, { class: "muted small" }));
   if (synced) body.append(el("p", synced, { class: "source-note ok" }));
-  if (!to) body.append(el("p", `${meeting.person} has no email yet, so the invite won't include them. Add it on their card.`, { class: "warn" }));
+  if (!to) body.append(el("p", `${meeting.person} has no email yet, so the invite won't include them. Add it in their details.`, { class: "warn" }));
   body.append(field("Message", message, "Edit it here; {first name}, {date}, {time} and {link} were filled in from your Settings template."));
   const ctx = () => ({ me, email: to, myEmail: model.settings.email, message: message.value });
   const open = url => window.open(url, "_blank", "noopener");
@@ -226,7 +226,7 @@ export async function inviteDialog({ model, meeting, download, onOpen, onEdit, s
                         { class: "muted small" }));
   const buttons = [{ label: "Copy message", value: "copy" }, { label: "Done", value: "", primary: true }];
   if (onEdit) buttons.unshift({ label: "Edit meeting", value: "edit", left: true });
-  if (onOpen) buttons.unshift({ label: "Open their card", value: "open", left: true });
+  if (onOpen) buttons.unshift({ label: "Open their details", value: "open", left: true });
   const v = await ask("Add to calendar & invite", body, buttons);
   if (v === "copy") {
     try { await navigator.clipboard.writeText(message.value); toast("Message copied."); } catch { toast("Couldn't copy."); }

@@ -416,3 +416,15 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .block.short { flex-direction: row; gap: 4px; align-items: center; white-space: nowrap; }
 .block.short .what { display: none; }
 .block .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- details page in the sidebar (replaces the old floating card) ---- */
+.details-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 16px 16px; position: relative; }
+.details-back { margin-bottom: 8px; font-size: 13px; }
+.details-pane .card, .details-pane .card.org { position: static; width: auto; max-height: none; overflow: visible;
+  border: 0; box-shadow: none; padding: 0; border-radius: 0; background: none; }
+.details-pane .card-photo { width: 64px; height: 64px; }
+.details-pane .card-name { font-size: 18px; }
+.details-pane .saved-flash { position: sticky; bottom: 4px; }
+@media (max-width: 760px) {
+  .details-pane .card, .details-pane .card.org { position: static; box-shadow: none; max-height: none; z-index: auto; }
+}

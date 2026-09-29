@@ -65,7 +65,7 @@ function nameField(box, model, { onRename }) {
 export function renderOverview(box, { graph, model, mode }, handlers) {
   box.replaceChildren();
   box.append(el("h3", model.me ? `${model.me.split(" ")[0]}'s network` : "Your network"));
-  box.append(el("div", mode === "demo" ? "Fictional demo data" : "Click anyone on the map to open their card.", { class: "sub" }));
+  box.append(el("div", mode === "demo" ? "Fictional demo data" : "Click anyone on the map to see their details.", { class: "sub" }));
   const s = graph.stats;
   const stats = el("div", undefined, { class: "stats" });
   for (const [v, label] of [[s.direct, "direct"], [s.second_degree, "2nd-degree"], [s.groups, "groups"],
@@ -103,6 +103,6 @@ export function renderOverview(box, { graph, model, mode }, handlers) {
     }
     box.append(ul);
   }
-  box.append(el("p", "Click anyone for their card; click a target to see your best way in. Esc or empty space closes it.",
+  box.append(el("p", "Click anyone (or yourself) to see their details here; click a target for your best way in. Esc or empty map space goes back.",
                 { class: "muted small" }));
 }

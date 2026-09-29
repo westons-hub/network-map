@@ -12,7 +12,7 @@ import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./co
 import * as files from "./store/files.js";
 import { addBackup, kvDelete, kvGet, kvSet, listBackups } from "./store/local.js";
 import { createCalendar } from "./ui/calendar.js";
-import { createCard } from "./ui/card.js";
+import { createDetails } from "./ui/details.js";
 import { ask, toast } from "./ui/dialog.js";
 import {
   companySuggestions, inviteDialog, meetingForm, personForm, photoForm, settingsForm, targetForm, taskForm,
@@ -41,7 +41,7 @@ const state = { mode: "demo", fileName: "", handle: null, doc: null, graph: null
 
 // ---- rendering ---------------------------------------------------------------
 
-const images = createImages({ onChange: () => { map.refresh(); renderSidebar(); card.render(); } });
+const images = createImages({ onChange: () => { map.refresh(); renderSidebar(); details.render(); } });
 
 /** Best path to the target a node stands for (null for anything else). */
 function pathFor(id) {
@@ -52,20 +52,17 @@ function pathFor(id) {
 const map = createMap($("map"), {
   images,
   pathFor,
-  onSelect: id => { state.selected = id; card.open(id); },
-  onDeselect: () => { state.selected = null; card.close(); },
-  onAfterDraw: () => card.reposition(),
+  onSelect: id => { state.selected = id; details.open(id); },
+  onDeselect: () => { state.selected = null; details.close(); },
 });
 
-const card = createCard({
-  container: $("map-wrap"),
-  map,
-  avoid: id => (pathFor(id)?.nodes ?? []).filter(n => n !== id),
+const details = createDetails({
+  sidebar: $("sidebar"),
   getCtx: () => ({ graph: state.graph, model: state.doc.model, paths: state.paths, images, mode: state.mode }),
   handlers: {
     close: clearSelection,
     focus,
-    patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); card.saved(); },
+    patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); details.saved(); },
     editPhoto,
     editAll,
     removePerson,
@@ -78,7 +75,7 @@ const card = createCard({
     makeTarget: company => addTarget(company),
     setTargetStage: (key, stage) => {
       const target = state.doc.model.targets.find(t => normalizeOrg(t.company) === key);
-      if (target) { edit({ type: "upsertTarget", key, target: { ...target, stage } }); card.saved(); }
+      if (target) { edit({ type: "upsertTarget", key, target: { ...target, stage } }); details.saved(); }
     },
   },
 });
@@ -215,13 +212,13 @@ function render() {
   const me = model.me || "You";
   state.graph = buildGraph(model.people, { me, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
-  if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; card.close(); }
+  if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; details.close(); }
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
   map.render(state.graph, model.layout);
   renderSidebar();
   renderChrome();
   renderViews();
-  card.render();
+  details.render();
 }
 
 function renderSidebar() {
@@ -252,17 +249,16 @@ function showView(view) {
   setPref(PREFS.view, state.view);
   tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === state.view)));
   for (const v of document.querySelectorAll("#main-pane > .view")) v.hidden = v.dataset.view !== state.view;
-  if (state.view !== "map") card.close();
   renderViews();
 }
 tabs.forEach(t => t.addEventListener("click", () => showView(t.dataset.view)));
 
-/** Select a node on the map, highlight it, and open its card. */
+/** Select a node on the map, highlight it, and open its details in the sidebar. */
 function focus(id, opts) {
   if (state.view !== "map") showView("map");
   state.selected = id;
   map.select(id, opts);
-  card.open(id);
+  details.open(id);
 }
 
 const personOnMap = name => state.graph.nodes.some(n => n.id === `p:${normalizeName(name)}`);
@@ -274,16 +270,16 @@ function openPerson(name) {
 function clearSelection() {
   state.selected = null;
   map.clear();
-  card.close();
+  details.close();
 }
 
-/** After renaming someone in their card, keep the card on them. */
+/** After renaming someone in their details, keep the details on them. */
 function followRename(key, fields) {
   if (fields.name === undefined || normalizeName(fields.name) === key) return;
   const id = `p:${normalizeName(fields.name)}`;
   state.selected = id;
   map.select(id);
-  card.open(id);
+  details.open(id);
 }
 
 function unsaved() {
@@ -402,7 +398,7 @@ async function editAll(key) {
   if (!fields || !Object.keys(fields).length) return;
   edit({ type: "patchPerson", key, fields });
   followRename(key, fields);
-  card.saved();
+  details.saved();
 }
 
 async function removePerson(key, name) {
@@ -686,7 +682,7 @@ document.addEventListener("keydown", e => {
   }
   if (e.key === "Escape" && !$("dialog").open) {
     if (!menu.hidden) closeMenu();
-    else if (state.selected || card.openId) clearSelection();
+    else if (state.selected || details.openId) clearSelection();
   }
 });
 

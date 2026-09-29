@@ -1,5 +1,5 @@
-// The popover card that opens next to a clicked node. It follows the node when the map pans
-// or zooms, flips sides to stay on screen, and never covers the node. On phones it's a bottom sheet.
+// Details for whatever you clicked on the map (a person, group, target, or you), shown as a page in the left
+// sidebar with a back arrow. Every field is click-to-edit. On phones the sidebar is the bottom sheet.
 
 import { entryNames } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
@@ -10,8 +10,6 @@ import { el } from "./dom.js";
 import { inlineField } from "./inline.js";
 import { statusColor } from "./map.js";
 
-const GAP = 14;          // space between the node and the card
-const MARGIN = 10;       // keep this far from the map's edges
 const isWebUrl = u => /^https?:\/\//i.test(u ?? "");
 const isEmail = e => /^[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]+$/.test(e ?? "");
 const personId = name => `p:${normalizeName(name)}`;
@@ -25,43 +23,20 @@ function prettyTime(time) {
   return time ? toDate("2000-01-01", time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
 }
 
-export function createCard({ container, map, getCtx, handlers, avoid = () => [] }) {
-  const card = el("div", undefined, { class: "card", role: "dialog", "aria-modal": "false", hidden: true });
-  container.append(card);
+/**
+ * sidebar: the <aside>; the details page replaces its scrolling body (Targets, overview…) while open.
+ * handlers.close() goes back to the default sidebar.
+ */
+export function createDetails({ sidebar, getCtx, handlers }) {
+  const body = sidebar.querySelector(".sidebar-scroll");
+  const pane = el("section", undefined, { class: "details-pane", hidden: true, "aria-label": "Details" });
+  const back = el("button", "← Back", { class: "details-back linklike", type: "button", title: "Back (Esc)",
+                                        onclick: () => handlers.close() });
+  const card = el("div", undefined, { class: "card" });
+  pane.append(back, card);
+  body.after(pane);
   let openId = null;
   let savedTimer;
-
-  // ---- positioning ----------------------------------------------------------------
-
-  const mobile = () => window.matchMedia("(max-width: 760px)").matches;
-
-  function reposition() {
-    if (!openId || card.hidden) return;
-    if (mobile()) { card.style.left = card.style.top = ""; card.style.visibility = ""; return; }
-    const box = map.nodeBox(openId);
-    const W = container.clientWidth, H = container.clientHeight;
-    if (!box || box.x < -box.r || box.y < -box.r || box.x > W + box.r || box.y > H + box.r) {
-      card.style.visibility = "hidden"; // node scrolled off the map; the card comes back with it
-      return;
-    }
-    card.style.visibility = "";
-    const w = card.offsetWidth, h = card.offsetHeight;
-    // Prefer the side away from anything we shouldn't cover (e.g. a target's highlighted best path).
-    const others = avoid(openId).map(id => map.nodeBox(id)).filter(Boolean);
-    const preferLeft = others.length > 0 && others.reduce((s, b) => s + b.x, 0) / others.length > box.x;
-    const right = box.x + box.r + GAP + w <= W - MARGIN ? box.x + box.r + GAP : undefined;
-    const leftSide = box.x - box.r - GAP - w >= MARGIN ? box.x - box.r - GAP - w : undefined;
-    let left = preferLeft ? leftSide ?? right : right ?? leftSide;
-    let top;
-    if (left !== undefined) {
-      top = Math.min(Math.max(box.y - Math.min(h / 2, 90), MARGIN), H - h - MARGIN);
-    } else {                                                                           // no room at the sides
-      left = Math.min(Math.max(box.x - w / 2, MARGIN), W - w - MARGIN);
-      top = box.y + box.r + GAP + h <= H - MARGIN ? box.y + box.r + GAP : Math.max(MARGIN, box.y - box.r - GAP - h);
-    }
-    card.style.left = `${Math.round(left)}px`;
-    card.style.top = `${Math.round(top)}px`;
-  }
 
   // ---- pieces ----------------------------------------------------------------------
 
@@ -319,19 +294,23 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
     if (!openId) return;
     const ctx = getCtx();
     const node = ctx.graph.nodes.find(n => n.id === openId);
-    if (!node || node.kind === "me") { close(); return; }
-    const scroll = card.scrollTop;
+    if (!node) { close(); return; }
+    const scroll = pane.scrollTop;
     card.replaceChildren();
-    card.classList.toggle("org", node.kind !== "person" && node.kind !== "second");
-    if (node.kind === "person" || node.kind === "second") personCard(node, ctx); else orgCard(node, ctx);
-    card.hidden = false;
-    card.scrollTop = scroll;
-    reposition();
+    card.classList.toggle("org", !["person", "second", "me"].includes(node.kind));
+    if (node.kind === "me") (handlers.renderMe ?? (() => close()))(card, ctx, { header, section, row, statusPill });
+    else if (node.kind === "person" || node.kind === "second") personCard(node, ctx);
+    else orgCard(node, ctx);
+    if (!openId) return;
+    body.hidden = true;
+    pane.hidden = false;
+    pane.scrollTop = scroll;
   }
 
   function close() {
     openId = null;
-    card.hidden = true;
+    pane.hidden = true;
+    body.hidden = false;
   }
 
   document.addEventListener("click", e => {
@@ -339,15 +318,14 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
   });
 
   return {
-    open(id) { openId = id; card.scrollTop = 0; render(); },
+    open(id) { openId = id; pane.scrollTop = 0; render(); },
     close,
     render,
-    reposition,
     get openId() { return openId; },
     /** A small "Saved" confirmation after an inline edit. */
     saved() {
-      let tag = card.querySelector(".saved-flash");
-      if (!tag) { tag = el("span", "Saved ✓", { class: "saved-flash" }); card.append(tag); }
+      let tag = pane.querySelector(".saved-flash");
+      if (!tag) { tag = el("span", "Saved ✓", { class: "saved-flash" }); pane.append(tag); }
       tag.classList.add("show");
       clearTimeout(savedTimer);
       savedTimer = setTimeout(() => tag.classList.remove("show"), 1300);
