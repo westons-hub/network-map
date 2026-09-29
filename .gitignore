@@ -4,13 +4,17 @@
 *.xls
 *.csv
 *.html
+*.pdf
 !site/index.html
 !site/demo/demo_network.xlsx
 !site/demo/sample_linkedin_connections.csv
 !site/template/contacts_template.xlsx
 !tests/fixtures/*.xlsx
+# The fictional "Save to PDF" sample (real people's profile PDFs must never be committed)
+!examples/sample_linkedin_profile.pdf
+!site/demo/sample_linkedin_profile.pdf
 
-# LinkedIn exports, offline map exports and intro reports name real people
+# LinkedIn exports, profile PDFs, offline map exports and intro reports name real people
 Connections*.csv
 Basic_LinkedInDataExport*/
 *_report.md
@@ -19,6 +23,8 @@ data/
 my_*/
 backups/
 logos/
+# ...except the demo's vector logos (Simple Icons CC0 / public-domain Commons; see site/demo/logos/SOURCES.md)
+!site/demo/logos/
 photos/
 # ...except the demo's AI-generated headshots of people who don't exist (see site/vendor/ATTRIBUTION.md)
 !site/demo/photos/

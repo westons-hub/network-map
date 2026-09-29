@@ -9,6 +9,7 @@ import {
   meetingDate, meetingOps, monthGrid, outlookUrl, shiftDemoDates, taskBadge, toDate, weekDays,
 } from "../site/js/core/schedule.js";
 import { emptyModel, readWorkbook, writeWorkbook } from "../site/js/core/workbook.js";
+import { readFileSync } from "node:fs";
 
 const NOW = new Date(2026, 8, 28, 12, 0); // Mon Sep 28 2026, noon
 const model = () => ({ ...emptyModel("Alex Rivera"),
@@ -131,4 +132,23 @@ test("demo dates move with today so the demo always looks current", () => {
   assert.equal(s.meetings[0].date, "2027-01-12");
   assert.equal(s.tasks[0].due, "2027-01-09");
   assert.equal(shiftDemoDates(m, "2026-09-28"), m);
+});
+
+test("the demo always has today / overdue / tomorrow / this week / next week / done, whatever the date", () => {
+  const raw = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
+  for (const today of ["2026-09-28", "2027-02-28", "2027-12-31", "2030-06-15", "2025-01-01"]) {
+    const m = shiftDemoDates(raw, today);
+    const g = groupTasks(m.tasks, today);
+    assert.ok(g.today.length >= 1, `${today}: something due today`);
+    assert.ok(g.overdue.length >= 1 && g.overdue.length <= 2, `${today}: 1-2 overdue`);
+    assert.ok(g.week.length >= 1, `${today}: tasks this week`);
+    assert.ok(g.done.length >= 1, `${today}: done items`);
+    const tomorrow = addDays(today, 1);
+    assert.ok(m.meetings.some(x => x.date === tomorrow), `${today}: a meeting tomorrow`);
+    assert.ok(m.meetings.some(x => x.date > tomorrow && x.date <= addDays(today, 7)), `${today}: meetings this week`);
+    assert.ok(m.meetings.some(x => x.date > addDays(today, 7) && x.date <= addDays(today, 14)), `${today}: meetings next week`);
+    assert.ok(m.meetings.some(x => x.date < today), `${today}: past meetings`);
+    assert.ok(m.people.every(p => !p.connectedOn || p.connectedOn <= today), `${today}: connections are in the past`);
+    assert.equal(taskBadge(m.tasks, today), g.today.length + g.overdue.length);
+  }
 });

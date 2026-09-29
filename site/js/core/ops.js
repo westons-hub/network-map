@@ -4,6 +4,7 @@
 
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
+import { mergePool } from "./pool.js";
 
 const clone = m => structuredClone(m);
 
@@ -64,6 +65,9 @@ export function applyOp(model, op) {
     }
     case "removeTask":
       m.tasks = m.tasks.filter(x => x.id !== op.id);
+      break;
+    case "mergePool": // importing Connections.csv into this workbook (no duplicates)
+      m.pool = mergePool(m.pool, op.entries).pool;
       break;
     case "setSettings":
       m.settings = { ...m.settings, ...op.settings };

@@ -122,8 +122,14 @@ test("the demo names an explicit logo domain for every organization on the map",
   const withSite = new Set(demo.companies.filter(c => c.website).map(c => c.company));
   const orgs = graph.nodes.filter(n => ["company", "school", "target"].includes(n.kind)).map(n => n.label);
   for (const o of orgs) assert.ok(withSite.has(o), o);
-  assert.ok(demo.companies.every(c => !c.logo)); // logos load at runtime; none stored
-  assert.ok(!readdirSync(new URL("../site/demo/", import.meta.url)).some(f => /\.(png|jpe?g|svg|ico|webp)$/i.test(f)));
+  // Crisp repo logos for every organization, each listed in SOURCES.md.
+  const sources = readFileSync(new URL("../site/demo/logos/SOURCES.md", import.meta.url), "utf8");
+  for (const c of demo.companies) {
+    assert.match(c.logo, /^demo\/logos\/[a-z-]+\.svg$/, c.company);
+    const svg = readFileSync(new URL(`../site/${c.logo}`, import.meta.url), "utf8");
+    assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="512" height="512"/);
+    assert.ok(sources.includes(c.logo.split("/").pop()), `${c.logo} is listed in SOURCES.md`);
+  }
   assert.ok(!JSON.stringify(demo).match(/\bBYU\b|Brigham Young/));
 });
 
@@ -154,8 +160,12 @@ test("guessDomain uses known domains, aliases, school patterns and overrides", (
 test("domainFrom and logo URLs", () => {
   assert.equal(domainFrom("HTTPS://WWW.BYU.EDU/"), "byu.edu");
   assert.equal(domainFrom("not a url"), "");
-  assert.equal(logoUrl("byu.edu"), "https://www.google.com/s2/favicons?domain=byu.edu&sz=128");
+  assert.equal(logoUrl("byu.edu"), "https://www.google.com/s2/favicons?domain=byu.edu&sz=256");
   assert.equal(logoUrl(""), "");
+  // A provider is used only when its key is set.
+  assert.match(logoUrl("byu.edu", { provider: "logo.dev", logoDevKey: "pk_test" }), /^https:\/\/img\.logo\.dev\/byu\.edu\?token=pk_test&size=256/);
+  assert.match(logoUrl("byu.edu", { provider: "brandfetch", brandfetchClientId: "abc" }), /^https:\/\/cdn\.brandfetch\.io\/byu\.edu\/w\/256\/h\/256\?c=abc$/);
+  assert.match(logoUrl("byu.edu", { provider: "logo.dev", logoDevKey: "" }), /google\.com/);
   assert.equal(isRealLogo(16), false);
   assert.equal(isRealLogo(64), true);
 });

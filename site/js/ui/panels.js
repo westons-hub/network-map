@@ -21,6 +21,7 @@ function pathSummary(t, path) {
   if (path.names.length === 2) {
     return { text: `You know ${t.direct.length === 1 ? "1 person" : `${t.direct.length} people`} here`, cls: "ok" };
   }
+  if (path.alumni) return { text: path.names.length === 2 ? `${path.person} used to work here` : `Ask ${path.ask} (alumni path)`, cls: "via" };
   return { text: `Ask ${path.ask} for an intro`, cls: "via" };
 }
 

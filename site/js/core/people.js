@@ -3,18 +3,20 @@
 import { clean, normalizeName } from "./org.js";
 
 /** Every field a person can have. Blank "connectedThrough" = you know them directly. */
-export const PERSON_FIELDS = ["name", "company", "school", "role", "email", "linkedinUrl", "photo",
+export const PERSON_FIELDS = ["name", "company", "school", "pastCompanies", "role", "email", "linkedinUrl", "photo",
                               "connectedThrough", "connectedOn", "status", "tags", "notes"];
 
 export const STATUSES = ["To Reach Out", "Contacted", "Scheduled", "Met", "Follow Up", "Referral"];
 
 export function makePerson(fields = {}) {
-  const p = { name: "", company: "", school: "", role: "", email: "", linkedinUrl: "", photo: "",
+  // school holds one or more schools ("BYU (2022–2026); Lakeview High"); pastCompanies works the same way.
+  const p = { name: "", company: "", school: "", pastCompanies: "", role: "", email: "", linkedinUrl: "", photo: "",
               connectedThrough: "", connectedOn: "", status: "", tags: [], notes: "", source: "", extra: {} };
   for (const [k, v] of Object.entries(fields)) {
     if (k === "tags") p.tags = Array.isArray(v) ? v.map(clean).filter(Boolean) : splitTags(v);
     else if (k === "extra") p.extra = { ...v };
     else if (k === "connectedOn") p.connectedOn = parseDate(v);
+    else if (k === "notes") p.notes = String(v ?? "").replace(/\r\n?/g, "\n").split("\n").map(clean).join("\n").trim();
     else if (k in p) p[k] = k === "photo" ? String(v ?? "").trim() : clean(v);
   }
   return p;

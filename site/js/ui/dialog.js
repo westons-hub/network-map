@@ -28,8 +28,38 @@ export function ask(title, body, buttons) {
     actions.append(btn);
   }
   form.append(actions);
+
+  // Esc or a click on the dark backdrop closes the dialog, but asks first if anything was typed.
+  let dirty = false;
+  const markDirty = () => { dirty = true; };
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  const confirmDiscard = () => {
+    if (form.querySelector(".discard")) return;
+    const bar = el("div", undefined, { class: "discard", role: "alert" });
+    bar.append(el("span", "Discard changes?"),
+      el("button", "Keep editing", { class: "btn small", type: "button", onclick: () => bar.remove() }),
+      el("button", "Discard", { class: "btn small danger", type: "button", onclick: () => dialog.close("") }));
+    actions.before(bar);
+    bar.querySelector("button").focus();
+  };
+  const dismiss = () => (dirty ? confirmDiscard() : dialog.close(""));
+  const onCancel = e => { e.preventDefault(); dismiss(); };
+  const onClick = e => {
+    if (e.target !== dialog) return;
+    const r = dialog.getBoundingClientRect();
+    const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    if (outside) dismiss();
+  };
+  dialog.addEventListener("cancel", onCancel);
+  dialog.addEventListener("click", onClick);
+
   return new Promise(resolve => {
-    dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true });
+    dialog.addEventListener("close", () => {
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("click", onClick);
+      resolve(dialog.returnValue);
+    }, { once: true });
     dialog.returnValue = "";
     dialog.showModal();
     form.querySelector("input:not([type=hidden]), select, textarea")?.focus();

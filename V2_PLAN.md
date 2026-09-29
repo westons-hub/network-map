@@ -37,15 +37,30 @@ instantly**, with nothing to install and no sign-up.
   **People**, **Targets** (Company, Priority, Stage, Notes), **Companies** (Company, Website, Logo),
   **LinkedIn Pool**, **Meetings**, **Tasks**, **Settings**, **Layout** (hidden).
 
-## 2. Add people with a lookup (so it isn't overwhelming)
+## 2. Add people with a lookup (so it isn't overwhelming) ✅
 
 - The map starts small: **me + my targets + only the people I've added.** LinkedIn connections never flood the map.
 - **Import LinkedIn:** choose `Connections.csv` → it goes into the LinkedIn Pool sheet, not onto the map.
   - Use every column: First Name, Last Name, URL, Email Address, Company, Position, Connected On (a date).
   - Skip the "Notes:" lines above the header. Re-importing never duplicates (dedupe by profile URL, then name).
   - If someone's company changed since the last import, move the old company and position into their Past Companies (see D).
-- **Add person:** type-ahead over the pool (name, company, title) → a form prefilled from LinkedIn; or add someone not on LinkedIn.
-  The form edits all fields (see F). My manual edits always beat LinkedIn data.
+- **One "+ Add person" box** (sidebar button + shortcut **N**; a PDF can also be dropped onto the map) that accepts anything:
+  - typing a name → type-ahead over the LinkedIn pool and people already on the map (warns "Already on map")
+  - pasting a LinkedIn profile URL → normalized and matched against the pool (by URL, then by the name in the slug);
+    matched: name, company, title, email, connected on and URL are prefilled; not matched: name from the slug + URL,
+    and it says what's missing
+  - dropping (or "Upload PDF") the profile PDF LinkedIn makes (**More → Save to PDF**) → parsed in the browser with
+    vendored pdf.js: name, headline, location, current and past positions with dates (→ Company, Role, Past
+    Companies), education with years (→ Schools), summary (→ Notes). Fictional sample: `examples/sample_linkedin_profile.pdf`
+    (demo: "Try a sample PDF").
+  - no match → a blank form with the typed name
+  All paths lead to the same prefilled **review card**, with the empty fields only I know highlighted (Connected
+  Through, Status, Schools, Notes, Photo). Save → the person appears with their card open. Tip shown in the box:
+  "For full history, open their LinkedIn profile → More → Save to PDF, then drop it here." **Never fetch linkedin.com.**
+- **LinkedIn pool tab:** searchable, filterable by company/title/connected date, "Add to map" per person (opens the
+  review card), checkboxes + "Add selected", "Add everyone at [company]", "Already on map" badges. Re-import merges
+  without duplicates. The demo has a 26-person fictional pool (incl. people at Apple and Nike).
+  My manual edits always beat LinkedIn data.
 - Edit or remove a person from the details panel.
 
 ## 3. Targets are core ✅ (alumni and pool pieces pending)
@@ -59,16 +74,22 @@ instantly**, with nothing to install and no sign-up.
   but isn't on the map, with one click to add them.
 - Clicking a target focuses the map and draws the best path in red. Offer "Download intro report (.md)".
 
-## 4. Company and school logos
+## 4. Company and school logos ✅
 
 - Company, school and target bubbles use `shape: "circularImage"`.
-- **Logo source:** Google's favicon service `https://www.google.com/s2/favicons?domain=<domain>&sz=128`, loaded at
-  runtime by the browser (browser-cached; domains with no logo are remembered). Swappable later (logo.dev / Brandfetch need keys).
-  - Google returns a 16px globe for unknown domains, so ≤16px counts as "no logo".
-  - No CORS headers, so favicons can't be embedded in the offline export; use the initials logo there.
-- **Domain:** the Companies sheet's Website wins; otherwise guess it from the name with aliases (BYU → byu.edu).
-- **Demo:** uses **real, well-known companies and schools** with their real logos, via **explicit domains in the demo
-  Companies sheet** (no logo files committed). Fallback: a generated initials logo.
+- **Demo:** crisp vector logos **stored in the repo** (`site/demo/logos/`, 512×512 SVG, brand mark on a white circle),
+  from **Simple Icons** (CC0) in brand colors where available (Delta, Goldman Sachs, Qualtrics, Google, Apple, Nike) and
+  **public-domain Wikimedia Commons** SVGs for the rest (Microsoft, Adobe, Deloitte, Stanford, University of Utah).
+  Sources and licenses in `site/demo/logos/SOURCES.md`; built by `scripts/make_logos.mjs`.
+- **My own data:** a logo provider with a publishable key in `site/config.js`:
+  - **logo.dev** (`img.logo.dev/{domain}?token=pk_…`): free plan; **no attribution for personal projects**, but
+    commercial projects on the free plan must show a visible "Logos provided by Logo.dev" link.
+  - **Brandfetch** (`cdn.brandfetch.io/{domain}?c=…`): free tier, **no attribution**, but logos must be hotlinked
+    (not stored/cached) and requests must send the site's origin as referrer.
+  - Neither is enabled by default (empty keys) — decide before relying on one. Fallback: Google favicons (`sz=256`),
+    then a generated initials logo. The Companies sheet's Website/Logo override the guess.
+- Google returns a 16px globe for unknown domains, so ≤16px counts as "no logo". Favicons can't be embedded in the
+  offline export (no CORS); the demo's SVGs can.
 
 ## 5. Profile pictures
 
@@ -119,18 +140,24 @@ instantly**, with nothing to install and no sign-up.
 - **School connections:** people link to their school node(s) with an edge, like company membership (solid for a
   current school, dotted for a past one). School edges are drawn but don't pull on the layout; they're part of
   highlight-on-click and paths.
-- View tabs at the top of the right pane: **Map | Calendar | To-Do** now, **People** added with the tracker (see E/F).
-  The sidebar stays.
+- View tabs at the top of the right pane: **Map | Calendar | To-Do | LinkedIn pool**, **People** added with the
+  tracker (see E/F). The sidebar stays.
+- **No-connection targets** sit on a ring just outside the outermost group (evenly spread in the widest gaps, capped
+  distance) in both Free and Ring, so "Fit" keeps the network large.
+- **Modals:** a click on the backdrop or Esc closes; with unsaved edits it asks "Discard changes?" first.
+- **Week view** has a time axis (hourly rows; opens at 8 AM; scroll for earlier/later), meetings placed by start time
+  with height = duration, an "All day / Due" row for tasks, a red "now" line, click an empty slot to schedule, drag a
+  meeting to move it. Every meeting has "Add to Google Calendar", "Add to Outlook" and "Download .ics".
 
-## D. Work history and schools
+## D. Work history and schools (1, 2, 6 ✅; 3–5 pending)
 
 LinkedIn's `Connections.csv` only has the **current** company and title and **no school**. The full archive's
 `Positions.csv` and `Education.csv` are **my own** history only.
 
-1. **Past Companies** (multiple, e.g. "Northwind Consulting (2019–2021); Summit Airlines"), edited with type-ahead
+1. ✅ **Past Companies** (multiple, e.g. "Northwind Consulting (2019–2021); Summit Airlines"), edited with type-ahead
    and optional years. Past employers link to that company's node with the faint dotted alumni edge.
    Target cards and best-path logic count alumni: "Alumni: Liam Walsh (2019–21)", ranked below current employees.
-2. **Schools** (multiple, with years, e.g. "BYU (2022–2026); Lakeview High"). Replaces the single School column
+2. ✅ **Schools** (multiple, with years, e.g. "BYU (2022–2026); Lakeview High"). Replaces the single School column
    (migrated automatically). Everyone sharing a school joins that school's group (using org aliases).
 3. **LinkedIn re-import:** a changed company moves the old company/position into Past Companies.
 4. **Optional import of my own `Positions.csv` and `Education.csv`:** sets MY past employers and schools. People who
@@ -200,7 +227,7 @@ returning as Growth Associate | BYU; 11 mutual connections (Casey, Morgan) | Pro
    task for the next day.
 5. If the person has no email, warn me and let me type one; save it to their row.
 
-## H. Calendar connections (optional sign-in, still no server)
+## H. Calendar connections (optional sign-in, still no server) ✅ built — needs client IDs to try for real
 
 1. The prefilled links in G stay the default (no sign-in).
 2. **"Connect Google Calendar"** (Google Identity Services token client, `calendar.events` scope, Calendar API from the
@@ -216,6 +243,10 @@ returning as Growth Associate | BYU; 11 mutual connections (Casey, Morgan) | Pro
 7. **Zoom API** (auto-created Zoom meetings) needs a server secret, so it's **not built**; list it under Roadmap in the README.
 
 ## I. Demo data shows everything off
+
+- **Demo dates are always fresh:** every date (meetings, tasks, connected on) is stored as an offset from a base date
+  and shifted to today when the demo loads (and on "Reset demo"). There's always something due today, 1–2 overdue, a
+  meeting tomorrow, more this week and next, and done items in the past (tested for several dates).
 
 Realistic tracker rows; real company/school logos and AI-generated headshots; past companies and schools with alumni links;
 6 targets (some with no connections: Apple, Nike); meetings spread across this month and next; open, overdue and done
@@ -236,21 +267,17 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
 
 ## Phases (commit locally after each; screenshots after each)
 
-1. ✅ App skeleton: full-screen layout, graph paper, demo by default, SheetJS open/save, backups, conflict reload,
-   migration, JS tests *(8a6afe5)*
-1b. ✅ Map readability (A) + Add target (C) + first pictures pass *(f9b85e2)*
-2. ✅ Pictures (B, revised): real companies/schools with real logos, DiceBear fallback, attribution *(2edc770)*
-2b. ✅ School edges; Stanford replaces BYU in the demo; AI-generated demo headshots (SFHQ, MIT); page footer note
-   removed (credits only in ATTRIBUTION.md + README); phases reordered
-3. ✅ **To-Do + Calendar + meetings + invites (F views/meetings log/tasks, G)** using the current People fields
-   (tracker-only fields come in Phase 5): Map | Calendar | To-Do tabs; Meetings and Tasks sheets; automatic tasks;
-   Schedule meeting with my Zoom link and the invite options (Google/Outlook links, Gmail/mailto draft, .ics);
-   Settings (my name, email, default length, Zoom link). Also: photos only from upload/link, and the **person popover
-   card** (section 6) with inline editing. Automatic Next Steps and Keep-In-Contact tasks arrive with the tracker
-   fields in Phase 5.
-4. **LinkedIn import + lookup Add/Edit person + work history and schools (D)**: pool import, past companies and
-   schools with alumni edges, pool suggestions with one-click add, intro report download
+1. ✅ App skeleton *(8a6afe5)* · 1b. ✅ Readability + Add target *(f9b85e2)* · 2. ✅ Pictures *(2edc770)* ·
+   2b. ✅ School edges, Stanford, AI headshots *(1b4c1a2)*
+3. ✅ To-Do + Calendar + meetings + invites, person popover card, Gravatar removed *(ce61e04)*
+3b. ✅ **Fixes + features:** always-fresh demo dates; modals close on backdrop/Esc with "Discard changes?"; week view
+   with times, drag to move, click a slot to book; **calendar connections (H)** + add-to-calendar on every meeting;
+   no-connection targets on a capped outer ring; **LinkedIn pool** tab; crisp repo logos + logo.dev/Brandfetch support;
+   **one "+ Add person" box** (name / LinkedIn link / profile PDF) with a review card; Schools + Past Companies +
+   alumni links (D.1, D.2, D.6)
+4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
+   `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
-6. **Google/Outlook calendar connections (H)**
+6. **Calendar connections, verified for real** (create the Google/Azure client IDs per docs/CALENDAR_SETUP.md and test)
 7. **Polish + deploy:** saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with
    live link + GIF, demo polish (I)

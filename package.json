@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@dicebear/core": "9.4.3",
-    "@dicebear/notionists": "9.4.2"
+    "@dicebear/notionists": "9.4.2",
+    "simple-icons": "16.33.0"
   }
 }

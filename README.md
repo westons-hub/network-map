@@ -26,10 +26,13 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Target companies:** add them with "+ Add target" (type-ahead over your companies, plus Priority and Stage). Every target is its own red-ringed node. Click one to see **your best way in** (for example Me → Liam → Zoe) drawn in red on the map, preferring the contacts you're warmest with.
 - **Highlight on click:** a person, group or target lights up with its connections while everything else fades. Hovering previews the same thing.
 - **Free or Ring layout:** physics with well-separated clusters, or a tidy ring with groups around you and no-connection targets on the outer edge.
-- **Logos and photos:** companies and schools show their real logo, loaded from their website's icon (only the domain is sent, never contact data; set a Website in the Companies sheet to override the guess). People get a photo you upload or link (resized in your browser and saved in your workbook), or illustrated avatars drawn locally with [DiceBear](https://www.dicebear.com) (CC0 "Notionists" style).
+- **One "+ Add person" box** (or press **N**): type a name (type-ahead over your LinkedIn connections), paste their LinkedIn link, or drop the PDF LinkedIn makes from their profile (**More → Save to PDF**) to fill in their whole work history and schools. A short review card highlights the things only you know. The app never contacts LinkedIn; the PDF is read on your computer.
+- **LinkedIn pool:** import `Connections.csv` once. Everyone is searchable and filterable, and nobody lands on the map until you add them (one at a time, selected, or "everyone at Apple"). Re-importing never creates duplicates.
+- **Work history:** multiple schools with years, past companies, and faint dotted "alumni" links, which also count as a way into a target.
+- **Logos and photos:** crisp vector logos in the demo; for your own companies, logos from their website icon or, with a free key, logo.dev / Brandfetch. People get a photo you upload or link (resized in your browser and saved in your workbook), or illustrated avatars drawn locally with [DiceBear](https://www.dicebear.com) (CC0 "Notionists" style).
 - **Status colors:** each person's ring shows To Reach Out, Contacted, Scheduled, Met, Follow Up or Referral.
 - **Person cards:** click anyone and a card opens right next to them: photo, status (click to change), LinkedIn, email + copy, what's next, the latest meeting, and every field editable in place (click, type, Enter). Groups and targets get a smaller card with your best way in.
-- **Meetings, invites, calendar and to-dos:** schedule or log a meeting from a card or the calendar. Your Zoom link is filled in, the person's status updates, and a "send thank-you" task is added. Send the invite through Google Calendar, Outlook, a Gmail draft, your mail app or an `.ics` file. Network Map never sends anything itself; you always click send. The Calendar tab (month/week) and To-Do tab (Overdue / Today / This week / Later) keep you on track.
+- **Meetings, invites, calendar and to-dos:** schedule or log a meeting from a card or the calendar. Your Zoom link is filled in, the person's status updates, and a "send thank-you" task is added. Send the invite through Google Calendar, Outlook, a Gmail draft, your mail app or an `.ics` file. Network Map never sends anything itself; you always click send. The Calendar tab has a month view and a week view with times (drag a meeting to move it, click an empty slot to book one), and the To-Do tab (Overdue / Today / This week / Later) keeps you on track. Optionally connect Google Calendar or Outlook to sync meetings, send invites automatically and see your own events ([setup](docs/CALENDAR_SETUP.md)).
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
@@ -80,7 +83,7 @@ npm test             # node --test, no install needed (Node 22+)
 
 ## Privacy
 
-Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos (Google's favicon service sees the company's domain, e.g. `deloitte.com`); the demo loads just the logos of its listed companies. Invites open in Google Calendar, Outlook or Gmail only when you click them. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
+Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos for your own data (the logo service sees the company's domain, e.g. `deloitte.com`; the demo's logos are stored in the site). LinkedIn profile PDFs are read in your browser. Invites open in Google Calendar, Outlook or Gmail only when you click them, and a calendar connection is optional: sign-in stays in your browser tab and only the meetings you create are sent. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
 
 ## License
 
@@ -88,8 +91,9 @@ MIT.
 
 ## Credits
 
-- [vis-network](https://github.com/visjs/vis-network) (MIT), [SheetJS Community Edition](https://sheetjs.com) (Apache 2.0), [DiceBear](https://www.dicebear.com) (MIT; "Notionists" avatar design by Zoish, CC0).
+- [vis-network](https://github.com/visjs/vis-network) (MIT), [SheetJS Community Edition](https://sheetjs.com) (Apache 2.0), [pdf.js](https://mozilla.github.io/pdf.js/) (Apache 2.0), [MSAL.js](https://github.com/AzureAD/microsoft-authentication-library-for-js) (MIT), [DiceBear](https://www.dicebear.com) (MIT; "Notionists" avatar design by Zoish, CC0).
+- Demo logos: [Simple Icons](https://simpleicons.org) (CC0) and public-domain Wikimedia Commons files (sources in `site/demo/logos/SOURCES.md`).
 - Demo headshots: AI-generated faces from the [SFHQ dataset](https://github.com/SelfishGene/SFHQ-dataset) by David Beniaguev (MIT). The demo people are fictional.
-- Company names and logos are trademarks of their owners. Logos are loaded from Google's favicon service and aren't stored in this repo.
+- Company names and logos are trademarks of their owners.
 
 Details and license texts: [`site/vendor/ATTRIBUTION.md`](site/vendor/ATTRIBUTION.md).

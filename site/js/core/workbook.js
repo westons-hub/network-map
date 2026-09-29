@@ -15,12 +15,12 @@ export const SHEETS = { people: "People", targets: "Targets", companies: "Compan
                         meetings: "Meetings", tasks: "Tasks", layout: "Layout", settings: "Settings" };
 
 // [column header, model field]. Headers are matched case-insensitively.
-export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["School", "school"], ["Role", "role"],
+export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["Schools", "school"], ["Role", "role"],
   ["Email", "email"], ["LinkedIn URL", "linkedinUrl"], ["Photo", "photo"],
   ["Connected Through", "connectedThrough"], ["Connected On", "connectedOn"], ["Status", "status"],
-  ["Tags", "tags"], ["Notes", "notes"]];
+  ["Tags", "tags"], ["Notes", "notes"], ["Past Companies", "pastCompanies"]];
 const PEOPLE_ALIASES = { "email address": "email", "url": "linkedinUrl", "linkedin": "linkedinUrl",
-                         "title": "role", "position": "role" };
+                         "title": "role", "position": "role", "school": "school", "past company": "pastCompanies" };
 export const TARGET_COLUMNS = [["Company", "company"], ["Priority", "priority"], ["Stage", "stage"], ["Notes", "notes"]];
 export const COMPANY_COLUMNS = [["Company", "company"], ["Website", "website"], ["Logo", "logo"]];
 export const STAGES = ["Researching", "Networking", "Applied", "Interviewing", "Offer"];
@@ -201,7 +201,7 @@ export function writeWorkbook(model, base) {
   const sheets = {
     [SHEETS.people]: sheetFrom(tableRows(model.people, PEOPLE_COLUMNS, p => PEOPLE_COLUMNS.map(([, f]) =>
       f === "tags" ? p.tags.join(", ") : f === "connectedOn" ? dateCell(p.connectedOn) : p[f] ?? "")),
-      [22, 24, 24, 24, 28, 36, 14, 22, 14, 14, 20, 40]),
+      [22, 24, 30, 24, 28, 36, 14, 22, 14, 14, 20, 40, 36]),
     [SHEETS.targets]: sheetFrom(tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
       [28, 10, 14, 40]),
     [SHEETS.companies]: sheetFrom(tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),

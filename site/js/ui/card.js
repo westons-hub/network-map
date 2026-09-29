@@ -1,6 +1,7 @@
 // The popover card that opens next to a clicked node. It follows the node when the map pans
 // or zooms, flips sides to stay on screen, and never covers the node. On phones it's a bottom sheet.
 
+import { entryNames } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES, personKey, poolName } from "../core/people.js";
 import { meetingDate, meetingsFor, tasksFor, todayIso, toDate } from "../core/schedule.js";
@@ -126,7 +127,7 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
                       label: opts.label ?? field, ...opts });
 
     const companies = unique([...model.people.map(x => x.company), ...model.pool.map(e => e.company)]);
-    const schools = unique(model.people.map(x => x.school));
+    const schools = unique(model.people.flatMap(x => entryNames(x.school)));
     const names = unique(model.people.map(x => x.name).filter(n => normalizeName(n) !== key));
 
     // Header: photo, name, role @ company, status pill.
@@ -207,7 +208,9 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
     const md = meetingDate(model, p.name);
     info.append(
       row("Email", edit("email", { type: "email", placeholder: "Add email" })),
-      row("School", edit("school", { suggestions: schools, placeholder: "Add school" })),
+      row("Schools", edit("school", { suggestions: schools, placeholder: "Add school(s)", label: "schools" })),
+      row("Past companies", edit("pastCompanies", { suggestions: companies, placeholder: "e.g. Deloitte (2019–2021)",
+                                                     label: "past companies" })),
       row("Connected via", placeholder ? el("span", "—") : inlineField({ value: p.connectedThrough, suggestions: names,
         label: "connected through", placeholder: "You know them directly",
         display: v => v ? el("button", v, { class: "linklike", type: "button", onclick: () => handlers.focus(personId(v)) }) : "",
@@ -263,8 +266,9 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
           chain.append(i === 0 ? el("span", name, { class: "step me" })
             : el("button", name, { class: "step", type: "button", onclick: () => handlers.focus(personId(name)) }));
         });
-        card.append(section("Your best way in", chain,
-          el("div", path.names.length === 2 ? `You know ${path.person} directly.` : `Ask ${path.ask} for an intro.`, { class: "small" })));
+        const how = path.alumni ? `${path.person} used to work here${path.names.length === 2 ? "" : `; ask ${path.ask} for an intro`}.`
+          : path.names.length === 2 ? `You know ${path.person} directly.` : `Ask ${path.ask} for an intro.`;
+        card.append(section("Your best way in", chain, el("div", how, { class: "small" })));
       } else {
         card.append(section(null, el("p", "No connections yet. Add a contact here, or ask your groups who they know.",
                                       { class: "empty-state" })));
@@ -273,6 +277,8 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
     }
 
     const people = t ? [...t.direct, ...t.second] : graph.groups[node.id] ?? [];
+    const alumni = t?.alumni ?? graph.edges.filter(e => e.from === node.id && e.kind === "alumni")
+      .map(e => ({ name: graph.nodes.find(n => n.id === e.to)?.label, years: e.years })).filter(a => a.name);
     if (people.length) {
       const list = el("div", undefined, { class: "people-chips" });
       for (const name of people) {
@@ -283,6 +289,14 @@ export function createCard({ container, map, getCtx, handlers, avoid = () => [] 
         list.append(chip);
       }
       card.append(section(t ? "People you know there" : "People in this group", list));
+    }
+    if (alumni.length) {
+      const list = el("div", undefined, { class: "people-chips" });
+      for (const a of alumni) {
+        list.append(el("button", `${a.name}${a.years ? ` (${a.years})` : ""}`, { class: "person-chip alumni", type: "button",
+                                                                               onclick: () => handlers.focus(personId(a.name)) }));
+      }
+      card.append(section("Alumni", list));
     }
     if (t) {
       const onMap = new Set(model.people.map(p => normalizeName(p.name)));

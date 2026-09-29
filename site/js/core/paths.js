@@ -1,6 +1,7 @@
 // Turn "who can intro me?" answers into things the map can draw: the nodes and
 // edges along your best path to a target, and a node's neighborhood for highlighting.
 
+import { parseEntries } from "./history.js";
 import { whoCanIntro } from "./intro.js";
 import { normalizeName, normalizeOrg } from "./org.js";
 
@@ -20,7 +21,8 @@ export function bestPath(graph, people, target, me) {
   const best = whoCanIntro(people, target.label ?? target.company ?? target, me)
     .filter(p => p.person.company && normalizeOrg(p.person.company) === key)
     .sort((a, b) => a.degree - b.degree
-                    || warmth(byKey.get(normalizeName(a.ask))?.status) - warmth(byKey.get(normalizeName(b.ask))?.status))[0];
+                    || warmth(byKey.get(normalizeName(a.ask))?.status) - warmth(byKey.get(normalizeName(b.ask))?.status))[0]
+    ?? alumniPath(people, key, me, byKey);
   if (!best) return null;
 
   const focus = graph.targets.find(t => t.key === key)?.focus;
@@ -47,7 +49,16 @@ export function bestPath(graph, people, target, me) {
     if (e) edges.push(edgeId(e));
     nodes.push(focus);
   }
-  return { names: [me, ...best.chain], ask: best.ask, person: best.person.name, nodes, edges };
+  return { names: [me, ...best.chain], ask: best.ask, person: best.person.name, nodes, edges, alumni: !!best.alumni };
+}
+
+/** Nobody works there now: the best path to someone who used to (ranked below current employees). */
+function alumniPath(people, key, me, byKey) {
+  const candidates = people.filter(p => parseEntries(p.pastCompanies).some(e => normalizeOrg(e.name) === key));
+  return candidates.flatMap(p => whoCanIntro(people, p.name, me).filter(x => x.person === p))
+    .sort((a, b) => a.degree - b.degree
+                    || warmth(byKey.get(normalizeName(a.ask))?.status) - warmth(byKey.get(normalizeName(b.ask))?.status))
+    .map(x => ({ ...x, alumni: true }))[0];
 }
 
 /** A node plus everything one edge away (including secondary "also" links). */

@@ -14,6 +14,7 @@
 //   minGroupSize; 2nd-degree people there get a secondary ("also") link to it.
 //   A target with nobody on the map is a "gap" node.
 
+import { parseEntries } from "./history.js";
 import { normalizeName, normalizeOrg } from "./org.js";
 import { makePerson, personKey } from "./people.js";
 
@@ -21,15 +22,20 @@ export const MIN_GROUP_SIZE = 3;
 
 const asTarget = t => (typeof t === "string" ? { company: t } : t);
 
+/** A person's schools: the Schools cell can hold several ("BYU (2022–2026); Lakeview High"). */
+export const schoolsOf = p => parseEntries(p.school).map(e => e.name);
+const valuesOf = (p, attr) => (attr === "school" ? schoolsOf(p) : p[attr] ? [p[attr]] : []);
+
 /** Pick the most common original spelling as the label for each normalized org. */
 function displayNames(people, attr) {
   const spellings = new Map();
   for (const p of people) {
-    if (!p[attr]) continue;
-    const key = normalizeOrg(p[attr]);
-    const counts = spellings.get(key) ?? new Map();
-    counts.set(p[attr], (counts.get(p[attr]) ?? 0) + 1);
-    spellings.set(key, counts);
+    for (const value of valuesOf(p, attr)) {
+      const key = normalizeOrg(value);
+      const counts = spellings.get(key) ?? new Map();
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+      spellings.set(key, counts);
+    }
   }
   const out = {};
   for (const [key, counts] of spellings) {
@@ -79,7 +85,9 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
   };
   for (const p of direct) {
     if (groupBy.includes("company") && p.company) add("company", normalizeOrg(p.company), p);
-    if (groupBy.includes("school") && p.school) add("school", normalizeOrg(p.school), p);
+    if (groupBy.includes("school")) {
+      for (const key of new Set(schoolsOf(p).map(normalizeOrg))) if (key) add("school", key, p);
+    }
     if (groupBy.includes("tags")) for (const t of p.tags) add("tag", t.toLowerCase(), p);
   }
 
@@ -117,15 +125,19 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
       groupIds.set(`company|${key}`, id); // people there attach to the target like a group
       g.groups[id] = directAt;
     }
-    g.targets.push({ label: t.company, key, focus: id, direct: directAt, second: secondAt,
+    // Alumni: people who used to work there (ranked below current employees).
+    const alumni = [...byKey.values()].flatMap(p => parseEntries(p.pastCompanies)
+      .filter(e => normalizeOrg(e.name) === key && normalizeOrg(p.company) !== key).map(e => ({ name: p.name, years: e.years })))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    g.targets.push({ label: t.company, key, focus: id, direct: directAt, second: secondAt, alumni,
                      priority: t.priority ?? "", stage: t.stage ?? "", notes: t.notes ?? "" });
   }
 
   const memberships = p => {
     const out = [];
-    for (const [kind, value] of [["company", p.company], ["school", p.school]]) {
+    for (const [kind, value] of [["company", p.company], ...schoolsOf(p).map(s => ["school", s])]) {
       const gid = value && groupIds.get(`${kind}|${normalizeOrg(value)}`);
-      if (gid) out.push(gid);
+      if (gid && !out.includes(gid)) out.push(gid);
     }
     for (const t of p.tags) {
       const gid = groupIds.get(`tag|${t.toLowerCase()}`);
@@ -138,7 +150,7 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
   const personNode = (p, kind) => ({
     id: `p:${personKey(p)}`, label: p.name, kind, company: p.company, school: p.school, role: p.role,
     email: p.email, status: p.status, tags: p.tags, notes: p.notes, url: p.linkedinUrl, photo: p.photo,
-    connectedOn: p.connectedOn, via: p.connectedThrough, source: p.source,
+    connectedOn: p.connectedOn, via: p.connectedThrough, source: p.source, pastCompanies: p.pastCompanies ?? "",
     atTarget: targetKeys.has(normalizeOrg(p.company)),
   });
 
@@ -159,6 +171,18 @@ export function buildGraph(people, { me = "Me", minGroupSize = MIN_GROUP_SIZE,
     g.nodes.push(personNode(p, "second"));
     g.edges.push({ from: `p:${normalizeName(p.connectedThrough)}`, to: `p:${personKey(p)}`, kind: "intro" });
     for (const gid of memberships(p)) g.edges.push({ from: gid, to: `p:${personKey(p)}`, kind: "also" });
+  }
+
+  // ---- alumni: past employers link to that company's bubble with a faint dotted line ----------------
+  for (const p of byKey.values()) {
+    const own = new Set(memberships(p));
+    for (const e of parseEntries(p.pastCompanies)) {
+      const gid = groupIds.get(`company|${normalizeOrg(e.name)}`);
+      if (gid && !own.has(gid)) {
+        own.add(gid);
+        g.edges.push({ from: gid, to: `p:${personKey(p)}`, kind: "alumni", years: e.years });
+      }
+    }
   }
 
   g.stats = graphStats(g);

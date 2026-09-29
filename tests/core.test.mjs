@@ -33,8 +33,8 @@ test("parseList splits on commas, semicolons and newlines", () => {
 
 test("LinkedIn export skips the Notes header and keeps every column", () => {
   const pool = parseLinkedInCsv(readFileSync(new URL("sample_linkedin_connections.csv", DEMO), "utf8"));
-  assert.equal(pool.length, 7);
-  assert.deepEqual(pool[0], { firstName: "Jordan", lastName: "Lee", url: "https://example.com/in/jordan-lee",
+  assert.equal(pool.length, 26);
+  assert.deepEqual(pool[0], { firstName: "Jordan", lastName: "Lee", url: "https://www.linkedin.com/in/jordan-lee-3f9a21",
     email: "", company: "Deloitte", position: "Senior Consultant", connectedOn: "2026-03-12" });
 });
 
@@ -130,7 +130,7 @@ test("demo workbook builds: only the people you added are on the map", () => {
     ["company:deloitte", "target:apple", "target:delta air lines", "target:goldman sachs", "target:nike", "target:qualtrics"]);
   assert.equal(m.avatarStyle, "notionists");
   assert.equal(g.nodes.find(n => n.id === "school:stanford").label, "Stanford University");
-  assert.equal(m.pool.length, 7); // LinkedIn connections stay in the pool, off the map
+  assert.equal(m.pool.length, 26); // LinkedIn connections stay in the pool, off the map
 });
 
 // ---- targets -------------------------------------------------------------------
@@ -152,7 +152,7 @@ test("target groups are flagged, aliases match, duplicates ignored, people never
   assert.equal(byId["p:d"].target, undefined);
   assert.equal(byId["p:d"].atTarget, true);
   assert.deepEqual(g.targets, [{ label: "EY", key: "ernst young", focus: "company:ernst young", direct: ["A", "B", "C"],
-                                 second: ["D"], priority: "", stage: "", notes: "" }]);
+                                 second: ["D"], alumni: [], priority: "", stage: "", notes: "" }]);
   assert.ok(!g.nodes.some(n => n.kind === "target"));
 });
 
@@ -205,4 +205,37 @@ test("intro report lists who to ask and the gaps", () => {
   assert.match(text, /ask \*\*Noah Carter\*\* \(your status with them: Met\)/);
   assert.match(text, /Noah Carter, Commercial Strategy Analyst at Delta Air Lines\*\* \[Met\]: you know them directly\./);
   assert.match(text, /Targets with no one on your map: Nike/);
+});
+
+// ---- schools & past companies ------------------------------------------------------
+
+test("Schools can hold several entries with years, and everyone sharing one joins its group", async () => {
+  const { parseEntries, formatEntries, addEntry } = await import("../site/js/core/history.js");
+  assert.deepEqual(parseEntries("BYU (2022 - 2026); Lakeview High\nStanford (2027)"),
+    [{ name: "BYU", years: "2022–2026" }, { name: "Lakeview High", years: "" }, { name: "Stanford", years: "2027" }]);
+  assert.equal(formatEntries(parseEntries("A (2019–2021);B")), "A (2019–2021); B");
+  assert.equal(addEntry("A (2019–2021)", { name: "a", years: "" }), "A (2019–2021)");
+  const g = buildGraph([P("A", { school: "BYU (2020–2024); Lakeview High" }), P("B", { school: "Brigham Young University" }),
+                        P("C", { school: "Lakeview High; BYU" }), P("D", { school: "Lakeview High" })]);
+  assert.deepEqual([...ids(g, "school")].sort(), ["school:brigham young university", "school:lakeview high"]);
+  assert.equal(g.nodes.find(n => n.id === "school:brigham young university").count, 3);
+});
+
+test("past employers get a dotted alumni link, count on targets, and give a path when nobody works there now", async () => {
+  const { bestPath } = await import("../site/js/core/paths.js");
+  const people = [P("Liam", { company: "Startup", pastCompanies: "Delta (2019–2021); Other Co" }), P("Kim", { company: "Delta" }),
+                  P("Ann", { pastCompanies: "Nike (2018–2020)" })];
+  const g = buildGraph(people, { targets: ["Delta", "Nike"] });
+  assert.ok(edges(g).has("target:delta>p:liam>alumni"));
+  assert.ok(edges(g).has("target:nike>p:ann>alumni"));
+  assert.deepEqual(g.targets.find(t => t.label === "Delta").alumni, [{ name: "Liam", years: "2019–2021" }]);
+  assert.equal(bestPath(g, people, g.targets.find(t => t.label === "Delta"), "Me").person, "Kim"); // current beats alumni
+  const viaAlumni = bestPath(g, people, g.targets.find(t => t.label === "Nike"), "Me");
+  assert.deepEqual([viaAlumni.person, viaAlumni.alumni], ["Ann", true]);
+  assert.ok(viaAlumni.edges.includes("target:nike>p:ann>alumni"));
+});
+
+test("notes keep their line breaks (other fields are tidied to one line)", () => {
+  const p = P("  Ana  ", { notes: "Line one  \r\n  Line   two\n\n", role: "PM\nLead" });
+  assert.deepEqual([p.name, p.notes, p.role], ["Ana", "Line one\nLine two", "PM Lead"]);
 });

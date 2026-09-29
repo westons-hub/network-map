@@ -222,7 +222,10 @@ export function icsFile(meeting, { me, myEmail, email, message }, now = new Date
 
 // ---- demo ------------------------------------------------------------------------------------
 
-/** Keep the demo's meetings and tasks around today: shift every date by (today - base date). */
+/**
+ * Keep the demo current: every date in it is stored relative to its "Demo base date", so shift them all by
+ * (today - base date) — meetings, tasks, and Connected On for people and the LinkedIn pool.
+ */
 export function shiftDemoDates(model, today = todayIso()) {
   const base = model.settings?.demoBaseDate;
   if (!isDate(base)) return model;
@@ -232,6 +235,8 @@ export function shiftDemoDates(model, today = todayIso()) {
   return {
     ...model,
     settings: { ...model.settings, demoBaseDate: today },
+    people: model.people.map(p => ({ ...p, connectedOn: shift(p.connectedOn) })),
+    pool: model.pool.map(e => ({ ...e, connectedOn: shift(e.connectedOn) })),
     meetings: model.meetings.map(m => ({ ...m, date: shift(m.date) })),
     tasks: model.tasks.map(t => ({ ...t, due: shift(t.due), created: shift(t.created) })),
   };

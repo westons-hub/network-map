@@ -2,8 +2,8 @@
 //   node scripts/make_demo.mjs
 // The people (names, emails, relationships) are fictional. Their headshots in site/demo/photos are
 // AI-generated faces of people who don't exist (SFHQ dataset, MIT license; see site/vendor/ATTRIBUTION.md).
-// The companies and schools are real, well-known organizations so the demo shows real logos; logos are
-// loaded at runtime from each organization's domain (listed below), never stored in the repo.
+// The companies and schools are real, well-known organizations so the demo shows real logos: crisp SVGs in
+// site/demo/logos (Simple Icons CC0 + public-domain Commons files; see SOURCES.md there).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -52,13 +52,16 @@ const TARGETS = [
 
 // Explicit logo domains for every organization in the demo (the demo never guesses domains).
 const COMPANIES = [
-  ["Deloitte", "deloitte.com"], ["Delta Air Lines", "delta.com"], ["Goldman Sachs", "goldmansachs.com"],
-  ["Qualtrics", "qualtrics.com"], ["Microsoft", "microsoft.com"], ["Google", "google.com"], ["Adobe", "adobe.com"],
-  ["Apple", "apple.com"], ["Nike", "nike.com"], ["Stanford University", "stanford.edu"],
-  ["University of Utah", "admissions.utah.edu"], // utah.edu itself has no favicon
+  ["Deloitte", "deloitte.com", "deloitte"], ["Delta Air Lines", "delta.com", "delta"],
+  ["Goldman Sachs", "goldmansachs.com", "goldman-sachs"], ["Qualtrics", "qualtrics.com", "qualtrics"],
+  ["Microsoft", "microsoft.com", "microsoft"], ["Google", "google.com", "google"], ["Adobe", "adobe.com", "adobe"],
+  ["Apple", "apple.com", "apple"], ["Nike", "nike.com", "nike"], ["Stanford University", "stanford.edu", "stanford"],
+  ["University of Utah", "admissions.utah.edu", "university-of-utah"], // utah.edu itself has no favicon
 ];
 
-// Meetings and tasks, in days relative to BASE (the app shifts them so the demo always looks current).
+// Every demo date is an offset from BASE; when the demo loads, the app shifts all of them by (today - BASE), so
+// there's always something due today, a couple of overdue tasks, a meeting tomorrow, more this week and next,
+// and finished items in the past. Connected On dates move the same way.
 const BASE = "2026-09-28";
 // [person, days from BASE, start, minutes, type, method, notes, next step]
 const MEETINGS = [
@@ -67,7 +70,7 @@ const MEETINGS = [
   ["Jordan Lee", -12, "16:30", 30, "Informational", "Zoom", "Walked through case interview prep and the strategy practice.", "Send resume for review"],
   ["Noah Carter", -5, "09:00", 30, "Informational", "Phone", "Delta's commercial strategy team; APM-style rotation.", "Apply to the fall rotation"],
   ["Daniel Ortiz", -2, "15:00", 30, "Coffee Chat", "Zoom", "Goldman strategy group; offered to connect me with Ben.", "Send thank-you"],
-  ["Priya Shah", 2, "10:00", 30, "Coffee Chat", "Zoom", "", ""],
+  ["Priya Shah", 1, "10:00", 30, "Coffee Chat", "Zoom", "", ""],
   ["Grace Owens", 6, "13:30", 30, "Interview", "Teams", "Recruiter screen for the Delta internship.", ""],
   ["Mia Chen", 12, "11:00", 30, "Coffee Chat", "Google Meet", "", ""],
   ["Ethan Brooks", 25, "14:00", 30, "Informational", "Zoom", "", ""],
@@ -129,7 +132,8 @@ const fromPool = pool.map(personFromPool).filter(p => onMap.has(p.name));
 const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists",
   people: mergePeople(fromPool, people).map(p => ({ ...p, source: "",
     photo: `demo/photos/${p.name.toLowerCase().replaceAll(" ", "-")}.jpg` })),
-  companies: COMPANIES.map(([company, website]) => ({ company, website, logo: "", extra: {} })),
+  // Crisp vector logos stored in the repo (see site/demo/logos/SOURCES.md); the Website stays as a fallback.
+  companies: COMPANIES.map(([company, website, logo]) => ({ company, website, logo: `demo/logos/${logo}.svg`, extra: {} })),
   targets: TARGETS.map(([company, priority, stage, notes]) => ({ company, priority, stage, notes, extra: {} })),
   meetings: MEETINGS.map(([person, d, start, min, type, method, notes, nextStep], i) => ({ id: `demo-m${i + 1}`, person,
     date: day(d), start, end: plus(start, min), type, method, notes, nextStep, eventId: "",

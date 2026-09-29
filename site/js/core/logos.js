@@ -66,11 +66,24 @@ export function guessDomain(name, website = "") {
   return slug(words) ? `${slug(words)}.com` : "";
 }
 
-// Where logos come from. Swap in another service here (logo.dev and Brandfetch need API keys).
+// Where logos come from. logo.dev and Brandfetch need a publishable key (set in site/config.js);
+// without one, Google's favicon service is used (smaller icons, but no key).
 export const LOGO_SOURCES = {
-  google: domain => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+  google: domain => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=256`,
+  "logo.dev": (domain, cfg) =>
+    `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(cfg.logoDevKey)}&size=256&format=png&retina=true`,
+  brandfetch: (domain, cfg) =>
+    `https://cdn.brandfetch.io/${encodeURIComponent(domain)}/w/256/h/256?c=${encodeURIComponent(cfg.brandfetchClientId)}`,
 };
-export const logoUrl = (domain, source = "google") => (domain ? LOGO_SOURCES[source](domain) : "");
+
+/** Which source to use for a config: a provider only counts if its key is filled in. */
+export function logoSource(cfg = {}) {
+  if (cfg.provider === "logo.dev" && cfg.logoDevKey) return "logo.dev";
+  if (cfg.provider === "brandfetch" && cfg.brandfetchClientId) return "brandfetch";
+  return "google";
+}
+
+export const logoUrl = (domain, cfg = {}) => (domain ? LOGO_SOURCES[logoSource(cfg)](domain, cfg) : "");
 
 /** Google answers unknown domains with a 16px globe, so tiny images mean "no logo". */
 export const isRealLogo = naturalWidth => naturalWidth > 16;

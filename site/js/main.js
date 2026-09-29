@@ -21,6 +21,10 @@ import { createImages } from "./ui/images.js";
 import { createMap } from "./ui/map.js";
 import { el, renderOverview, renderTargets } from "./ui/panels.js";
 import { createTodo } from "./ui/todo.js";
+import * as calendars from "./store/calendars.js";
+import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
+import { isPdf } from "./ui/pdf.js";
+import { createPoolView } from "./ui/poolView.js";
 
 const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
@@ -67,7 +71,7 @@ const card = createCard({
     removePerson,
     scheduleMeeting: opts => editMeeting(null, opts),
     editMeeting: m => editMeeting(m),
-    inviteMeeting: m => inviteDialog({ model: state.doc.model, meeting: m, download: files.download }),
+    inviteMeeting: m => meetingActions(m),
     addTask: opts => editTask(null, opts),
     toggleTask,
     editTarget,
@@ -81,17 +85,122 @@ const card = createCard({
 
 const calendar = createCalendar($("calendar-view"), {
   getModel: () => state.doc.model,
+  getExternal: (from, to) => externalEvents(from, to),
   onDay: (date, kind) => (kind === "meeting" ? editMeeting(null, { date }) : editTask(null, { date })),
+  onSlot: (date, start) => editMeeting(null, { date, start }),
   onItem: item => {
     if (item.kind === "meeting") {
       const m = state.doc.model.meetings.find(x => x.id === item.id);
-      if (m && personOnMap(m.person)) openPerson(m.person); else if (m) editMeeting(m);
+      if (m) meetingActions(m);
     } else {
       const t = state.doc.model.tasks.find(x => x.id === item.id);
       if (t) editTask(t);
     }
   },
+  onMove: (id, date, start, end) => moveMeeting(id, date, start, end),
 });
+
+const pool = createPoolView($("pool-view"), {
+  getModel: () => state.doc.model,
+  onImport: () => importPool(),
+  onAdd: entry => addPerson({ entry }),
+  onAddMany: entries => addMany(entries),
+  onOpen: name => openPerson(name),
+});
+
+// ---- connected calendar (optional) ------------------------------------------------
+// Your own events are fetched for the range the Calendar shows and drawn muted; they're never saved.
+const external = { key: "", events: [], loading: false };
+function externalEvents(from, to) {
+  if (!calendars.status().provider) return [];
+  const key = `${from}|${to}`;
+  if (external.key !== key && !external.loading) {
+    external.loading = true;
+    calendars.listEvents(from, to)
+      .then(events => { Object.assign(external, { key, events }); if (state.view === "calendar") calendar.render(); })
+      .catch(e => toast(e.message, 7000))
+      .finally(() => { external.loading = false; });
+  }
+  const own = new Set(state.doc.model.meetings.map(m => m.eventId).filter(Boolean));
+  return external.key === key ? external.events.filter(e => !own.has(e.id)) : [];
+}
+calendars.onChange(() => { external.key = ""; renderViews(); });
+
+/** After a meeting is saved: if a calendar is connected, create/update its event there (sends the invite). */
+async function syncToCalendar(meeting) {
+  if (!calendars.status().provider || state.mode === "demo") return false;
+  const model = state.doc.model;
+  const person = model.people.find(p => normalizeName(p.name) === normalizeName(meeting.person));
+  try {
+    const { fillTemplate } = await import("./core/schedule.js");
+    const synced = await calendars.syncMeeting(meeting, { me: model.me, email: person?.email ?? "",
+      message: fillTemplate(model.settings.inviteTemplate, { meeting, me: model.me }) });
+    if (synced && (synced.eventId !== meeting.eventId || synced.link !== meeting.link)) {
+      edit({ type: "upsertMeeting", meeting: { ...meeting, eventId: synced.eventId, link: synced.link ?? meeting.link } });
+    }
+    toast(`Saved to your ${calendars.status().provider === "google" ? "Google Calendar" : "Outlook calendar"}` +
+          (person?.email ? `; ${meeting.person} gets the invite.` : "."));
+    external.key = "";
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast(`Couldn't update your calendar: ${e.message}`, 8000);
+    return false;
+  }
+}
+
+function meetingActions(m) {
+  const provider = calendars.status().provider;
+  const synced = m.eventId && provider && m.eventId.startsWith(`${provider}:`)
+    ? `On your ${provider === "google" ? "Google Calendar" : "Outlook calendar"} (synced).` : "";
+  return inviteDialog({ model: state.doc.model, meeting: m, download: files.download, synced,
+                        onOpen: personOnMap(m.person) ? () => openPerson(m.person) : undefined,
+                        onEdit: () => editMeeting(m) });
+}
+
+function moveMeeting(id, date, start, end) {
+  const m = state.doc.model.meetings.find(x => x.id === id);
+  if (!m) return;
+  const moved = { ...m, date, start, end };
+  edit(meetingOps(state.doc.model, moved).filter(op => op.type !== "upsertTask"));
+  toast(`Moved to ${new Date(`${date}T${start}`).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`);
+  syncToCalendar(moved);
+}
+
+// ---- adding people ------------------------------------------------------------------
+
+async function addPerson({ pdf, entry } = {}) {
+  const result = await addPersonFlow({ model: state.doc.model, demo: state.mode === "demo", pdf, entry });
+  if (!result) return;
+  if (result.open) return openPerson(result.open);
+  const { person, existingKey } = result;
+  edit({ type: "upsertPerson", key: existingKey, person: { ...person, source: person.source || "excel" } });
+  focus(`p:${normalizeName(person.name)}`, { follow: !existingKey });
+  toast(existingKey ? `Updated ${person.name}.` : `Added ${person.name} to your map.`);
+}
+
+function addMany(entries) {
+  const people = peopleFromPool(state.doc.model, entries);
+  if (!people.length) return toast("Everyone selected is already on your map.");
+  edit(people.map(person => ({ type: "upsertPerson", person })));
+  toast(`Added ${people.length} ${people.length === 1 ? "person" : "people"} to your map.`);
+}
+
+async function importPool() {
+  const picked = await files.pickFile();
+  if (!picked) return;
+  if (!/\.csv$/i.test(picked.name)) return toast("Choose the Connections.csv from your LinkedIn data export.");
+  try {
+    const { mergePool } = await import("./core/pool.js");
+    const entries = parseLinkedInCsv(new TextDecoder().decode(picked.bytes), picked.name);
+    const { added, updated } = mergePool(state.doc.model.pool, entries);
+    edit({ type: "mergePool", entries });
+    showView("pool");
+    toast(`Imported ${entries.length} connections: ${added} new, ${updated} updated, no duplicates. They stay off the map until you add them.`, 7000);
+  } catch (e) {
+    toast(e.message, 8000);
+  }
+}
 
 const todo = createTodo($("todo-view"), {
   getModel: () => state.doc.model,
@@ -130,14 +239,16 @@ function renderViews() {
   badge.hidden = !n;
   badge.textContent = String(n);
   badge.title = `${n} overdue or due today`;
+  $("pool-count").textContent = state.doc.model.pool.length ? String(state.doc.model.pool.length) : "";
   if (state.view === "calendar") calendar.render();
   if (state.view === "todo") todo.render();
+  if (state.view === "pool") pool.render();
 }
 
 // Map | Calendar | To-Do tabs (the choice is remembered in this browser).
 const tabs = [...document.querySelectorAll(".view-tabs [data-view]")];
 function showView(view) {
-  state.view = ["map", "calendar", "todo"].includes(view) ? view : "map";
+  state.view = ["map", "calendar", "todo", "pool"].includes(view) ? view : "map";
   setPref(PREFS.view, state.view);
   tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === state.view)));
   for (const v of document.querySelectorAll("#main-pane > .view")) v.hidden = v.dataset.view !== state.view;
@@ -147,10 +258,10 @@ function showView(view) {
 tabs.forEach(t => t.addEventListener("click", () => showView(t.dataset.view)));
 
 /** Select a node on the map, highlight it, and open its card. */
-function focus(id) {
+function focus(id, opts) {
   if (state.view !== "map") showView("map");
   state.selected = id;
-  map.select(id);
+  map.select(id, opts);
   card.open(id);
 }
 
@@ -312,6 +423,10 @@ async function editMeeting(meeting, opts = {}) {
   if (result.action === "delete") {
     edit({ type: "removeMeeting", id: meeting.id });
     toast("Meeting deleted.");
+    if (meeting.eventId && calendars.status().provider && state.mode !== "demo") {
+      calendars.cancelMeeting(meeting).then(() => toast("Canceled on your calendar; they get a cancellation."))
+        .catch(e => toast(`Couldn't cancel on your calendar: ${e.message}`, 8000));
+    }
     return;
   }
   const ops = [];
@@ -319,10 +434,13 @@ async function editMeeting(meeting, opts = {}) {
   if (result.email && person) ops.push({ type: "patchPerson", key: personKey(person), fields: { email: result.email } });
   ops.push(...meetingOps(model, result.meeting));
   edit(ops);
-  if (result.meeting.date >= todayIso() && !meeting) {
-    const choice = await ask("Meeting saved", `Send ${result.meeting.person} an invite now?`,
-      [{ label: "Not now", value: "" }, { label: "Send invite…", value: "invite", primary: true }]);
-    if (choice === "invite") await inviteDialog({ model: state.doc.model, meeting: result.meeting, download: files.download });
+  const upcoming = result.meeting.date >= todayIso();
+  // Connected calendar: create/update the event there (it sends the invite). Otherwise offer the links.
+  if (upcoming && (await syncToCalendar(result.meeting))) return;
+  if (upcoming && !meeting) {
+    const choice = await ask("Meeting saved", `Add it to your calendar and invite ${result.meeting.person}?`,
+      [{ label: "Not now", value: "" }, { label: "Add to calendar & invite…", value: "invite", primary: true }]);
+    if (choice === "invite") await meetingActions(state.doc.model.meetings.find(x => x.id === result.meeting.id) ?? result.meeting);
   } else toast(meeting ? "Meeting updated." : "Meeting logged.");
 }
 
@@ -340,7 +458,7 @@ function toggleTask(task) {
 }
 
 async function openSettings() {
-  const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo" });
+  const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo", calendar: calendars });
   if (!result) return;
   const ops = [{ type: "setSettings", settings: result.settings }];
   if (result.me !== state.doc.model.me) ops.push({ type: "setMe", name: result.me });
@@ -541,8 +659,8 @@ menuBtn.addEventListener("click", e => { e.stopPropagation(); menu.hidden ? open
 document.addEventListener("click", e => { if (!menu.contains(e.target)) closeMenu(); });
 
 const ACTIONS = { open: openFile, reopen, new: newWorkbook, template: downloadTemplate, download: downloadCopy,
-                  backups: showBackups, settings: openSettings, demo: loadDemo };
-const SAFE_ACTIONS = ["download", "backups", "template", "settings"]; // don't leave the current file
+                  backups: showBackups, settings: openSettings, demo: loadDemo, importPool };
+const SAFE_ACTIONS = ["download", "backups", "template", "settings", "importPool"]; // don't leave the current file
 menu.addEventListener("click", async e => {
   const action = e.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
@@ -557,8 +675,14 @@ menu.addEventListener("click", async e => {
 
 $("save").addEventListener("click", save);
 $("add-target").addEventListener("click", () => addTarget());
+$("add-person").addEventListener("click", () => addPerson());
+const typing = t => t.closest?.("input, textarea, select, [contenteditable]");
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && state.mode === "file") { e.preventDefault(); save(); }
+  if (e.key.toLowerCase() === "n" && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e.target) && !$("dialog").open) {
+    e.preventDefault();
+    addPerson();
+  }
   if (e.key === "Escape" && !$("dialog").open) {
     if (!menu.hidden) closeMenu();
     else if (state.selected || card.openId) clearSelection();
@@ -576,6 +700,25 @@ $("search").addEventListener("keydown", e => {
 });
 
 $("show2").addEventListener("change", e => map.set({ showSecond: e.target.checked }));
+$("show-alumni").addEventListener("change", e => map.set({ showAlumni: e.target.checked }));
+
+// Drop a LinkedIn profile PDF straight onto the map to add them.
+{
+  const wrap = $("map-wrap"), overlay = $("drop-overlay");
+  const hasFiles = e => [...(e.dataTransfer?.types ?? [])].includes("Files");
+  let depth = 0;
+  wrap.addEventListener("dragenter", e => { if (hasFiles(e)) { depth++; overlay.hidden = false; } });
+  wrap.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+  wrap.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; overlay.hidden = true; } });
+  wrap.addEventListener("drop", e => {
+    e.preventDefault();
+    depth = 0;
+    overlay.hidden = true;
+    const file = [...e.dataTransfer.files].find(isPdf);
+    if (file) addPerson({ pdf: file });
+    else toast("Drop a PDF of their LinkedIn profile (on their profile: More → Save to PDF).");
+  });
+}
 $("fit").addEventListener("click", () => map.fit());
 $("illustrated").addEventListener("change", e => edit({ type: "setAvatarStyle", style: e.target.checked ? "notionists" : "initials" }));
 

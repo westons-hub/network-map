@@ -6,7 +6,7 @@ const TAU = Math.PI * 2;
 const HUB_GAP = 60;       // space between neighboring hubs' fans on the ring
 const MEMBER_R = 110;     // members' distance from their group
 const CHILD_R = 85;       // 2nd-degree distance from their connector
-const OUTER_GAP = 170;    // outer ring (gap targets) beyond the fans
+const OUTER_GAP = 110;    // outer ring (no-connection targets) just beyond the outermost group
 
 /** Primary parent of each node: the edge that places it (member > direct > intro > group/gap from me). */
 function parents(graph) {
@@ -107,17 +107,10 @@ export function ringLayout(graph) {
     place(id, 0.55 * R1 * Math.cos(angle), 0.55 * R1 * Math.sin(angle));
   }
 
-  // Targets with nobody yet: an outer ring beyond everything else, in the spaces
-  // between hubs so their lines don't cut through a cluster.
-  const reach = Math.max(R1, ...Object.values(pos).map(p => Math.hypot(p.x, p.y)));
+  // Targets with nobody yet: a ring just outside everything else, in the widest open spaces.
   const gaps = (children.me ?? []).filter(isGap);
-  const R3 = reach + OUTER_GAP;
-  gaps.forEach((id, i) => {
-    const a = boundaries.length >= gaps.length
-      ? boundaries[Math.floor(((i + 0.5) * boundaries.length) / gaps.length)]
-      : -Math.PI / 2 + (TAU * (i + 0.5)) / gaps.length;
-    place(id, R3 * Math.cos(a), R3 * Math.sin(a));
-  });
+  Object.assign(pos, outerRing(pos, gaps));
+  const R3 = Math.max(R1, ...Object.values(pos).map(p => Math.hypot(p.x, p.y)));
 
   // Anything left (e.g. a loop of people connected only through each other): park it outside.
   const rest = graph.nodes.filter(n => !pos[n.id]);
@@ -126,4 +119,29 @@ export function ringLayout(graph) {
     place(n.id, (R3 + 120) * Math.cos(a), (R3 + 120) * Math.sin(a));
   });
   return pos;
+}
+
+/**
+ * Where to put targets you have no connections at yet: evenly spread on a ring just outside the outermost
+ * node (so "Fit" keeps the network big), each in one of the widest angular gaps between everything else.
+ * Used by both layouts. positions: { id: {x,y} } for the rest of the map (you at 0,0).
+ */
+export function outerRing(positions, gapIds, margin = OUTER_GAP) {
+  if (!gapIds.length) return {};
+  const others = Object.entries(positions).filter(([id]) => id !== "me" && !gapIds.includes(id)).map(([, p]) => p);
+  const radius = Math.max(260, ...others.map(p => Math.hypot(p.x, p.y))) + margin;
+  const angles = others.map(p => Math.atan2(p.y, p.x)).sort((a, b) => a - b);
+  let spots;
+  if (angles.length < 2) {
+    spots = gapIds.map((_, i) => -Math.PI / 2 + (TAU * (i + 0.5)) / gapIds.length);
+  } else {
+    // Greedy: each target goes to the gap between neighboring angles that has the most room per target.
+    const gaps = angles.map((a, i) => ({ from: a, width: (i + 1 < angles.length ? angles[i + 1] : angles[0] + TAU) - a, n: 0 }));
+    for (let k = 0; k < gapIds.length; k++) {
+      gaps.reduce((best, g) => (g.width / (g.n + 1) > best.width / (best.n + 1) ? g : best)).n += 1;
+    }
+    spots = gaps.flatMap(g => Array.from({ length: g.n }, (_, i) => g.from + (g.width * (i + 1)) / (g.n + 1)));
+  }
+  spots.sort((a, b) => a - b);
+  return Object.fromEntries(gapIds.map((id, i) => [id, { x: radius * Math.cos(spots[i]), y: radius * Math.sin(spots[i]) }]));
 }

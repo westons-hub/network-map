@@ -126,10 +126,10 @@ const findPerson = (model, name) => model.people.find(p => normalizeName(p.name)
  * Schedule a meeting (or log one that already happened: a past date counts as "Met").
  * Resolves with { action: "save", meeting, email? } | { action: "delete" } | null.
  */
-export async function meetingForm({ model, meeting, person = "", date = "" }) {
+export async function meetingForm({ model, meeting, person = "", date = "", start: startAt = "" }) {
   const editing = !!meeting;
   const s = model.settings;
-  const m = meeting ?? { id: newId("m"), person, date: date || todayIso(), start: "10:00", end: "", type: "Coffee Chat",
+  const m = meeting ?? { id: newId("m"), person, date: date || todayIso(), start: startAt || "10:00", end: "", type: "Coffee Chat",
                          method: "Zoom", link: s.zoomLink || "", notes: "", nextStep: "", eventId: "" };
   const body = el("div", undefined, { class: "form" });
   const people = datalist(model.people.map(p => p.name).sort());
@@ -192,14 +192,18 @@ export async function meetingForm({ model, meeting, person = "", date = "" }) {
  * The "Send invite" options. Nothing is sent by Network Map: each button opens a prefilled page or file
  * that you review and send or save yourself.
  */
-export async function inviteDialog({ model, meeting, download }) {
+export async function inviteDialog({ model, meeting, download, onOpen, onEdit, synced = "" }) {
   const person = findPerson(model, meeting.person);
   const me = model.me || "";
   const body = el("div", undefined, { class: "form" });
   const message = el("textarea", undefined, { rows: 3, value: fillTemplate(model.settings.inviteTemplate, { meeting, me }) });
   const to = person?.email || "";
-  body.append(el("p", `${meeting.type || "Meeting"} with ${meeting.person} · ${meeting.date} ${meeting.start}${meeting.method ? ` · ${meeting.method}` : ""}`,
-                 { class: "muted small" }));
+  const when = new Date(`${meeting.date}T${meeting.start || "00:00"}`)
+    .toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  body.append(el("p", `${meeting.type || "Meeting"} with ${meeting.person} · ${when}${meeting.method ? ` · ${meeting.method}` : ""}`,
+                 { class: "meeting-summary" }));
+  if (meeting.notes) body.append(el("p", meeting.notes, { class: "muted small" }));
+  if (synced) body.append(el("p", synced, { class: "source-note ok" }));
   if (!to) body.append(el("p", `${meeting.person} has no email yet, so the invite won't include them. Add it on their card.`, { class: "warn" }));
   body.append(field("Message", message, "Edit it here; {first name}, {date}, {time} and {link} were filled in from your Settings template."));
   const ctx = () => ({ me, email: to, myEmail: model.settings.email, message: message.value });
@@ -210,9 +214,9 @@ export async function inviteDialog({ model, meeting, download }) {
     b.append(el("strong", label), el("span", hint, { class: "muted small" }));
     grid.append(b);
   };
-  button("Google Calendar", "Opens a prefilled event. Save it to add it and email the invite.", () => open(googleCalendarUrl(meeting, ctx())));
-  button("Outlook.com", "Personal Outlook calendar.", () => open(outlookUrl(meeting, ctx(), "live")));
-  button("Outlook (work/school)", "Microsoft 365 calendar.", () => open(outlookUrl(meeting, ctx(), "office")));
+  button("Add to Google Calendar", "Opens a prefilled event with them as a guest. Save it to send the invite.", () => open(googleCalendarUrl(meeting, ctx())));
+  button("Add to Outlook", "Outlook.com (personal) calendar, prefilled.", () => open(outlookUrl(meeting, ctx(), "live")));
+  button("Add to Outlook (work/school)", "Microsoft 365 calendar, prefilled.", () => open(outlookUrl(meeting, ctx(), "office")));
   button("Gmail draft", "A new email with your message.", () => open(gmailUrl(meeting, ctx())));
   button("Email app", "Your default mail app (mailto).", () => { window.location.href = mailtoUrl(meeting, ctx()); });
   button("Download .ics", "A calendar file for any calendar app.", () =>
@@ -220,11 +224,14 @@ export async function inviteDialog({ model, meeting, download }) {
       .replace(/[^\w.-]+/g, "-").toLowerCase(), "text/calendar"));
   body.append(grid, el("p", "Network Map never sends anything itself. You'll always review and click send or save.",
                         { class: "muted small" }));
-  await ask("Send invite", body, [{ label: "Copy message", value: "copy" }, { label: "Done", value: "", primary: true }])
-    .then(async v => {
-      if (v !== "copy") return;
-      try { await navigator.clipboard.writeText(message.value); toast("Message copied."); } catch { toast("Couldn't copy."); }
-    });
+  const buttons = [{ label: "Copy message", value: "copy" }, { label: "Done", value: "", primary: true }];
+  if (onEdit) buttons.unshift({ label: "Edit meeting", value: "edit", left: true });
+  if (onOpen) buttons.unshift({ label: "Open their card", value: "open", left: true });
+  const v = await ask("Add to calendar & invite", body, buttons);
+  if (v === "copy") {
+    try { await navigator.clipboard.writeText(message.value); toast("Message copied."); } catch { toast("Couldn't copy."); }
+  } else if (v === "open") onOpen();
+  else if (v === "edit") onEdit();
 }
 
 // ---- tasks --------------------------------------------------------------------------------
@@ -266,7 +273,8 @@ export async function personForm({ model, person }) {
     name: input("name", person.name, { required: true }),
     role: input("role", person.role),
     company: input("company", person.company),
-    school: input("school", person.school),
+    school: input("school", person.school, { placeholder: "e.g. BYU (2022–2026); Lakeview High" }),
+    pastCompanies: input("pastCompanies", person.pastCompanies, { placeholder: "e.g. Deloitte (2019–2021)" }),
     email: input("email", person.email, { type: "email" }),
     linkedinUrl: input("linkedinUrl", person.linkedinUrl, { type: "url", placeholder: "https://www.linkedin.com/in/…" }),
     connectedThrough: input("connectedThrough", person.connectedThrough, { placeholder: "Blank = you know them directly" }),
@@ -280,7 +288,8 @@ export async function personForm({ model, person }) {
   body.append(names.list,
     el("div", "Basics", { class: "form-section" }), field("Name", fields.name), two(field("Role", fields.role), field("Company", fields.company)),
     two(field("Email", fields.email), field("LinkedIn", fields.linkedinUrl)),
-    el("div", "Connection", { class: "form-section" }), two(field("School", fields.school), field("Connected through", fields.connectedThrough)),
+    el("div", "Connection", { class: "form-section" }), two(field("Schools", fields.school), field("Past companies", fields.pastCompanies)),
+    field("Connected through", fields.connectedThrough),
     two(field("Connected on", fields.connectedOn), field("Status", fields.status)),
     el("div", "Notes", { class: "form-section" }), field("Tags", fields.tags), field("Notes", fields.notes));
   const choice = await ask(`Edit ${person.name}`, body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
@@ -297,7 +306,7 @@ export async function personForm({ model, person }) {
 // ---- settings -----------------------------------------------------------------------------
 
 /** Resolves with { me, avatarStyle, settings } or null. */
-export async function settingsForm({ model, demo }) {
+export async function settingsForm({ model, demo, calendar }) {
   const s = model.settings;
   const body = el("div", undefined, { class: "form" });
   const me = el("input", undefined, { value: model.me, autocomplete: "name" });
@@ -314,6 +323,46 @@ export async function settingsForm({ model, demo }) {
               two(field("Default meeting length (min)", length), field("Zoom link", zoom, "Your personal room or scheduling link.")),
               field("Invite message", template, "Placeholders: {first name}, {name}, {date}, {time}, {link}, {my name}"),
               avatarLabel);
+
+  // Calendar connection (optional): sync meetings and show your events.
+  if (calendar) {
+    const box = el("div", undefined, { class: "calendar-connect" });
+    box.append(el("div", "Calendar", { class: "form-section" }));
+    const st = calendar.status();
+    if (demo) {
+      box.append(el("p", "In the demo, use the Add to Google Calendar / Outlook / .ics buttons on any meeting. " +
+                         "With your own data you can connect your calendar here.", { class: "muted small" }));
+      const row = el("div", undefined, { class: "quick-links" });
+      row.append(el("button", "Connect your own calendar", { class: "btn small", type: "button", disabled: true,
+                                                              title: "Open your own workbook to connect a calendar" }));
+      box.append(row);
+    } else if (st.provider) {
+      box.append(el("p", `Connected: ${st.provider === "google" ? "Google Calendar" : "Outlook"} (${st.account}). ` +
+                         "New and edited meetings sync there and invites are sent; your events show in the Calendar tab.",
+                    { class: "source-note ok" }));
+      box.append(el("button", "Disconnect", { class: "btn small danger", type: "button", onclick: async () => {
+        await calendar.disconnect(); toast("Calendar disconnected."); document.getElementById("dialog").close("");
+      } }));
+    } else {
+      box.append(el("p", "Optional: connect to create/update/cancel events and send invites automatically, and see your own events. " +
+                         "Sign-in stays in this browser tab.", { class: "muted small" }));
+      const row = el("div", undefined, { class: "quick-links" });
+      for (const [id, label, fn] of [["google", "Connect Google Calendar", calendar.connectGoogle], ["outlook", "Connect Outlook", calendar.connectOutlook]]) {
+        row.append(el("button", label, { class: "btn small", type: "button", disabled: !st.configured[id],
+          title: st.configured[id] ? "" : "Needs a client ID in site/config.js (see docs/CALENDAR_SETUP.md)",
+          onclick: async () => {
+            try { await fn(); toast(`${label.replace("Connect ", "")} connected.`); document.getElementById("dialog").close(""); }
+            catch (e) { toast(e.message, 8000); }
+          } }));
+      }
+      box.append(row);
+      if (!st.configured.google && !st.configured.outlook) {
+        box.append(el("p", "Not set up on this site yet: add a Google or Microsoft client ID to site/config.js (docs/CALENDAR_SETUP.md).",
+                      { class: "muted small" }));
+      }
+    }
+    body.append(box);
+  }
   const choice = await ask("Settings", body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
   if (choice !== "save") return null;
   return { me: me.value.trim(), avatarStyle: avatars.checked ? "notionists" : "initials",

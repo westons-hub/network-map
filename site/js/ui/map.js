@@ -7,7 +7,7 @@
 // * Clicking fades everything except the node and its neighbors (hover = lighter preview).
 // * Two layouts: "free" (physics, groups spread apart) and "ring" (computed, see core/layout.js).
 
-import { ringLayout } from "../core/layout.js";
+import { outerRing, ringLayout } from "../core/layout.js";
 import { edgeId, neighborhood } from "../core/paths.js";
 
 const vis = globalThis.vis;
@@ -55,7 +55,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
   let graph = { nodes: [], edges: [] };
-  let options = { showSecond: true, layout: "free" };
+  let options = { showSecond: true, showAlumni: true, layout: "free" };
   let selected = null;   // clicked node id
   let hovered = null;    // hovered node id (preview only when nothing is selected)
   let smallLabels = false;
@@ -111,7 +111,9 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
                         hover: { border: ring, background: "#ffffff" } },
                shapeProperties: { useBorderWithImage: true, interpolation: true, borderDashes: n.gap ? [6, 5] : false },
                font: { ...font, size: 16, color: n.gap ? rgba(c("target"), alpha) : font.color },
-               mass: 2 + Math.min(count, 12) * 0.35 };
+               mass: 2 + Math.min(count, 12) * 0.35,
+               // No-connection targets sit on a ring outside the network (placed by placeGaps), not in the physics.
+               physics: !n.gap };
     }
     // A person: picture, with a ring in their status color.
     const ring = statusColor(n.status) || c("no-status");
@@ -127,25 +129,28 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   function edgeStyle(e, focus, nodeIndex) {
     const to = nodeIndex.get(e.to), from = nodeIndex.get(e.from);
     const viaSomeone = e.kind === "intro" || e.kind === "gap" || (e.kind === "also" && to?.kind === "second");
+    const alumni = e.kind === "alumni";
     const toTarget = from?.target || from?.kind === "target";
-    // Secondary memberships (a person's school, or a target they're reachable at) are drawn. Tag groups stay
-    // hidden unless highlighted.
-    const alsoHidden = e.kind === "also" && from?.kind === "tag" && !(focus && focus.edges.has(edgeId(e)));
     const onPath = focus?.path.has(edgeId(e));
+    // Tag-group links stay hidden unless highlighted; alumni links follow the "Show alumni links" toggle.
+    const hidden = (e.kind === "also" && from?.kind === "tag" && !(focus && focus.edges.has(edgeId(e))))
+      || (alumni && !options.showAlumni && !onPath);
     const faded = focus && !focus.edges.has(edgeId(e));
-    const alpha = faded ? focus.fade * 0.8 : 1;
-    const color = onPath ? c("target") : viaSomeone ? c("edge-dashed") : c("edge");
+    const alpha = faded ? focus.fade * 0.8 : alumni && !onPath ? 0.75 : 1;
+    const color = onPath ? c("target") : viaSomeone || alumni ? c("edge-dashed") : c("edge");
     const length = { group: 210 + Math.min(to?.count ?? 0, 12) * 10, gap: to?.gap ? 400 : 260, member: 85,
                      direct: 190, intro: 85 }[e.kind];
     return {
-      id: edgeId(e), from: e.from, to: e.to, kind: e.kind, hidden: alsoHidden,
-      width: onPath ? 4.5 : e.kind === "group" ? 2.2 : viaSomeone ? 1.5 : 1.7,
-      dashes: onPath ? false : viaSomeone ? [6, 6] : false,
+      id: edgeId(e), from: e.from, to: e.to, kind: e.kind, hidden,
+      title: alumni ? `Used to work here${e.years ? ` (${e.years})` : ""}` : undefined,
+      width: onPath ? 4.5 : e.kind === "group" ? 2.2 : alumni ? 1.2 : viaSomeone ? 1.5 : 1.7,
+      dashes: onPath ? false : alumni ? [1.5, 5] : viaSomeone ? [6, 6] : false,
       color: { color, highlight: color, hover: color, opacity: alpha },
       // School links pull gently (long springs) so a school settles near its people without tearing company
-      // clusters apart; tag links never pull.
-      physics: e.kind !== "also" || from?.kind !== "tag", length: e.kind === "also" ? (toTarget ? 90 : 240) : length,
-      smooth: e.kind === "also" ? { type: "curvedCW", roundness: 0.12 } : undefined,
+      // clusters apart; tag and alumni links never pull.
+      physics: e.kind !== "gap" && !alumni && (e.kind !== "also" || from?.kind !== "tag"),
+      length: e.kind === "also" ? (toTarget ? 90 : 240) : length,
+      smooth: e.kind === "also" || alumni ? { type: "curvedCW", roundness: 0.12 } : undefined,
     };
   }
 
@@ -157,6 +162,14 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   }
 
   // ---- layouts -----------------------------------------------------------------
+
+  /** Free layout: put no-connection targets on a ring just outside the settled network. */
+  function placeGaps(animate = true) {
+    const ids = graph.nodes.filter(n => n.kind === "target" && n.gap).map(n => n.id);
+    if (!ids.length || options.layout !== "free") return;
+    const ring = outerRing(network.getPositions(), ids);
+    if (animate) animateTo(ring, 500); else nodes.update(Object.entries(ring).map(([id, p]) => ({ id, ...p })));
+  }
 
   let animation;
   function animateTo(targets, ms = 750) {
@@ -187,7 +200,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
     } else {
       cancelAnimationFrame(animation);
       network.setOptions({ physics: { enabled: true } });
-      network.once("stabilized", () => network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }));
+      network.once("stabilized", () => placeGaps(true)); // animateTo fits the view when it's done
       network.startSimulation();
     }
   }
@@ -274,17 +287,27 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
       if (first) {
         if (options.layout === "ring") applyLayout(false);
         else {
-          network.once("stabilizationIterationsDone", () => network.fit({ animation: false }));
-          network.once("stabilized", () => network.fit({ animation: { duration: 500, easingFunction: "easeInOutQuad" } }));
+          network.once("stabilizationIterationsDone", () => { placeGaps(false); network.fit({ animation: false }); });
+          network.once("stabilized", () => placeGaps(true));
         }
       } else if (options.layout === "ring") applyLayout(true);
+      else if (next.nodes.some(n => n.gap && !previous[n.id])) {
+        placeGaps(true);
+        network.once("stabilized", () => placeGaps(true));
+      }
     },
     set(opts) { options = { ...options, ...opts }; restyle(); },
     setLayout(mode, animate = true) { options.layout = mode; applyLayout(animate); },
     /** Refresh pictures after logos/avatars finish loading. */
     refresh: restyle,
-    select(id) {
+    /** follow: a just-added node is still settling, so re-center on it once the layout comes to rest. */
+    select(id, { follow = false } = {}) {
       if (!nodes.get(id)) return;
+      if (follow && options.layout === "free") {
+        network.once("stabilized", () => {
+          if (selected === id) network.focus(id, { scale: 1.1, animation: { duration: 600, easingFunction: "easeInOutQuad" } });
+        });
+      }
       selected = id;
       network.selectNodes([id]);
       restyle();

@@ -1,14 +1,15 @@
 // Pictures for nodes: logos for companies/schools/targets and avatars for people.
 //
-// Organizations: Logo on the Companies sheet > favicon for the Companies sheet's Website >
-//   favicon for a guessed domain (only with your own data; the demo only uses its explicit domains) >
-//   generated initials logo.
+// Organizations: Logo on the Companies sheet (the demo's crisp SVGs live there) > a logo for the Companies
+//   sheet's Website > a logo for a guessed domain (only with your own data) > generated initials logo.
+//   Logos come from logo.dev or Brandfetch if a key is set in site/config.js, otherwise Google's favicons.
 // People: Photo cell (an uploaded picture or a pasted image link) > the workbook's avatar style
 //   (DiceBear "Notionists", generated locally) > initials avatar.
 // Anything that fails to load falls back to the generated initials picture.
 
 import { initialsAvatar, initialsLogo } from "../core/avatars.js";
-import { domainFrom, guessDomain, isRealLogo, logoUrl } from "../core/logos.js";
+import { CONFIG } from "../../config.js";
+import { domainFrom, guessDomain, isRealLogo, logoSource, logoUrl } from "../core/logos.js";
 import { normalizeOrg } from "../core/org.js";
 
 // Soft pastel backgrounds for illustrated avatars (DiceBear picks one per seed).
@@ -36,17 +37,22 @@ export function createImages({ onChange }) {
   let notifyTimer;
   const changed = () => { clearTimeout(notifyTimer); notifyTimer = setTimeout(onChange, 60); };
 
+  const source = logoSource(CONFIG.logos);
+  const url = domain => logoUrl(domain, CONFIG.logos);
+
   function probe(domain) {
-    const known = probes[domain];
+    const key = source === "google" ? domain : `${source}:${domain}`;
+    const known = probes[key];
     if (known && (known.ok || Date.now() - known.t < PROBE_TTL)) return known.ok ? "ok" : "none";
     if (!pending.has(domain)) {
       pending.add(domain);
       const img = new Image();
-      const done = ok => { pending.delete(domain); probes[domain] = { ok, t: Date.now() }; saveProbes(probes); changed(); };
+      const done = ok => { pending.delete(domain); probes[key] = { ok, t: Date.now() }; saveProbes(probes); changed(); };
       img.onload = () => done(isRealLogo(img.naturalWidth));
       img.onerror = () => done(false);
-      img.referrerPolicy = "no-referrer";
-      img.src = logoUrl(domain);
+      // Brandfetch requires the site's origin as referrer; Google doesn't need one.
+      img.referrerPolicy = source === "google" ? "no-referrer" : "strict-origin-when-cross-origin";
+      img.src = url(domain);
     }
     return "pending";
   }
@@ -88,7 +94,7 @@ export function createImages({ onChange }) {
       if (row?.logo) return { image: row.logo, brokenImage: fallback };
       if (node.kind !== "tag") {
         const domain = domainFrom(row?.website) || (guessDomains ? guessDomain(node.label) : "");
-        if (domain && probe(domain) === "ok") return { image: logoUrl(domain), brokenImage: fallback };
+        if (domain && probe(domain) === "ok") return { image: url(domain), brokenImage: fallback };
       }
       return { image: fallback, brokenImage: fallback };
     },
