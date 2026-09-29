@@ -15,8 +15,8 @@ const css = getComputedStyle(document.documentElement);
 const c = name => css.getPropertyValue(`--${name}`).trim();
 
 const GROUP_KINDS = ["company", "school", "tag", "target"];
-const STATUS_VAR = { "met": "met", "contacted": "contacted", "to reach out": "reach", "follow up": "follow",
-                     "referral": "referral" };
+const STATUS_VAR = { "met": "met", "contacted": "contacted", "scheduled": "scheduled", "to reach out": "reach",
+                     "follow up": "follow", "referral": "referral" };
 export const statusColor = status => { const v = STATUS_VAR[String(status ?? "").trim().toLowerCase()]; return v && c(v); };
 
 const FADE = 0.15;          // opacity of everything outside a clicked node's neighborhood
@@ -51,7 +51,7 @@ function drawGrid(network, ctx) {
   ctx.restore();
 }
 
-export function createMap(container, { images, onSelect, onDeselect, pathFor }) {
+export function createMap(container, { images, onSelect, onDeselect, pathFor, onAfterDraw = () => {} }) {
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
   let graph = { nodes: [], edges: [] };
@@ -229,6 +229,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor }) 
   // ---- events --------------------------------------------------------------------
 
   network.on("beforeDrawing", ctx => drawGrid(network, ctx));
+  network.on("afterDrawing", () => onAfterDraw());
   network.on("click", p => {
     if (p.nodes.length) { selected = p.nodes[0]; restyle(); onSelect(selected); }
     else if (!p.edges.length) { clear(); onDeselect(); }
@@ -294,5 +295,13 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor }) 
     },
     clear,
     fit() { network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } }); },
+    /** Where a node is on screen (relative to the map), and its radius in screen pixels. */
+    nodeBox(id) {
+      const pos = network.getPositions([id])[id];
+      if (!pos) return null;
+      const { x, y } = network.canvasToDOM(pos);
+      const node = nodes.get(id);
+      return { x, y, r: ((node?.size ?? 16) + (node?.borderWidth ?? 2)) * network.getScale() };
+    },
   };
 }

@@ -17,14 +17,14 @@ const SITE = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
 // Name, Company, School, Role, Connected Through, Status, Tags, Notes
 const PEOPLE = [
   ["Jordan Lee", "Deloitte", "Stanford University", "Senior Consultant", "", "Met", "Consulting club", "Case interview tips"],
-  ["Priya Shah", "Deloitte", "University of Utah", "Manager", "", "Contacted", "", ""],
+  ["Priya Shah", "Deloitte", "University of Utah", "Manager", "", "Scheduled", "", ""],
   ["Marcus Bell", "Deloitte", "Stanford", "Analyst", "", "Met", "Consulting club", ""],
   ["Hana Kim", "Deloitte LLP", "", "Partner", "", "To Reach Out", "", "Leads the strategy practice"],
   ["Sofia Alvarez", "Microsoft", "Stanford University", "Product Manager", "", "Met", "Product", "Owns the marketplace roadmap"],
-  ["Ethan Brooks", "Microsoft", "", "Data Analyst", "", "Follow Up", "Product", ""],
+  ["Ethan Brooks", "Microsoft", "", "Data Analyst", "", "Scheduled", "Product", ""],
   ["Lena Novak", "Microsoft", "University of Utah", "Program Manager", "", "To Reach Out", "Product", ""],
   ["Noah Carter", "Delta Air Lines", "Stanford University", "Commercial Strategy Analyst", "", "Met", "", "Info session speaker"],
-  ["Grace Owens", "Delta Air Lines", "", "Recruiter", "", "Contacted", "", ""],
+  ["Grace Owens", "Delta Air Lines", "", "Recruiter", "", "Scheduled", "", ""],
   ["Daniel Ortiz", "Goldman Sachs", "Stanford University", "Strategy Associate", "", "Met", "", ""],
   ["Mia Chen", "Google", "University of Utah", "Product Lead", "", "Met", "", ""],
   ["Owen Price", "Google", "University of Utah", "Associate Product Manager", "", "To Reach Out", "", ""],
@@ -58,6 +58,35 @@ const COMPANIES = [
   ["University of Utah", "admissions.utah.edu"], // utah.edu itself has no favicon
 ];
 
+// Meetings and tasks, in days relative to BASE (the app shifts them so the demo always looks current).
+const BASE = "2026-09-28";
+// [person, days from BASE, start, minutes, type, method, notes, next step]
+const MEETINGS = [
+  ["Liam Walsh", -30, "18:00", 60, "Coffee Chat", "In Person", "Caught up; he offered to introduce me to Zoe at Qualtrics.", "Ask Liam for the Zoe intro"],
+  ["Sofia Alvarez", -20, "12:00", 30, "Coffee Chat", "In Person", "Marketplace roadmap, how PMs at Microsoft pick problems.", "Send thank-you"],
+  ["Jordan Lee", -12, "16:30", 30, "Informational", "Zoom", "Walked through case interview prep and the strategy practice.", "Send resume for review"],
+  ["Noah Carter", -5, "09:00", 30, "Informational", "Phone", "Delta's commercial strategy team; APM-style rotation.", "Apply to the fall rotation"],
+  ["Daniel Ortiz", -2, "15:00", 30, "Coffee Chat", "Zoom", "Goldman strategy group; offered to connect me with Ben.", "Send thank-you"],
+  ["Priya Shah", 2, "10:00", 30, "Coffee Chat", "Zoom", "", ""],
+  ["Grace Owens", 6, "13:30", 30, "Interview", "Teams", "Recruiter screen for the Delta internship.", ""],
+  ["Mia Chen", 12, "11:00", 30, "Coffee Chat", "Google Meet", "", ""],
+  ["Ethan Brooks", 25, "14:00", 30, "Informational", "Zoom", "", ""],
+];
+// [task, person, company, due (days from BASE), done]
+const TASKS = [
+  ["Send thank-you to Daniel Ortiz within 24 hrs", "Daniel Ortiz", "Goldman Sachs", -1, false],
+  ["Follow up with Hana Kim about the strategy practice", "Hana Kim", "Deloitte", -3, false],
+  ["Send resume to Jordan for review", "Jordan Lee", "Deloitte", 0, false],
+  ["Prepare questions for coffee chat with Priya", "Priya Shah", "Deloitte", 1, false],
+  ["Ask Liam for the intro to Zoe Adams", "Liam Walsh", "Qualtrics", 3, false],
+  ["Research Apple strategy & operations roles", "", "Apple", 9, false],
+  ["Update resume with fall projects", "", "", 14, false],
+  ["Send thank-you to Noah Carter within 24 hrs", "Noah Carter", "Delta Air Lines", -4, true],
+  ["Send thank-you to Sofia Alvarez within 24 hrs", "Sofia Alvarez", "Microsoft", -19, true],
+];
+const day = n => { const d = new Date(`${BASE}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const plus = (t, min) => { const [h, m] = t.split(":").map(Number); const x = h * 60 + m + min; return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
+
 const HOW_TO = [
   ["Sheet / column", "What to put there"],
   ["People", "Everyone on your map. Only Name is required."],
@@ -73,7 +102,9 @@ const HOW_TO = [
   ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer) are optional."],
   ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong, or put an image link in Logo."],
   ["LinkedIn Pool", "Filled by 'Import LinkedIn' from your Connections.csv. These people are NOT on the map until you add them."],
-  ["Settings", "Your name, and Avatar style: initials, or notionists for illustrated avatars drawn in your browser."],
+  ["Meetings", "One row per meeting: Person, Date, Start, End, Type, Method, Notes, Next Step. The app fills this when you schedule or log a meeting."],
+  ["Tasks", "Your to-dos: Task, Person, Company, Due, Done. Scheduling a meeting adds a 'Send thank-you' task automatically."],
+  ["Settings", "Your name and email, default meeting length, your Zoom link (used in invites), the invite message, and Avatar style (initials or notionists)."],
   ["Layout", "Managed by the app (saved node positions)."],
   ["Privacy", "Network Map runs entirely in your browser. This file is never uploaded anywhere."],
 ];
@@ -100,6 +131,14 @@ const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists",
     photo: `demo/photos/${p.name.toLowerCase().replaceAll(" ", "-")}.jpg` })),
   companies: COMPANIES.map(([company, website]) => ({ company, website, logo: "", extra: {} })),
   targets: TARGETS.map(([company, priority, stage, notes]) => ({ company, priority, stage, notes, extra: {} })),
+  meetings: MEETINGS.map(([person, d, start, min, type, method, notes, nextStep], i) => ({ id: `demo-m${i + 1}`, person,
+    date: day(d), start, end: plus(start, min), type, method, notes, nextStep, eventId: "",
+    link: method === "Zoom" ? "https://zoom.us/j/0000000000" : method === "Google Meet" ? "https://meet.google.com/abc-defg-hij" : "",
+    extra: {} })),
+  tasks: TASKS.map(([task, person, company, d, done], i) => ({ id: `demo-t${i + 1}`, task, person, company, due: day(d),
+    done, created: day(Math.min(d, 0) - 3), source: "", extra: {} })),
+  settings: { ...emptyModel().settings, email: "alex.rivera@example.com", zoomLink: "https://zoom.us/j/0000000000",
+              demoBaseDate: BASE },
   pool };
 writeFileSync(join(SITE, "demo", "demo_network.xlsx"), withHowTo(writeWorkbook(demo)));
 

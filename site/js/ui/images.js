@@ -3,7 +3,7 @@
 // Organizations: Logo on the Companies sheet > favicon for the Companies sheet's Website >
 //   favicon for a guessed domain (only with your own data; the demo only uses its explicit domains) >
 //   generated initials logo.
-// People: Photo cell > Gravatar (only if turned on) > the workbook's avatar style
+// People: Photo cell (an uploaded picture or a pasted image link) > the workbook's avatar style
 //   (DiceBear "Notionists", generated locally) > initials avatar.
 // Anything that fails to load falls back to the generated initials picture.
 
@@ -24,22 +24,15 @@ function saveProbes(p) {
   try { localStorage.setItem(PROBE_KEY, JSON.stringify(p)); } catch { /* storage blocked: just re-check next time */ }
 }
 
-async function sha256(text) {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 export function createImages({ onChange }) {
   let companies = new Map();
   let guessDomains = false;
-  let gravatar = false;
   let avatarStyle = "initials";
   let dicebear = null;                 // { createAvatar, style } once loaded
   let dicebearLoading = false;
   const illustrated = new Map();       // name -> data URI
   const probes = loadProbes();         // domain -> { ok, t }
   const pending = new Set();
-  const hashes = new Map();            // email -> sha256 | null (pending)
   let notifyTimer;
   const changed = () => { clearTimeout(notifyTimer); notifyTimer = setTimeout(onChange, 60); };
 
@@ -81,12 +74,11 @@ export function createImages({ onChange }) {
   return {
     /**
      * companies: Companies sheet rows; guessDomains: false in the demo (it only uses explicit Websites);
-     * gravatar: user setting; avatarStyle: the workbook's "Avatar style" setting.
+     * avatarStyle: the workbook's "Avatar style" setting.
      */
     configure(opts) {
       companies = new Map((opts.companies ?? []).map(c => [normalizeOrg(c.company), c]));
       guessDomains = !!opts.guessDomains;
-      gravatar = !!opts.gravatar;
       avatarStyle = opts.avatarStyle ?? "initials";
     },
 
@@ -105,15 +97,6 @@ export function createImages({ onChange }) {
       const art = avatarStyle === "notionists" ? illustratedAvatar(node.label) : null;
       const fallback = art ?? initialsAvatar(node.label);
       if (node.photo) return { image: node.photo, brokenImage: fallback };
-      const email = (node.email ?? "").trim().toLowerCase();
-      if (gravatar && email.includes("@")) {
-        if (!hashes.has(email)) {
-          hashes.set(email, null);
-          sha256(email).then(h => { hashes.set(email, h); changed(); }).catch(() => {});
-        }
-        const h = hashes.get(email);
-        if (h) return { image: `https://gravatar.com/avatar/${h}?s=96&d=404`, brokenImage: fallback };
-      }
       return { image: fallback, brokenImage: initialsAvatar(node.label) };
     },
   };

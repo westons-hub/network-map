@@ -2,36 +2,42 @@
 // workbook or a LinkedIn CSV. Everything happens in this browser tab.
 
 import { buildGraph } from "./core/graph.js";
-import { applyOp, replay } from "./core/ops.js";
-import { normalizeOrg } from "./core/org.js";
+import { replay } from "./core/ops.js";
+import { normalizeName, normalizeOrg } from "./core/org.js";
 import { bestPath } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
+import { meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
 import { saveDoc } from "./core/sync.js";
 import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./core/workbook.js";
 import * as files from "./store/files.js";
 import { addBackup, kvDelete, kvGet, kvSet, listBackups } from "./store/local.js";
+import { createCalendar } from "./ui/calendar.js";
+import { createCard } from "./ui/card.js";
 import { ask, toast } from "./ui/dialog.js";
-import { companySuggestions, photoForm, targetForm } from "./ui/forms.js";
+import {
+  companySuggestions, inviteDialog, meetingForm, personForm, photoForm, settingsForm, targetForm, taskForm,
+} from "./ui/forms.js";
 import { createImages } from "./ui/images.js";
 import { createMap } from "./ui/map.js";
-import { el, renderDetails, renderTargets } from "./ui/panels.js";
+import { el, renderOverview, renderTargets } from "./ui/panels.js";
+import { createTodo } from "./ui/todo.js";
 
 const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
 const TEMPLATE_URL = "template/contacts_template.xlsx";
 const DEFAULT_NAME = "my_network.xlsx";
-const PREFS = { layout: "network-map:layout", gravatar: "network-map:gravatar" };
+const PREFS = { layout: "network-map:layout", view: "network-map:view" };
 
 const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
 const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 
 // doc = { model, base (bytes last read/written), lastModified, pending (unsaved edits) }
 const state = { mode: "demo", fileName: "", handle: null, doc: null, graph: null, paths: new Map(), selected: null,
-                neverSaved: false, lastHandle: null };
+                neverSaved: false, lastHandle: null, view: "map" };
 
 // ---- rendering ---------------------------------------------------------------
 
-const images = createImages({ onChange: () => { map.refresh(); renderSidebar(); } });
+const images = createImages({ onChange: () => { map.refresh(); renderSidebar(); card.render(); } });
 
 /** Best path to the target a node stands for (null for anything else). */
 function pathFor(id) {
@@ -42,8 +48,57 @@ function pathFor(id) {
 const map = createMap($("map"), {
   images,
   pathFor,
-  onSelect: id => { state.selected = id; renderSidebar(); },
-  onDeselect: () => { state.selected = null; renderSidebar(); },
+  onSelect: id => { state.selected = id; card.open(id); },
+  onDeselect: () => { state.selected = null; card.close(); },
+  onAfterDraw: () => card.reposition(),
+});
+
+const card = createCard({
+  container: $("map-wrap"),
+  map,
+  avoid: id => (pathFor(id)?.nodes ?? []).filter(n => n !== id),
+  getCtx: () => ({ graph: state.graph, model: state.doc.model, paths: state.paths, images, mode: state.mode }),
+  handlers: {
+    close: clearSelection,
+    focus,
+    patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); card.saved(); },
+    editPhoto,
+    editAll,
+    removePerson,
+    scheduleMeeting: opts => editMeeting(null, opts),
+    editMeeting: m => editMeeting(m),
+    inviteMeeting: m => inviteDialog({ model: state.doc.model, meeting: m, download: files.download }),
+    addTask: opts => editTask(null, opts),
+    toggleTask,
+    editTarget,
+    makeTarget: company => addTarget(company),
+    setTargetStage: (key, stage) => {
+      const target = state.doc.model.targets.find(t => normalizeOrg(t.company) === key);
+      if (target) { edit({ type: "upsertTarget", key, target: { ...target, stage } }); card.saved(); }
+    },
+  },
+});
+
+const calendar = createCalendar($("calendar-view"), {
+  getModel: () => state.doc.model,
+  onDay: (date, kind) => (kind === "meeting" ? editMeeting(null, { date }) : editTask(null, { date })),
+  onItem: item => {
+    if (item.kind === "meeting") {
+      const m = state.doc.model.meetings.find(x => x.id === item.id);
+      if (m && personOnMap(m.person)) openPerson(m.person); else if (m) editMeeting(m);
+    } else {
+      const t = state.doc.model.tasks.find(x => x.id === item.id);
+      if (t) editTask(t);
+    }
+  },
+});
+
+const todo = createTodo($("todo-view"), {
+  getModel: () => state.doc.model,
+  onAdd: task => { edit({ type: "upsertTask", task }); toast("Task added."); },
+  onToggle: toggleTask,
+  onEdit: t => editTask(t),
+  onPerson: name => openPerson(name),
 });
 
 function render() {
@@ -51,35 +106,73 @@ function render() {
   const me = model.me || "You";
   state.graph = buildGraph(model.people, { me, targets: model.targets });
   state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
-  if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) state.selected = null;
-  images.configure({ companies: model.companies, guessDomains: state.mode !== "demo",
-                     gravatar: pref(PREFS.gravatar, "off") === "on", avatarStyle: model.avatarStyle });
+  if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; card.close(); }
+  images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
   map.render(state.graph, model.layout);
   renderSidebar();
   renderChrome();
+  renderViews();
+  card.render();
 }
 
 function renderSidebar() {
   if (!state.graph) return;
-  const ctx = { graph: state.graph, model: state.doc.model, mode: state.mode, selected: state.selected,
-                paths: state.paths, images };
+  const ctx = { graph: state.graph, model: state.doc.model, mode: state.mode, paths: state.paths, images };
   const handlers = { onFocus: focus, onRename: name => edit({ type: "setMe", name }), onEditTarget: editTarget,
-                     onMakeTarget: company => addTarget(company), onPhoto: editPhoto };
+                     onPerson: openPerson, onView: showView };
   renderTargets($("targets"), ctx, handlers);
-  renderDetails($("details"), ctx, handlers);
+  renderOverview($("details"), ctx, handlers);
 }
 
+function renderViews() {
+  const n = taskBadge(state.doc.model.tasks);
+  const badge = $("todo-badge");
+  badge.hidden = !n;
+  badge.textContent = String(n);
+  badge.title = `${n} overdue or due today`;
+  if (state.view === "calendar") calendar.render();
+  if (state.view === "todo") todo.render();
+}
+
+// Map | Calendar | To-Do tabs (the choice is remembered in this browser).
+const tabs = [...document.querySelectorAll(".view-tabs [data-view]")];
+function showView(view) {
+  state.view = ["map", "calendar", "todo"].includes(view) ? view : "map";
+  setPref(PREFS.view, state.view);
+  tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === state.view)));
+  for (const v of document.querySelectorAll("#main-pane > .view")) v.hidden = v.dataset.view !== state.view;
+  if (state.view !== "map") card.close();
+  renderViews();
+}
+tabs.forEach(t => t.addEventListener("click", () => showView(t.dataset.view)));
+
+/** Select a node on the map, highlight it, and open its card. */
 function focus(id) {
+  if (state.view !== "map") showView("map");
   state.selected = id;
   map.select(id);
-  renderSidebar();
-  $("details-section").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  card.open(id);
+}
+
+const personOnMap = name => state.graph.nodes.some(n => n.id === `p:${normalizeName(name)}`);
+function openPerson(name) {
+  if (personOnMap(name)) focus(`p:${normalizeName(name)}`);
+  else toast(`${name} isn't on your map.`);
 }
 
 function clearSelection() {
   state.selected = null;
   map.clear();
-  renderSidebar();
+  card.close();
+}
+
+/** After renaming someone in their card, keep the card on them. */
+function followRename(key, fields) {
+  if (fields.name === undefined || normalizeName(fields.name) === key) return;
+  const id = `p:${normalizeName(fields.name)}`;
+  state.selected = id;
+  map.select(id);
+  card.open(id);
 }
 
 function unsaved() {
@@ -130,9 +223,12 @@ function renderChrome() {
 
 // ---- edits -------------------------------------------------------------------
 
-function edit(op) {
+/** Apply one edit (or several at once, e.g. a meeting plus its status change and task). */
+function edit(opOrOps) {
+  const ops = Array.isArray(opOrOps) ? opOrOps : [opOrOps];
+  if (!ops.length) return;
   const doc = state.doc;
-  state.doc = { ...doc, model: applyOp(doc.model, op), pending: [...doc.pending, op] };
+  state.doc = { ...doc, model: replay(doc.model, ops), pending: [...doc.pending, ...ops] };
   persistDraft();
   render();
 }
@@ -179,12 +275,78 @@ async function editPhoto(node) {
   try {
     const result = await photoForm({ name: person.name, current: person.photo });
     if (!result) return;
-    edit({ type: "upsertPerson", key, person: { ...person, photo: result.photo } });
+    edit({ type: "patchPerson", key, fields: { photo: result.photo } });
     toast(result.photo ? `Photo saved for ${person.name}.` : `Photo removed for ${person.name}.`);
   } catch (e) {
     console.error(e);
     toast(`Couldn't use that image: ${e.message}`);
   }
+}
+
+async function editAll(key) {
+  const person = state.doc.model.people.find(p => personKey(p) === key);
+  if (!person) return;
+  const fields = await personForm({ model: state.doc.model, person });
+  if (!fields || !Object.keys(fields).length) return;
+  edit({ type: "patchPerson", key, fields });
+  followRename(key, fields);
+  card.saved();
+}
+
+async function removePerson(key, name) {
+  const choice = await ask(`Remove ${name}?`,
+    `${name} will be taken off your map and out of the People sheet. Their meetings and tasks stay in your workbook.`,
+    [{ label: "Cancel", value: "" }, { label: "Remove", value: "remove", danger: true, primary: true }]);
+  if (choice !== "remove") return;
+  edit({ type: "removePerson", key });
+  clearSelection();
+  toast(`Removed ${name}.`);
+}
+
+// ---- meetings & tasks ------------------------------------------------------------
+
+async function editMeeting(meeting, opts = {}) {
+  const model = state.doc.model;
+  const result = await meetingForm({ model, meeting, ...opts });
+  if (!result) return;
+  if (result.action === "delete") {
+    edit({ type: "removeMeeting", id: meeting.id });
+    toast("Meeting deleted.");
+    return;
+  }
+  const ops = [];
+  const person = model.people.find(p => normalizeName(p.name) === normalizeName(result.meeting.person));
+  if (result.email && person) ops.push({ type: "patchPerson", key: personKey(person), fields: { email: result.email } });
+  ops.push(...meetingOps(model, result.meeting));
+  edit(ops);
+  if (result.meeting.date >= todayIso() && !meeting) {
+    const choice = await ask("Meeting saved", `Send ${result.meeting.person} an invite now?`,
+      [{ label: "Not now", value: "" }, { label: "Send invite…", value: "invite", primary: true }]);
+    if (choice === "invite") await inviteDialog({ model: state.doc.model, meeting: result.meeting, download: files.download });
+  } else toast(meeting ? "Meeting updated." : "Meeting logged.");
+}
+
+async function editTask(task, opts = {}) {
+  const result = await taskForm({ model: state.doc.model, task, ...opts });
+  if (!result) return;
+  if (result.action === "delete") { edit({ type: "removeTask", id: task.id }); toast("Task deleted."); return; }
+  edit({ type: "upsertTask", task: result.task });
+  toast(task ? "Task updated." : "Task added.");
+}
+
+function toggleTask(task) {
+  edit({ type: "upsertTask", task: { ...task, done: !task.done } });
+  if (!task.done) toast(`Done: ${task.task}`);
+}
+
+async function openSettings() {
+  const result = await settingsForm({ model: state.doc.model, demo: state.mode === "demo" });
+  if (!result) return;
+  const ops = [{ type: "setSettings", settings: result.settings }];
+  if (result.me !== state.doc.model.me) ops.push({ type: "setMe", name: result.me });
+  if (result.avatarStyle !== state.doc.model.avatarStyle) ops.push({ type: "setAvatarStyle", style: result.avatarStyle });
+  edit(ops);
+  toast("Settings saved.");
 }
 
 // ---- loading -----------------------------------------------------------------
@@ -198,7 +360,7 @@ async function fetchBytes(url) {
 async function loadDemo() {
   const base = await fetchBytes(DEMO_URL);
   const edits = (await kvGet("demo-edits")) ?? [];
-  let model = readWorkbook(base);
+  let model = shiftDemoDates(readWorkbook(base)); // keep the demo's meetings and tasks around today
   let pending = edits;
   try { model = replay(model, edits); } catch { pending = []; await kvDelete("demo-edits"); }
   Object.assign(state, { mode: "demo", fileName: "", handle: null, neverSaved: false, selected: null,
@@ -379,12 +541,13 @@ menuBtn.addEventListener("click", e => { e.stopPropagation(); menu.hidden ? open
 document.addEventListener("click", e => { if (!menu.contains(e.target)) closeMenu(); });
 
 const ACTIONS = { open: openFile, reopen, new: newWorkbook, template: downloadTemplate, download: downloadCopy,
-                  backups: showBackups, demo: loadDemo };
+                  backups: showBackups, settings: openSettings, demo: loadDemo };
+const SAFE_ACTIONS = ["download", "backups", "template", "settings"]; // don't leave the current file
 menu.addEventListener("click", async e => {
   const action = e.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
   closeMenu();
-  if (action !== "download" && action !== "backups" && action !== "template" && unsaved()) {
+  if (!SAFE_ACTIONS.includes(action) && unsaved()) {
     const choice = await ask("Unsaved changes", `You have unsaved changes to ${state.fileName}.`,
       [{ label: "Cancel", value: "" }, { label: "Continue without saving", value: "go" }]);
     if (choice !== "go") return;
@@ -398,7 +561,7 @@ document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && state.mode === "file") { e.preventDefault(); save(); }
   if (e.key === "Escape" && !$("dialog").open) {
     if (!menu.hidden) closeMenu();
-    else if (state.selected) clearSelection();
+    else if (state.selected || card.openId) clearSelection();
   }
 });
 
@@ -413,8 +576,6 @@ $("search").addEventListener("keydown", e => {
 });
 
 $("show2").addEventListener("change", e => map.set({ showSecond: e.target.checked }));
-$("gravatar").checked = pref(PREFS.gravatar, "off") === "on";
-$("gravatar").addEventListener("change", e => { setPref(PREFS.gravatar, e.target.checked ? "on" : "off"); render(); });
 $("fit").addEventListener("click", () => map.fit());
 $("illustrated").addEventListener("change", e => edit({ type: "setAvatarStyle", style: e.target.checked ? "notionists" : "initials" }));
 
@@ -446,4 +607,5 @@ window.addEventListener("beforeunload", e => {
   }
   const handle = await kvGet("last-handle");
   if (handle?.getFile) { state.lastHandle = handle; renderChrome(); }
+  showView(pref(PREFS.view, "map"));
 })();

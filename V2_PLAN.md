@@ -14,7 +14,7 @@ instantly**, with nothing to install and no sign-up.
 - **Browser-only** web app on **GitHub Pages**: plain HTML/CSS/JS ES modules in `site/`, no server, no backend, no build step.
 - **All data stays in the browser. Nothing is uploaded**, and there are no analytics or trackers. Say so on the page.
   The only outside requests are company logos (the logo service sees a domain). Section H adds optional calendar
-  sign-in, which sends only the events I create. (Gravatar was removed.)
+  sign-in, which sends only the events I create.
 - **No LinkedIn scraping:** only my own data exports plus manual entry.
 - **Never commit real data.** `.gitignore` blocks `.xlsx`, `.csv`, `.html` exports and intro reports, except the demo
   (`site/demo/`), the blank template and test fixtures. Demo **people** are fictional; their photos are AI-generated
@@ -77,7 +77,7 @@ instantly**, with nothing to install and no sign-up.
   (MIT license; no on-page attribution required), resized to 128px and stored in `site/demo/photos/` (one per person,
   matched to the name's apparent gender/age; sources in `SOURCES.md`).
 - **My own data:** the Photo field only — "Change photo" picks an image file (resized in the browser to ~96×96, stored
-  as a data URI in the Photo cell) or pastes an image URL. **No Gravatar** (removed: setting, code and docs).
+  as a data URI in the Photo cell) or pastes an image URL. Photos come only from an upload or a pasted image link.
 - Fallback: DiceBear "Notionists" (CC0, generated locally, seeded by name; the "Avatar style" setting) or initials.
 - A person's **status shows as the colored border ring**.
 
@@ -242,11 +242,12 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
 2. ✅ Pictures (B, revised): real companies/schools with real logos, DiceBear fallback, attribution *(2edc770)*
 2b. ✅ School edges; Stanford replaces BYU in the demo; AI-generated demo headshots (SFHQ, MIT); page footer note
    removed (credits only in ATTRIBUTION.md + README); phases reordered
-3. **To-Do + Calendar + meetings + invites (F views/meetings log/tasks, G)** using the current People fields
+3. ✅ **To-Do + Calendar + meetings + invites (F views/meetings log/tasks, G)** using the current People fields
    (tracker-only fields come in Phase 5): Map | Calendar | To-Do tabs; Meetings and Tasks sheets; automatic tasks;
    Schedule meeting with my Zoom link and the invite options (Google/Outlook links, Gmail/mailto draft, .ics);
-   Settings (my name, email, default length, Zoom link). Also: **remove Gravatar** and the **person popover card**
-   (section 6) with inline editing.
+   Settings (my name, email, default length, Zoom link). Also: photos only from upload/link, and the **person popover
+   card** (section 6) with inline editing. Automatic Next Steps and Keep-In-Contact tasks arrive with the tracker
+   fields in Phase 5.
 4. **LinkedIn import + lookup Add/Edit person + work history and schools (D)**: pool import, past companies and
    schools with alumni edges, pool suggestions with one-click add, intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first

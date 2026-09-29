@@ -27,6 +27,7 @@
             <button role="menuitem" data-action="template">Download the blank template</button>
             <hr>
             <button role="menuitem" data-action="download">Download a copy (.xlsx)</button>
+            <button role="menuitem" data-action="settings">Settings…</button>
             <button role="menuitem" data-action="backups">Backups…</button>
             <button role="menuitem" data-action="demo">Back to the demo</button>
           </div>
@@ -58,9 +59,10 @@
         <summary>Legend &amp; view</summary>
         <div class="legend-title">People (ring = status)</div>
         <div class="legend">
-          <span><i class="dot status-met"></i>Met</span>
-          <span><i class="dot status-contacted"></i>Contacted</span>
           <span><i class="dot status-to-reach-out"></i>To Reach Out</span>
+          <span><i class="dot status-contacted"></i>Contacted</span>
+          <span><i class="dot status-scheduled"></i>Scheduled</span>
+          <span><i class="dot status-met"></i>Met</span>
           <span><i class="dot status-follow-up"></i>Follow Up</span>
           <span><i class="dot status-referral"></i>Referral</span>
           <span><i class="dot status-none"></i>No status</span>
@@ -82,11 +84,9 @@
           <label><input type="checkbox" id="show2" checked> Show 2nd-degree connections</label>
           <label><input type="checkbox" id="illustrated"> Illustrated avatars for people without a photo
             <span class="muted small">(DiceBear Notionists, drawn in your browser)</span></label>
-          <label><input type="checkbox" id="gravatar"> Gravatar photos
-            <span class="muted small">(sends a hash of each email to gravatar.com)</span></label>
         </div>
         <p class="muted small">Groups form when 3+ people you know directly share a company or school.
-          Double-click a person to open their LinkedIn.</p>
+          Click anyone for their card; double-click to open their LinkedIn.</p>
       </details>
 
       <footer class="privacy muted small">
@@ -96,15 +96,24 @@
     </div>
   </aside>
 
-  <main id="map-wrap">
-    <div id="map" aria-label="Network map"></div>
-    <div class="map-tools">
-      <div class="segmented" role="group" aria-label="Layout">
-        <button type="button" data-layout="free" aria-pressed="true" title="Physics layout">Free</button>
-        <button type="button" data-layout="ring" aria-pressed="false" title="Groups on a circle around you">Ring</button>
+  <main id="main-pane">
+    <nav class="view-tabs" role="tablist" aria-label="Views">
+      <button role="tab" data-view="map" aria-selected="true">Map</button>
+      <button role="tab" data-view="calendar" aria-selected="false">Calendar</button>
+      <button role="tab" data-view="todo" aria-selected="false">To-Do <span id="todo-badge" class="tab-badge" hidden></span></button>
+    </nav>
+    <div id="map-wrap" class="view" data-view="map">
+      <div id="map" aria-label="Network map"></div>
+      <div class="map-tools">
+        <div class="segmented" role="group" aria-label="Layout">
+          <button type="button" data-layout="free" aria-pressed="true" title="Physics layout">Free</button>
+          <button type="button" data-layout="ring" aria-pressed="false" title="Groups on a circle around you">Ring</button>
+        </div>
+        <button id="fit" class="btn small" type="button" title="Show everything">Fit</button>
       </div>
-      <button id="fit" class="btn small" type="button" title="Show everything">Fit</button>
     </div>
+    <section id="calendar-view" class="view pane" data-view="calendar" hidden aria-label="Calendar"></section>
+    <section id="todo-view" class="view pane" data-view="todo" hidden aria-label="To-Do"></section>
   </main>
 </div>
 

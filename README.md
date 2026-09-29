@@ -26,9 +26,10 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **Target companies:** add them with "+ Add target" (type-ahead over your companies, plus Priority and Stage). Every target is its own red-ringed node. Click one to see **your best way in** (for example Me → Liam → Zoe) drawn in red on the map, preferring the contacts you're warmest with.
 - **Highlight on click:** a person, group or target lights up with its connections while everything else fades. Hovering previews the same thing.
 - **Free or Ring layout:** physics with well-separated clusters, or a tidy ring with groups around you and no-connection targets on the outer edge.
-- **Logos and photos:** companies and schools show their real logo, loaded from their website's icon (only the domain is sent, never contact data; set a Website in the Companies sheet to override the guess). People get an "Add photo" (resized in your browser and saved in your workbook), opt-in Gravatar, or illustrated avatars drawn locally with [DiceBear](https://www.dicebear.com) (CC0 "Notionists" style).
-- **Status colors:** each person's ring shows Met, Contacted, To Reach Out, Follow Up or Referral.
-- **Details panel:** email (click to write, or copy), role, school, Connected On date, tags, notes and LinkedIn link.
+- **Logos and photos:** companies and schools show their real logo, loaded from their website's icon (only the domain is sent, never contact data; set a Website in the Companies sheet to override the guess). People get a photo you upload or link (resized in your browser and saved in your workbook), or illustrated avatars drawn locally with [DiceBear](https://www.dicebear.com) (CC0 "Notionists" style).
+- **Status colors:** each person's ring shows To Reach Out, Contacted, Scheduled, Met, Follow Up or Referral.
+- **Person cards:** click anyone and a card opens right next to them: photo, status (click to change), LinkedIn, email + copy, what's next, the latest meeting, and every field editable in place (click, type, Enter). Groups and targets get a smaller card with your best way in.
+- **Meetings, invites, calendar and to-dos:** schedule or log a meeting from a card or the calendar. Your Zoom link is filled in, the person's status updates, and a "send thank-you" task is added. Send the invite through Google Calendar, Outlook, a Gmail draft, your mail app or an `.ics` file. Network Map never sends anything itself; you always click send. The Calendar tab (month/week) and To-Do tab (Overdue / Today / This week / Later) keep you on track.
 - **Full-screen map** on a graph-paper background, with smooth zoom.
 - **Private by design:** no server, no uploads and no trackers. See [Privacy](#privacy).
 
@@ -79,7 +80,7 @@ npm test             # node --test, no install needed (Node 22+)
 
 ## Privacy
 
-Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos (Google's favicon service sees the company's domain, e.g. `deloitte.com`) and, only if you turn it on, Gravatar (it sees a hash of each email). The demo loads just the logos of its listed companies and never uses Gravatar. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
+Network Map has no backend. Your workbook is read and written by JavaScript in your own browser tab and is never uploaded. The only outside requests are company logos (Google's favicon service sees the company's domain, e.g. `deloitte.com`); the demo loads just the logos of its listed companies. Invites open in Google Calendar, Outlook or Gmail only when you click them. Backups and unsaved edits are kept in your browser's storage on your machine. Don't commit real contact data: `.gitignore` blocks `.xlsx`, `.csv` and `.html` files except the fictional demo, the blank template and test fixtures.
 
 ## License
 

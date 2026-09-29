@@ -6,7 +6,7 @@ import { clean, normalizeName } from "./org.js";
 export const PERSON_FIELDS = ["name", "company", "school", "role", "email", "linkedinUrl", "photo",
                               "connectedThrough", "connectedOn", "status", "tags", "notes"];
 
-export const STATUSES = ["Met", "Contacted", "To Reach Out", "Follow Up", "Referral"];
+export const STATUSES = ["To Reach Out", "Contacted", "Scheduled", "Met", "Follow Up", "Referral"];
 
 export function makePerson(fields = {}) {
   const p = { name: "", company: "", school: "", role: "", email: "", linkedinUrl: "", photo: "",

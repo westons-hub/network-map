@@ -25,11 +25,48 @@ export function applyOp(model, op) {
         person.extra = { ...m.people[i].extra, ...person.extra };
         m.people[i] = person;
       } else m.people.push(person);
-      if (op.key && op.key !== personKey(person)) renameConnector(m, op.key, person.name);
+      if (op.key && op.key !== personKey(person)) {
+        renameConnector(m, op.key, person.name);
+        renameInLogs(m, person.name, op.key);
+      }
+      break;
+    }
+    case "patchPerson": { // inline edit: only the fields that changed, so it replays safely after a reload
+      const i = m.people.findIndex(p => personKey(p) === op.key);
+      if (i < 0) break;
+      const person = makePerson({ ...m.people[i], ...op.fields });
+      person.extra = m.people[i].extra;
+      person.source = m.people[i].source;
+      m.people[i] = person;
+      if (op.fields.name !== undefined && personKey(person) !== op.key) {
+        renameConnector(m, op.key, person.name);
+        renameInLogs(m, m.people[i].name, op.key);
+      }
       break;
     }
     case "removePerson":
       m.people = m.people.filter(p => personKey(p) !== op.key);
+      break;
+    case "upsertMeeting": {
+      const i = m.meetings.findIndex(x => x.id === op.meeting.id);
+      const meeting = { extra: {}, ...(i >= 0 ? m.meetings[i] : {}), ...op.meeting };
+      if (i >= 0) m.meetings[i] = meeting; else m.meetings.push(meeting);
+      break;
+    }
+    case "removeMeeting":
+      m.meetings = m.meetings.filter(x => x.id !== op.id);
+      break;
+    case "upsertTask": {
+      const i = m.tasks.findIndex(x => x.id === op.task.id);
+      const task = { extra: {}, ...(i >= 0 ? m.tasks[i] : {}), ...op.task };
+      if (i >= 0) m.tasks[i] = task; else m.tasks.push(task);
+      break;
+    }
+    case "removeTask":
+      m.tasks = m.tasks.filter(x => x.id !== op.id);
+      break;
+    case "setSettings":
+      m.settings = { ...m.settings, ...op.settings };
       break;
     case "upsertTarget": { // op.key = normalized company before the edit (absent when adding)
       const t = { company: "", priority: "", stage: "", notes: "", extra: {}, ...op.target };
@@ -57,6 +94,11 @@ export function applyOp(model, op) {
 }
 
 export const replay = (model, ops) => ops.reduce(applyOp, model);
+
+/** Someone was renamed: their meetings and tasks follow them. */
+function renameInLogs(m, newName, oldKey) {
+  for (const x of [...m.meetings, ...m.tasks]) if (normalizeName(x.person) === oldKey) x.person = newName;
+}
 
 /** Someone was renamed: keep people who were "Connected Through" them attached. */
 function renameConnector(m, oldKey, newName) {

@@ -2,7 +2,7 @@
 // bytes and a plain model, and back. It uses SheetJS, so it runs the same in the
 // browser and in Node tests.
 //
-// Model: { me, avatarStyle, people, targets, companies, pool, layout, notices }
+// Model: { me, avatarStyle, settings, people, targets, companies, pool, meetings, tasks, layout, notices }
 //
 // Sheets you add yourself (and extra columns on ours) are kept when saving.
 // Old files (a "Contacts" sheet, Targets with only Company/Notes) are migrated.
@@ -11,8 +11,8 @@ import * as XLSX from "../../vendor/xlsx.mjs";
 import { clean } from "./org.js";
 import { POOL_COLUMNS, makePerson, parseDate, poolEntry } from "./people.js";
 
-export const SHEETS = { people: "People", targets: "Targets", companies: "Companies",
-                        pool: "LinkedIn Pool", layout: "Layout", settings: "Settings" };
+export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
+                        meetings: "Meetings", tasks: "Tasks", layout: "Layout", settings: "Settings" };
 
 // [column header, model field]. Headers are matched case-insensitively.
 export const PEOPLE_COLUMNS = [["Name", "name"], ["Company", "company"], ["School", "school"], ["Role", "role"],
@@ -28,8 +28,26 @@ export const PRIORITIES = ["1", "2", "3"];
 
 export const AVATAR_STYLES = ["initials", "notionists"];
 
+// Meetings: the spec's columns first, then the meeting link and a stable ID the app uses for edits.
+export const MEETING_COLUMNS = [["Person", "person"], ["Date", "date"], ["Start", "start"], ["End", "end"],
+  ["Type", "type"], ["Method", "method"], ["Notes", "notes"], ["Next Step", "nextStep"],
+  ["Calendar Event ID", "eventId"], ["Link", "link"], ["ID", "id"]];
+export const TASK_COLUMNS = [["Task", "task"], ["Person", "person"], ["Company", "company"], ["Due", "due"],
+  ["Done", "done"], ["Created", "created"], ["Source", "source"], ["ID", "id"]];
+export const MEETING_TYPES = ["Coffee Chat", "Informational", "Networking Event", "Class/Club", "Interview", "Other"];
+export const METHODS = ["Zoom", "Google Meet", "Teams", "Phone", "In Person", "Email", "LinkedIn"];
+
+export const DEFAULT_INVITE = "Hi {first name}, looking forward to our chat on {date} at {time}. {link}";
+// [row label on the Settings sheet, settings field, default]
+const SETTING_ROWS = [["Your email", "email", ""], ["Meeting length (minutes)", "meetingLength", 30],
+  ["Zoom link", "zoomLink", ""], ["Check-in every (days)", "checkInDays", 60],
+  ["Invite message", "inviteTemplate", DEFAULT_INVITE], ["Demo base date", "demoBaseDate", ""]];
+
+export const defaultSettings = () => Object.fromEntries(SETTING_ROWS.map(([, f, d]) => [f, d]));
+
 export function emptyModel(me = "") {
-  return { me, avatarStyle: "initials", people: [], targets: [], companies: [], pool: [], layout: {}, notices: [] };
+  return { me, avatarStyle: "initials", settings: defaultSettings(), people: [], targets: [], companies: [], pool: [],
+           meetings: [], tasks: [], layout: {}, notices: [] };
 }
 
 const lower = s => clean(s).toLowerCase();
@@ -59,6 +77,7 @@ function pick(rec, columns, aliases = {}) {
 }
 
 const text = v => (v instanceof Date ? parseDate(v) : clean(v));
+const isTrue = v => v === true || /^(true|yes|y|x|done|1|✓)$/i.test(clean(v));
 
 /** Workbook bytes (ArrayBuffer / Uint8Array) -> model. */
 export function readWorkbook(bytes) {
@@ -113,8 +132,34 @@ export function readWorkbook(bytes) {
     if (id && Number.isFinite(x) && Number.isFinite(y)) model.layout[id] = { x, y };
   }
 
+  // ---- Meetings & Tasks ----
+  const time = v => (v instanceof Date ? `${String(v.getHours()).padStart(2, "0")}:${String(v.getMinutes()).padStart(2, "0")}`
+    : clean(v).replace(/^(\d):/, "0$1:"));
+  findSheet(wb, SHEETS.meetings)?.rows.forEach((rec, i) => {
+    const { known, extra } = pick(rec, MEETING_COLUMNS);
+    if (!text(known.person) && !text(known.date)) return;
+    model.meetings.push({ id: text(known.id) || `m-row${i + 2}`, person: text(known.person), date: text(known.date),
+      start: time(known.start), end: time(known.end), type: text(known.type), method: text(known.method),
+      notes: String(known.notes ?? "").trim(), nextStep: text(known.nextStep), eventId: text(known.eventId),
+      link: text(known.link), extra });
+  });
+  findSheet(wb, SHEETS.tasks)?.rows.forEach((rec, i) => {
+    const { known, extra } = pick(rec, TASK_COLUMNS);
+    if (!text(known.task)) return;
+    model.tasks.push({ id: text(known.id) || `t-row${i + 2}`, task: text(known.task), person: text(known.person),
+      company: text(known.company), due: text(known.due), done: isTrue(known.done), created: text(known.created),
+      source: text(known.source), extra });
+  });
+
   // ---- Settings ----
   for (const rec of findSheet(wb, SHEETS.settings)?.rows ?? []) {
+    const row = SETTING_ROWS.find(([label]) => lower(label) === lower(rec.Setting));
+    if (row) {
+      const [, field, fallback] = row;
+      model.settings[field] = typeof fallback === "number"
+        ? (Number(rec.Value) > 0 ? Number(rec.Value) : fallback)
+        : field === "inviteTemplate" ? String(rec.Value ?? "").trim() || fallback : text(rec.Value);
+    }
     if (lower(rec.Setting) === "your name") model.me = text(rec.Value);
     if (lower(rec.Setting) === "avatar style" && AVATAR_STYLES.includes(lower(rec.Value))) model.avatarStyle = lower(rec.Value);
   }
@@ -164,8 +209,15 @@ export function writeWorkbook(model, base) {
     [SHEETS.pool]: sheetFrom([POOL_COLUMNS, ...model.pool.map(e =>
       [e.firstName, e.lastName, e.url, e.email, e.company, e.position, dateCell(e.connectedOn)])],
       [14, 16, 40, 28, 28, 30, 14]),
+    [SHEETS.meetings]: sheetFrom(tableRows(model.meetings ?? [], MEETING_COLUMNS, m => MEETING_COLUMNS.map(([, f]) =>
+      f === "date" ? dateCell(m.date) : m[f] ?? "")), [22, 12, 8, 8, 16, 12, 40, 30, 22, 30, 16]),
+    [SHEETS.tasks]: sheetFrom(tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>
+      f === "due" || f === "created" ? dateCell(t[f]) : f === "done" ? (t.done ? "Yes" : "") : t[f] ?? "")),
+      [40, 22, 20, 12, 8, 12, 20, 16]),
     [SHEETS.settings]: sheetFrom([["Setting", "Value"], ["Your name", model.me ?? ""],
-                                  ["Avatar style", model.avatarStyle ?? "initials"]], [16, 30]),
+                                  ["Avatar style", model.avatarStyle ?? "initials"],
+                                  ...SETTING_ROWS.map(([label, field, fallback]) => [label, model.settings?.[field] ?? fallback])],
+                                 [26, 60]),
     [SHEETS.layout]: sheetFrom([["Node", "X", "Y"], ...Object.entries(model.layout ?? {}).map(([id, p]) =>
       [id, Math.round(p.x), Math.round(p.y)])], [36, 8, 8]),
   };
