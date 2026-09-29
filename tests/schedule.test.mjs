@@ -195,3 +195,29 @@ test("invites: several guests, a time zone, a reminder and a custom title", asyn
   assert.match(ics, /BEGIN:VALARM\r\nACTION:DISPLAY\r\n.*\r\nTRIGGER:-PT15M\r\nEND:VALARM/);
   assert.match(ics, /DTSTART:20260930T140000Z/);
 });
+
+test("deleting a meeting finds its automatic tasks: untouched ones go, edited ones are asked about, done ones stay", async () => {
+  const { meetingTasks, meetingOps, thankYouText } = await import("../site/js/core/schedule.js");
+  const mtg = meeting({ id: "m9", person: "Priya Shah", date: "2026-10-02", type: "Coffee Chat" });
+  let m = { ...model(), tasks: [] };
+  for (const op of meetingOps(m, mtg, NOW)) if (op.type === "upsertTask") m.tasks.push(op.task);
+  m.tasks.push({ id: "p1", task: "Prepare questions for coffee chat with Priya", person: "Priya Shah", due: "2026-10-01", done: false, source: "prep:m9" },
+               { id: "p2", task: "Ask Priya about the APM program", person: "Priya Shah", due: "2026-10-01", done: false, source: "prep:m9" },
+               { id: "p3", task: thankYouText("Priya Shah"), done: true, source: "thanks:m9" },
+               { id: "o1", task: "Unrelated", done: false, source: "" });
+  const r = meetingTasks(m, mtg);
+  assert.deepEqual(r.untouched.map(t => t.id), ["t-m9", "p1"]);
+  assert.deepEqual(r.edited.map(t => t.id), ["p2"]);
+  m.tasks[0] = { ...m.tasks[0], due: "2026-10-05" }; // moved the thank-you: now it counts as edited
+  assert.deepEqual(meetingTasks(m, mtg).edited.map(t => t.id).sort(), ["p2", "t-m9"]);
+});
+
+test("the demo's automatic tasks are linked to their meetings", async () => {
+  const { meetingTasks } = await import("../site/js/core/schedule.js");
+  const { readWorkbook } = await import("../site/js/core/workbook.js");
+  const d = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
+  const priya = d.meetings.find(x => x.person === "Priya Shah");
+  assert.deepEqual(meetingTasks(d, priya).untouched.map(t => t.task), ["Prepare questions for coffee chat with Priya"]);
+  const daniel = d.meetings.find(x => x.person === "Daniel Ortiz");
+  assert.deepEqual(meetingTasks(d, daniel).untouched.map(t => t.task), ["Send thank-you to Daniel Ortiz within 24 hrs"]);
+});

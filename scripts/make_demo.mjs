@@ -73,17 +73,17 @@ const MEETINGS = [
   ["Mia Chen", 12, "11:00", 30, "Coffee Chat", "Google Meet", "", ""],
   ["Ethan Brooks", 25, "14:00", 30, "Informational", "Zoom", "", ""],
 ];
-// [task, person, company, due (days from BASE), done]
+// [task, person, company, due (days from BASE), done, made for meeting #n (thank-you / prep tasks, linked by meeting ID)]
 const TASKS = [
-  ["Send thank-you to Daniel Ortiz within 24 hrs", "Daniel Ortiz", "Deloitte", -1, false],
+  ["Send thank-you to Daniel Ortiz within 24 hrs", "Daniel Ortiz", "Deloitte", -1, false, "thanks:5"],
   ["Follow up with Hana Kim about the strategy practice", "Hana Kim", "Deloitte", -3, false],
   ["Send resume to Jordan for review", "Jordan Lee", "Deloitte", 0, false],
-  ["Prepare questions for coffee chat with Priya", "Priya Shah", "Deloitte", 1, false],
+  ["Prepare questions for coffee chat with Priya", "Priya Shah", "Deloitte", 1, false, "prep:6"],
   ["Ask Liam for the intro to Zoe Adams", "Liam Walsh", "Microsoft", 3, false],
   ["Research Google strategy & operations roles", "", "Google", 9, false],
   ["Update resume with fall projects", "", "", 14, false],
-  ["Send thank-you to Noah Carter within 24 hrs", "Noah Carter", "Microsoft", -4, true],
-  ["Send thank-you to Sofia Alvarez within 24 hrs", "Sofia Alvarez", "Microsoft", -19, true],
+  ["Send thank-you to Noah Carter within 24 hrs", "Noah Carter", "Microsoft", -4, true, "thanks:4"],
+  ["Send thank-you to Sofia Alvarez within 24 hrs", "Sofia Alvarez", "Microsoft", -19, true, "thanks:2"],
 ];
 const day = n => { const d = new Date(`${BASE}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const plus = (t, min) => { const [h, m] = t.split(":").map(Number); const x = h * 60 + m + min; return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
@@ -155,8 +155,8 @@ const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists", profile:
     date: day(d), start, end: plus(start, min), type, method, notes, nextStep, eventId: "",
     link: method === "Zoom" ? "https://zoom.us/j/0000000000" : method === "Google Meet" ? "https://meet.google.com/abc-defg-hij" : "",
     extra: {} })),
-  tasks: TASKS.map(([task, person, company, d, done], i) => ({ id: `demo-t${i + 1}`, task, person, company, due: day(d),
-    done, created: day(Math.min(d, 0) - 3), source: "", extra: {} })),
+  tasks: TASKS.map(([task, person, company, d, done, made], i) => ({ id: `demo-t${i + 1}`, task, person, company, due: day(d),
+    done, created: day(Math.min(d, 0) - 3), source: made ? made.replace(/:(\d+)$/, ":demo-m$1") : "", extra: {} })),
   settings: { ...emptyModel().settings, email: "alex.rivera@example.com", zoomLink: "https://zoom.us/j/0000000000",
               demoBaseDate: BASE },
   pool };

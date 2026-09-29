@@ -39,7 +39,7 @@ export function createTodo(root, { getModel, onAdd, onToggle, onEdit, onPerson }
     for (const [key, label] of GROUPS) {
       const tasks = groups[key];
       if (key === "done" && !tasks.length) continue;
-      const section = el("section", undefined, { class: `todo-group ${key}` });
+      const section = el("section", undefined, { class: `todo-group todo-${key}` }); // "todo-week", not "week" (the calendar uses .week)
       const h = el("h3", undefined);
       h.append(label, el("span", String(tasks.length), { class: "count" }));
       if (key === "done") {

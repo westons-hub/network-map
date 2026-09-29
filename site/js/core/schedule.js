@@ -61,6 +61,22 @@ export function meetingDate(model, name, now = new Date()) {
   return next ? { meeting: next, upcoming: true } : list.length ? { meeting: list.at(-1), upcoming: false } : null;
 }
 
+/** The automatic tasks' wording (a task still worded like this hasn't been edited). */
+export const thankYouText = person => `Send thank-you to ${person} within 24 hrs`;
+export const prepText = meeting => `Prepare questions for ${(meeting.type || "meeting").toLowerCase()} with ${firstName(meeting.person)}`;
+
+/**
+ * The not-done tasks made for a meeting (source "thanks:<meeting id>" or "prep:<meeting id>"), split into ones you
+ * haven't touched (still the automatic wording and date) and ones you've edited. Deleting the meeting removes the
+ * first kind and asks about the second.
+ */
+export function meetingTasks(model, meeting) {
+  const linked = (model.tasks ?? []).filter(t => !t.done && /^(thanks|prep):/.test(t.source ?? "") && t.source.slice(t.source.indexOf(":") + 1) === meeting.id);
+  const untouched = t => (t.source.startsWith("thanks:") ? t.task === thankYouText(meeting.person) && t.due === addDays(meeting.date, 1)
+                                                          : t.task === prepText(meeting));
+  return { untouched: linked.filter(untouched), edited: linked.filter(t => !untouched(t)) };
+}
+
 /**
  * The edits one meeting causes: save it, update the person's status (Scheduled if it's upcoming,
  * Met once it has happened), and add a "Send thank-you" task for the day after (once per meeting).
@@ -74,7 +90,7 @@ export function meetingOps(model, meeting, now = new Date()) {
   }
   const source = `thanks:${meeting.id}`;
   if (meeting.person && isDate(meeting.date) && !model.tasks.some(t => t.source === source)) {
-    ops.push({ type: "upsertTask", task: { id: `t-${meeting.id}`, task: `Send thank-you to ${meeting.person} within 24 hrs`,
+    ops.push({ type: "upsertTask", task: { id: `t-${meeting.id}`, task: thankYouText(meeting.person),
       person: meeting.person, company: person?.company ?? "", due: addDays(meeting.date, 1), done: false,
       created: todayIso(now), source } });
   }

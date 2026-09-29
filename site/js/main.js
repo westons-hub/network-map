@@ -8,7 +8,7 @@ import { exportWorkbook } from "./core/export.js";
 import { searchMap } from "./core/search.js";
 import { bestPath, neighborhood } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
-import { demoEditsForToday, meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
+import { demoEditsForToday, meetingOps, meetingTasks, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
 import { saveDoc } from "./core/sync.js";
 import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./core/workbook.js";
 import * as files from "./store/files.js";
@@ -526,8 +526,21 @@ async function editMeeting(meeting, opts = {}) {
   if (!result) return;
   if (result.action === "open") return openPerson(meeting.person);
   if (result.action === "delete") {
-    edit({ type: "removeMeeting", id: meeting.id });
-    toast("Meeting deleted.");
+    // Its automatic tasks go with it; ones you've edited only if you say so.
+    const { untouched, edited } = meetingTasks(model, meeting);
+    let remove = untouched;
+    if (edited.length) {
+      const n = edited.length;
+      const list = el("ul", undefined, { class: "small" });
+      for (const t of edited) list.append(el("li", t.task));
+      const body = el("div");
+      body.append(el("p", `You edited ${n === 1 ? "a task" : `${n} tasks`} made for this meeting:`), list);
+      const choice = await ask(`Also remove ${n} related task${n === 1 ? "" : "s"}?`, body,
+        [{ label: "Keep them", value: "keep" }, { label: n === 1 ? "Remove it too" : "Remove them too", value: "remove", primary: true }]);
+      if (choice === "remove") remove = [...untouched, ...edited];
+    }
+    edit([{ type: "removeMeeting", id: meeting.id }, ...remove.map(t => ({ type: "removeTask", id: t.id }))]);
+    toast(`Meeting deleted${remove.length ? `, with ${remove.length} related task${remove.length === 1 ? "" : "s"}` : ""}.`);
     if (meeting.eventId && calendars.status().provider && state.mode !== "demo") {
       calendars.cancelMeeting(meeting).then(() => toast("Canceled on your calendar; they get a cancellation."))
         .catch(e => toast(`Couldn't cancel on your calendar: ${e.message}`, 8000));

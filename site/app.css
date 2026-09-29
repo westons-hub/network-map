@@ -308,9 +308,9 @@ dialog .actions .left { margin-right: auto; }
 .todo-groups { display: grid; gap: 14px; max-width: 860px; }
 .todo-group h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0 0 6px; text-transform: uppercase;
                  letter-spacing: .05em; color: var(--muted); }
-.todo-group.overdue h3 { color: var(--overdue); }
+.todo-group.todo-overdue h3 { color: var(--overdue); }
 .todo-group h3 .count { background: var(--line); color: var(--text); border-radius: 999px; padding: 0 7px; font-size: 11px; }
-.todo-group.overdue h3 .count { background: var(--badge-red); color: #fff; }
+.todo-group.todo-overdue h3 .count { background: var(--badge-red); color: #fff; }
 .todo-list { list-style: none; margin: 0; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .todo-list li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
 .todo-list li:first-child { border-top: 0; }
@@ -611,7 +611,7 @@ dialog:has(.event-editor) { width: min(640px, 96vw); }
 /* ---- Orbit sign-off at the bottom of the LinkedIn Pool and To-Do views (in the flow, never over content) ---- */
 .brand-footer { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 28px 0 4px; padding-top: 14px;
   border-top: 1px solid var(--line); color: var(--muted); font: 700 13px var(--font); letter-spacing: -.01em; max-width: 860px; }
-.brand-footer img { width: 18px; height: 18px; }
+.brand-footer img { width: 22px; height: 22px; opacity: .9; }
 #pool-view .brand-footer { max-width: none; }
 
 /* ---- welcome card + "Start your own" guide ---- */
@@ -668,3 +668,4 @@ dialog:has(.onboarding) { width: min(700px, 96vw); }
 .inline-chips { min-height: 32px; }
 .field-chips input, .field .field-chips input { border: 0; outline: none; padding: 4px; flex: 1 1 120px; width: auto; min-width: 100px; background: transparent; box-shadow: none; }
 .field-chips:focus-within { border-color: var(--accent); }
+.view-tabs button { white-space: nowrap; flex: none; }

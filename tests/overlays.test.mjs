@@ -48,3 +48,13 @@ test("the Connections badge doesn't share a class with the intro", () => {
   assert.ok(!/["\s`]intro["\s`]/.test(classValues), "details.js must not use the bare class `intro`");
   assert.ok(!/^\.intro\b/m.test(css), "no bare .intro rule in app.css");
 });
+
+test("To-Do group classes don't reuse the calendar's layout classes", () => {
+  const todo = readFileSync(join(root, "js/ui/todo.js"), "utf8");
+  const layoutClasses = [...css.matchAll(/^\.([\w-]+)\s*\{[^}]*(?:display|border|background)/gm)].map(m => m[1]);
+  const groupClass = todo.match(/class: `todo-group ([^`]*)`/)?.[1] ?? "";
+  for (const key of ["overdue", "today", "week", "later", "done"]) {
+    const cls = groupClass.replace("${key}", key);
+    assert.ok(!layoutClasses.includes(cls), `the "${key}" To-Do group uses .${cls}, which is also a layout class`);
+  }
+});

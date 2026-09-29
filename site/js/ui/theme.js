@@ -17,14 +17,13 @@ export const isDark = () => resolvedTheme() === "dark";
 /** Brand image for the current theme: brandSrc("logo") -> "brand/orbit-logo-white.svg" on dark. */
 export const brandSrc = (kind, dark = isDark()) => `brand/orbit-${kind}${dark ? "-white" : ""}.svg`;
 
-/** A small "Orbit" sign-off for the bottom of a view (the mark follows the theme). */
+/** A small sign-off for the bottom of a view: just the Orbit mark, in the theme's color. */
 export function brandFooter() {
   const f = document.createElement("footer");
   f.className = "brand-footer";
-  const img = Object.assign(document.createElement("img"), { src: brandSrc("mark"), alt: "", width: 18, height: 18 });
+  const img = Object.assign(document.createElement("img"), { src: brandSrc("mark"), alt: "Orbit", width: 22, height: 22 });
   img.dataset.brand = "mark";
-  const name = Object.assign(document.createElement("span"), { textContent: "Orbit" });
-  f.append(img, name);
+  f.append(img);
   return f;
 }
 
