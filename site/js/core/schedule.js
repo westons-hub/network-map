@@ -241,3 +241,28 @@ export function shiftDemoDates(model, today = todayIso()) {
     tasks: model.tasks.map(t => ({ ...t, due: shift(t.due), created: shift(t.created) })),
   };
 }
+
+/**
+ * Saved demo edits carry real dates (a meeting you added "tomorrow"). When you come back days later, shift every
+ * date inside them by the days since they were saved, so they keep the same place relative to today.
+ */
+export function shiftOps(ops, days) {
+  if (!days) return ops;
+  const shift = d => (isDate(d) ? addDays(d, days) : d);
+  return ops.map(op => {
+    switch (op.type) {
+      case "upsertMeeting": return { ...op, meeting: { ...op.meeting, date: shift(op.meeting.date) } };
+      case "upsertTask": return { ...op, task: { ...op.task, due: shift(op.task.due), created: shift(op.task.created) } };
+      case "upsertPerson": return { ...op, person: { ...op.person, connectedOn: shift(op.person.connectedOn) } };
+      case "patchPerson": return "connectedOn" in (op.fields ?? {}) ? { ...op, fields: { ...op.fields, connectedOn: shift(op.fields.connectedOn) } } : op;
+      default: return op;
+    }
+  });
+}
+
+/** Demo edits as saved in the browser: { savedOn, ops } (older saves were a bare array). Returns ops for today. */
+export function demoEditsForToday(saved, today = todayIso()) {
+  if (!saved) return [];
+  if (Array.isArray(saved)) return saved;
+  return shiftOps(saved.ops ?? [], isDate(saved.savedOn) ? daysBetween(saved.savedOn, today) : 0);
+}

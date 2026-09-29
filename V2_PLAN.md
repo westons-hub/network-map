@@ -1,6 +1,6 @@
 # Network Map v2: build spec for Claude Code
 
-This is the single spec. V2_ADDITIONS.md (and the change to its section B) has been merged in here.
+This is the single spec. V2_ADDITIONS.md (and the change to its section B) and NEXT_UPDATE.md have been merged in here.
 Build in the phases at the bottom, run the tests, and **commit locally after each phase. Don't push until I say so.**
 After each phase, show me screenshots of what changed. Ask me about anything unclear before building it.
 
@@ -102,7 +102,7 @@ instantly**, with nothing to install and no sign-up.
 - Fallback: DiceBear "Notionists" (CC0, generated locally, seeded by name; the "Avatar style" setting) or initials.
 - A person's **status shows as the colored border ring**.
 
-## 6. Person popover card (replaces person details in the sidebar)
+## 6. Person popover card — *superseded by K (details back in the sidebar)*
 
 - Clicking a person on the map opens a **floating card next to their node** (not in the sidebar). It stays attached to
   the node when I pan/zoom, flips side/position to stay fully on screen, and never covers the node. Highlight-on-click
@@ -260,6 +260,65 @@ Riverbend University → **Stanford University** (BYU is not used in the demo) �
 Lakeview State University and Harbor Tech Institute → **University of Utah** ·
 new no-connection targets **Apple** and **Nike** (replacing Granite Peak Partners and Harborview Media).
 
+## J. Orbit brand + welcome intro (NEXT_UPDATE §1)
+
+- **Full rebrand to Orbit** (the GitHub repo keeps its name): app name, header logo, favicon/touch icon, page title,
+  README, demo banner; UI accents from the brand (navy #1E3A5F, rose #F43F5E, orange #F97316, slate #5B6B80) and
+  **DM Sans** (self-hosted under the SIL Open Font License; no Google Fonts request). Brand files from `~/Downloads/brand/`.
+  Tagline: "Your orbit, always moving outward."
+- **Welcome intro** recreating `Orbit Welcome Short.mp4` (6.5 s, 1920×1080) in **SVG + CSS/JS** (no video file, no
+  animation library), dark background #131A26, centered:
+  0.0–0.5 s white core dot fades/scales in → 0.5–1.5 s the orbit arc draws around it (stroke-dashoffset, rose→orange
+  gradient, arrowhead) and the orange satellite pops on → ~1.8–2.4 s the mark shrinks and moves down; **"Map your orbit"**
+  types in above it letter by letter (DM Sans 700, white), then **"Find your path."** fades in (#A3AEBF) → ~3.3–4.0 s a
+  thin wide ellipse draws around the small mark (faint rose/orange) and the **"Orbit"** wordmark appears beside it →
+  4.0–6.0 s an orange and a rose dot travel the ellipse in opposite directions → 6.0–6.5 s fade out, app fades in.
+  First visit only (localStorage, try/catch); "Replay intro" in Settings; skip by click/any key/"Skip";
+  `prefers-reduced-motion` → static logo + tagline ~1 s. The app loads behind it.
+
+## K. Details back in the sidebar (NEXT_UPDATE §2)
+
+Replaces the floating popover (section 6): clicking a person, company, school, target **or me** opens full details in
+the **left sidebar** with everything the card had (photo + Change photo, status quick-change, LinkedIn / email + copy /
+Schedule meeting / Add task, all fields click-to-edit, notes, next steps, upcoming meetings and tasks, Edit all, Remove).
+A back arrow/× returns to the default sidebar; clicking empty map space also clears it; highlight-on-click stays. On
+phones the sidebar details are the bottom sheet.
+
+## L. Autofill everywhere (NEXT_UPDATE §3)
+
+One type-ahead component for every repeating field — Company, Past Companies, Schools, Role, Tags, Meeting Type,
+Method, Status, Relationship Plan, Connections/people — with suggestions from everything already entered (people, pool,
+targets, Companies sheet, imported PDFs), matched through org aliases ("U of U" → University of Utah), showing the logo
+and how many people share each company/school; ↑/↓, Enter, Tab; "Add 'X'" for new values. Multi-entry fields keep the
+optional years format ("Deloitte (2021–2023)").
+
+## M. Connections between people (NEXT_UPDATE §4)
+
+- A **Connections** section in the Add-person review and in the details view: pick existing people (type-ahead) and a
+  type for each: **Introduced me**, Coworker, Classmate, Friend, Mentor, Other (free text).
+- **Only "Introduced me" makes someone 2nd-degree** (they hang off the introducer); the other types are extra
+  person-to-person links. All types draw edges, appear in highlight-on-click, and count in best-path logic.
+- Shown and removable from both people's details. Stored in a **Connections sheet** (Person A, Person B, Type, Notes).
+  The old Connected Through column **migrates** into it and **stays in People, filled automatically** from "Introduced
+  me" (typing in that column in Excel still imports). Nice-to-have: Shift+drag from one person to another to connect.
+
+## N. My profile (NEXT_UPDATE §5)
+
+- The center node has a photo and full profile. Demo: Alex Rivera gets an AI-generated headshot (same SFHQ source/license
+  rules), role and headline (student/recent grad looking for strategy/product roles), school with years, past jobs with
+  years, email, LinkedIn, location, "What I'm looking for" notes.
+- Clicking the center node opens this profile in the sidebar. With my own data, **"My profile"** (Settings and the
+  center node) edits my name, photo, schools, jobs and info, saved in a **Me** sheet. My schools/past companies drive
+  "Same school" and "Former coworker" badges.
+
+## O. Demo dates always current (NEXT_UPDATE §6)
+
+Every demo date (meetings, tasks, follow-ups, connected on, date reached out, meeting logs) is relative to **today** when
+the demo starts; always something due today, 1–2 overdue, a meeting tomorrow, several this week and next, some done.
+Calendar and To-Do open on today. **Saved demo edits never go stale:** edits made days ago are shifted by (today − the day
+they were saved). "Reset demo" rebuilds from today. Tests fake the clock (incl. month-end, a Monday, a Sunday) and reload
+a saved demo copy a week later.
+
 ## 9. README (portfolio-first)
 
 Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
@@ -275,6 +334,9 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (f3d4e
    no-connection targets on a capped outer ring; **LinkedIn pool** tab; crisp repo logos + logo.dev/Brandfetch support;
    **one "+ Add person" box** (name / LinkedIn link / profile PDF) with a review card; Schools + Past Companies +
    alumni links (D.1, D.2, D.6)
+3c. **Next update (NEXT_UPDATE.md), one local commit per part:**
+   1) demo dates always current (O) · 2) details back in the sidebar (K) · 3) my profile (N) · 4) connections between
+   people (M) · 5) autofill everywhere (L) · 6) Orbit rebrand + welcome intro (J)
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first

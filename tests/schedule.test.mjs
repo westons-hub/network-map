@@ -6,7 +6,7 @@ import { applyOp, replay } from "../site/js/core/ops.js";
 import { makePerson } from "../site/js/core/people.js";
 import {
   addDays, addMinutes, calendarItems, fillTemplate, gmailUrl, googleCalendarUrl, groupTasks, icsFile, mailtoUrl,
-  meetingDate, meetingOps, monthGrid, outlookUrl, shiftDemoDates, taskBadge, toDate, weekDays,
+  demoEditsForToday, meetingDate, meetingOps, monthGrid, outlookUrl, shiftDemoDates, shiftOps, taskBadge, toDate, weekDays,
 } from "../site/js/core/schedule.js";
 import { emptyModel, readWorkbook, writeWorkbook } from "../site/js/core/workbook.js";
 import { readFileSync } from "node:fs";
@@ -136,7 +136,8 @@ test("demo dates move with today so the demo always looks current", () => {
 
 test("the demo always has today / overdue / tomorrow / this week / next week / done, whatever the date", () => {
   const raw = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
-  for (const today of ["2026-09-28", "2027-02-28", "2027-12-31", "2030-06-15", "2025-01-01"]) {
+  // Includes a month-end (Jan 31), a Monday (2027-03-01), a Sunday (2027-03-07), a leap day and a year boundary.
+  for (const today of ["2026-09-28", "2027-01-31", "2027-03-01", "2027-03-07", "2028-02-29", "2027-12-31", "2030-06-15", "2025-01-01"]) {
     const m = shiftDemoDates(raw, today);
     const g = groupTasks(m.tasks, today);
     assert.ok(g.today.length >= 1, `${today}: something due today`);
@@ -151,4 +152,24 @@ test("the demo always has today / overdue / tomorrow / this week / next week / d
     assert.ok(m.people.every(p => !p.connectedOn || p.connectedOn <= today), `${today}: connections are in the past`);
     assert.equal(taskBadge(m.tasks, today), g.today.length + g.overdue.length);
   }
+});
+
+test("saved demo edits don't go stale: reloaded a week later, their dates move with today", () => {
+  const raw = readWorkbook(readFileSync(new URL("../site/demo/demo_network.xlsx", import.meta.url)));
+  const day1 = "2027-03-01";
+  // On day 1 you add a meeting for tomorrow and a task due today in the demo.
+  const ops = [{ type: "upsertMeeting", meeting: meeting({ id: "mine", person: "Mia Chen", date: addDays(day1, 1) }) },
+               { type: "upsertTask", task: { id: "t-mine", task: "Mine", person: "", due: day1, done: false, created: day1 } }];
+  const saved = { savedOn: day1, ops };
+  const weekLater = addDays(day1, 7);
+  const m = replay(shiftDemoDates(raw, weekLater), demoEditsForToday(saved, weekLater));
+  assert.equal(m.meetings.find(x => x.id === "mine").date, addDays(weekLater, 1)); // still tomorrow
+  assert.equal(m.tasks.find(x => x.id === "t-mine").due, weekLater);                // still due today
+  const g = groupTasks(m.tasks, weekLater);
+  assert.ok(g.today.length >= 2 && g.overdue.length >= 1);
+  assert.ok(m.meetings.some(x => x.date === addDays(weekLater, 1) && x.id !== "mine"), "the demo's own meeting tomorrow is still there");
+  // Older saves (a bare list) still load unchanged, and "no edits" is an empty list.
+  assert.deepEqual(demoEditsForToday(ops, weekLater), ops);
+  assert.deepEqual(demoEditsForToday(undefined), []);
+  assert.deepEqual(shiftOps(ops, 0), ops);
 });

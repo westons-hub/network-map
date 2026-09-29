@@ -6,7 +6,7 @@ import { replay } from "./core/ops.js";
 import { normalizeName, normalizeOrg } from "./core/org.js";
 import { bestPath } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
-import { meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
+import { demoEditsForToday, meetingOps, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
 import { saveDoc } from "./core/sync.js";
 import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./core/workbook.js";
 import * as files from "./store/files.js";
@@ -346,7 +346,8 @@ function edit(opOrOps) {
 
 /** Unsaved edits are kept in this browser so a refresh doesn't lose them. */
 function persistDraft() {
-  if (state.mode === "demo") return kvSet("demo-edits", state.doc.pending);
+  // Demo edits are stored with the day they were saved, so their dates can be moved forward next time.
+  if (state.mode === "demo") return kvSet("demo-edits", { savedOn: todayIso(), ops: state.doc.pending });
   return kvSet("draft", { fileName: state.fileName, pending: state.doc.pending, time: Date.now() });
 }
 
@@ -477,7 +478,7 @@ async function fetchBytes(url) {
 
 async function loadDemo() {
   const base = await fetchBytes(DEMO_URL);
-  const edits = (await kvGet("demo-edits")) ?? [];
+  const edits = demoEditsForToday(await kvGet("demo-edits"));
   let model = shiftDemoDates(readWorkbook(base)); // keep the demo's meetings and tasks around today
   let pending = edits;
   try { model = replay(model, edits); } catch { pending = []; await kvDelete("demo-edits"); }
