@@ -449,7 +449,7 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .conn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .conn-list li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .conn-type { font-size: 11px; padding: 0 7px; border-radius: 999px; background: #f4f3ff; color: #5925dc; border: 1px solid #d9d6fe; }
-.conn-type.intro { background: #f2f4f7; color: #475467; border-color: #e4e7ec; }
+.conn-type.introduced { background: #f2f4f7; color: #475467; border-color: #e4e7ec; }
 .conn-remove { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; margin-left: auto; }
 .conn-remove:hover { color: var(--overdue); }
 .conn-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 6px; }
@@ -485,11 +485,11 @@ a { color: #2e5b93; }
 .cal-day.today .num, .week-head.today .num { background: var(--orbit-orange); }
 
 /* ---- welcome intro ---- */
-.intro { position: fixed; inset: 0; z-index: 1000; background: var(--orbit-bg-dark); display: grid; cursor: pointer; }
-.intro svg { width: 100%; height: 100%; display: block; }
-.intro-title { font: 700 176px var(--font); letter-spacing: -2px; }
-.intro-sub { font: 400 40px var(--font); fill: #A3AEBF; }
-.intro-skip { position: absolute; right: 22px; bottom: 18px; border: 1px solid rgba(255, 255, 255, .25); background: transparent;
+.orbit-intro { position: fixed; inset: 0; z-index: 1000; background: var(--orbit-bg-dark); display: grid; cursor: pointer; }
+.orbit-intro svg { width: 100%; height: 100%; display: block; }
+.orbit-intro-title { font: 700 176px var(--font); letter-spacing: -2px; }
+.orbit-intro-sub { font: 400 40px var(--font); fill: #A3AEBF; }
+.orbit-intro-skip { position: absolute; right: 22px; bottom: 18px; border: 1px solid rgba(255, 255, 255, .25); background: transparent;
               color: #A3AEBF; font: 600 13px var(--font); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
-.intro-skip:hover { color: #fff; border-color: rgba(255, 255, 255, .6); }
-@media (max-width: 760px) { .intro svg { height: auto; align-self: center; } }
+.orbit-intro-skip:hover { color: #fff; border-color: rgba(255, 255, 255, .6); }
+@media (max-width: 760px) { .orbit-intro svg { height: auto; align-self: center; } }

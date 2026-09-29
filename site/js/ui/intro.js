@@ -49,7 +49,7 @@ const markSeen = () => { try { localStorage.setItem(SEEN_KEY, "1"); } catch { /*
 export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, freezeAt } = {}) {
   if (freezeAt === undefined) markSeen();
   const overlay = document.createElement("div");
-  overlay.className = "intro";
+  overlay.className = "orbit-intro";
   overlay.setAttribute("role", "dialog");
   overlay.setAttribute("aria-label", "Welcome to Orbit. Map your orbit. Find your path.");
   const root = svg("svg", { viewBox: "0 0 1920 1080", preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true" }, overlay);
@@ -64,9 +64,9 @@ export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion:
   const clipRect = svg("rect", { x: "128", y: "20", width: "0", height: "80" }, clip);
 
   // Title, letter by letter (all letters exist from the start so centering never shifts).
-  const title = svg("text", { x: "960", y: "458", "text-anchor": "middle", class: "intro-title" }, root);
+  const title = svg("text", { x: "960", y: "458", "text-anchor": "middle", class: "orbit-intro-title" }, root);
   const letters = [...TITLE].map(ch => { const t = svg("tspan", { opacity: "0" }, title); t.textContent = ch; return t; });
-  const sub = svg("text", { x: "960", y: "572", "text-anchor": "middle", class: "intro-sub", opacity: "0" }, root);
+  const sub = svg("text", { x: "960", y: "572", "text-anchor": "middle", class: "orbit-intro-sub", opacity: "0" }, root);
   sub.textContent = "Find your path.";
 
   // The wide ellipse and its two travelling dots.
@@ -86,7 +86,7 @@ export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion:
   const word = svg("path", { d: WORDMARK, fill: "#FFFFFF", "clip-path": "url(#intro-wordclip)" }, mark);
 
   const skip = document.createElement("button");
-  skip.className = "intro-skip";
+  skip.className = "orbit-intro-skip";
   skip.type = "button";
   skip.textContent = "Skip ›";
   overlay.append(skip);

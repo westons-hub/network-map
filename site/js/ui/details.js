@@ -220,8 +220,8 @@ export function createDetails({ sidebar, getCtx, handlers }) {
     const list = el("ul", undefined, { class: "conn-list" });
     for (const c of connectionsOf(model.connections, p.name)) {
       const li = el("li");
-      const label = c.dir === "introducedBy" ? "Introduced you" : c.dir === "introduced" ? "They introduced you to" : c.type;
-      li.append(el("span", c.dir === "introducedBy" ? "Introduced by" : label, { class: `conn-type${c.type === INTRODUCED ? " intro" : ""}` }),
+      const label = c.dir === "introducedBy" ? "Introduced you" : c.dir === "introduced" ? "Introduced you to" : c.type;
+      li.append(el("span", c.dir === "introducedBy" ? "Introduced by" : label, { class: `conn-type${c.type === INTRODUCED ? " introduced" : ""}` }),
         el("button", c.other, { class: "linklike", type: "button", onclick: () => handlers.focus(personId(c.other)) }));
       if (c.notes) li.append(el("span", `· ${c.notes}`, { class: "muted small" }));
       li.append(el("button", "×", { class: "conn-remove", type: "button", title: "Remove this connection",
