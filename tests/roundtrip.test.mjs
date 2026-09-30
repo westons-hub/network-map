@@ -18,9 +18,11 @@ function everything() {
   return {
     ...emptyModel("Alex Rivera"),
     avatarStyle: "notionists",
-    profile: { photo: PHOTO, role: "MBA Candidate", headline: "Looking for product roles", company: "", school: "Stanford University (2025–2027)",
+    profile: { ...emptyModel().profile, photo: PHOTO, role: "MBA Candidate", headline: "Looking for product roles", company: "", school: "Stanford University (2025–2027)",
                pastCompanies: "Delta Air Lines (2020–2022)", email: "alex@example.com", linkedinUrl: "https://www.linkedin.com/in/alex",
-               location: "Palo Alto", lookingFor: "Summer internships.\nProduct or strategy." },
+               location: "Palo Alto", lookingFor: "Summer internships.\nProduct or strategy.", about: "About me.\nTwo lines.",
+               industry: "Higher Education", websites: "https://alex.example", skills: "Strategy; SQL", certifications: "CSPO",
+               volunteering: "Food Bank (2019–2021)" },
     settings: { ...emptyModel().settings, email: "alex@example.com", meetingLength: 45, zoomLink: "https://zoom.us/j/123",
                 checkInDays: 30, inviteTemplate: "Hi {first name}! {link}", groupSize: 4, groupBy: "company, languages", demoBaseDate: "" },
     people: [

@@ -196,7 +196,7 @@ test("download mode (no way to re-read the file) still saves", async () => {
 test("your profile round-trips through the Me sheet, and a name typed there wins", async () => {
   const { sharedWithMe } = await import("../site/js/core/history.js");
   const { normalizeOrg } = await import("../site/js/core/org.js");
-  let m = { ...fullModel(), profile: { photo: "demo/photos/x.jpg", role: "MBA Candidate", headline: "Looking for PM roles",
+  let m = { ...fullModel(), profile: { ...emptyModel().profile, photo: "demo/photos/x.jpg", role: "MBA Candidate", headline: "Looking for PM roles",
     company: "", school: "Stanford University (2025–2027)", pastCompanies: "Delta Air Lines (2020–2022)", email: "me@x.com",
     linkedinUrl: "https://www.linkedin.com/in/me", location: "Provo, UT", lookingFor: "Strategy roles.\nHappy to chat." } };
   const back = readWorkbook(writeWorkbook(m));

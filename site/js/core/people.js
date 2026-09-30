@@ -145,7 +145,7 @@ export function parseCsv(text) {
 }
 
 /** CSV text -> array of {header: value} objects, starting at the first row whose first cell matches. */
-function csvRecords(text, firstHeader) {
+export function csvRecords(text, firstHeader) {
   const rows = parseCsv(text);
   const start = rows.findIndex(r => clean(r[0]).toLowerCase() === firstHeader);
   if (start < 0) return null;
@@ -156,6 +156,10 @@ function csvRecords(text, firstHeader) {
 }
 
 export const POOL_COLUMNS = ["First Name", "Last Name", "URL", "Email Address", "Company", "Position", "Connected On"];
+// From the rest of your LinkedIn export (Invitations.csv, Notes.csv and, only if you opt in, messages.csv).
+export const POOL_EXTRA_COLUMNS = [["Reached Out", "reachedOut"], ["Invited On", "invitedOn"], ["Invite Note", "inviteNote"],
+  ["LinkedIn Note", "note"], ["Messages", "messages"], ["Last Contacted", "lastContacted"]];
+export const INVITE_PENDING = "Invite pending";
 
 /**
  * Parse LinkedIn's Connections.csv (Settings > Data privacy > Get a copy of your data).
@@ -178,6 +182,9 @@ export function poolEntry(rec) {
     firstName: clean(get("First Name")), lastName: clean(get("Last Name")), url: clean(get("URL")),
     email: clean(get("Email Address")), company: clean(get("Company")), position: clean(get("Position")),
     connectedOn: parseDate(get("Connected On")),
+    // Only when set, so a plain Connections.csv row stays exactly as before.
+    ...Object.fromEntries(POOL_EXTRA_COLUMNS.map(([h, f]) => [f, f === "invitedOn" || f === "lastContacted" ? parseDate(get(h)) : f === "inviteNote" || f === "note" ? String(get(h) ?? "").trim() : clean(get(h))])
+      .filter(([, v]) => v !== "" && v !== undefined)),
   };
 }
 
@@ -185,6 +192,13 @@ export const poolName = e => clean(`${e.firstName} ${e.lastName}`);
 
 /** A pool entry as a person you could add to the map. */
 export function personFromPool(e) {
+  // What your LinkedIn export knows about them comes along: who reached out first, when, and your LinkedIn note.
+  const extra = {};
+  if (e.reachedOut === "You" && e.invitedOn) extra["Date Reached Out"] = e.invitedOn;
+  if (e.lastContacted) extra["Last Contacted"] = e.lastContacted;
+  if (e.messages) extra.Messages = String(e.messages);
+  const notes = [e.note ? `From LinkedIn: ${e.note}` : "", e.inviteNote ? `Invite note: ${e.inviteNote}` : ""].filter(Boolean).join("\n");
   return makePerson({ name: poolName(e), company: e.company, role: e.position, email: e.email,
-                      linkedinUrl: e.url, connectedOn: e.connectedOn, source: "linkedin" });
+                      linkedinUrl: e.url, connectedOn: e.connectedOn, source: "linkedin", extra, notes,
+                      status: e.reachedOut === INVITE_PENDING ? "To Reach Out" : "" });
 }

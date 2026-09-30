@@ -22,7 +22,7 @@ export function ask(title, body, buttons) {
   if (body instanceof Node) form.append(body); else if (body) form.append(el("p", body));
   const actions = el("div", undefined, { class: "actions" });
   for (const b of buttons) {
-    const btn = el("button", b.label, { class: `btn${b.primary ? " primary" : ""}${b.danger ? " danger" : ""}`, value: b.value });
+    const btn = el("button", b.label, { class: `btn${b.primary ? " primary" : ""}${b.danger ? " danger" : ""}${b.cta ? " cta" : ""}`, value: b.value });
     if (b.formnovalidate || !b.primary) btn.formNoValidate = true; // only the main action checks required fields
     if (b.left) btn.classList.add("left");
     actions.append(btn);

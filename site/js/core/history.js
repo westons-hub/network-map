@@ -31,7 +31,9 @@ export function addEntry(text, entry) {
 export function sharedWithMe(profile, person, normalize) {
   if (!profile || !person) return { schools: [], companies: [] };
   const mySchools = new Map(parseEntries(profile.school).map(e => [normalize(e.name), e.name]));
-  const myJobs = new Map([...parseEntries(profile.pastCompanies), ...(profile.company ? [{ name: profile.company }] : [])]
+  // Volunteering organizations count like past companies.
+  const myJobs = new Map([...parseEntries(profile.pastCompanies), ...parseEntries(profile.volunteering),
+                          ...(profile.company ? [{ name: profile.company }] : [])]
     .map(e => [normalize(e.name), e.name]));
   const theirJobs = [...parseEntries(person.pastCompanies), ...(person.company ? [{ name: person.company }] : [])];
   return {

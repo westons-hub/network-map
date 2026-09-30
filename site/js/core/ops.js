@@ -42,7 +42,7 @@ export function applyOp(model, op) {
       const i = m.people.findIndex(p => personKey(p) === op.key);
       if (i < 0) break;
       const person = makePerson({ ...m.people[i], ...op.fields });
-      person.extra = m.people[i].extra;
+      person.extra = op.fields.extra ? { ...op.fields.extra } : m.people[i].extra; // extra columns only when given
       person.source = m.people[i].source;
       m.people[i] = person;
       if (op.fields.name !== undefined && personKey(person) !== op.key) {

@@ -13,12 +13,17 @@
 # The fictional "Save to PDF" sample (real people's profile PDFs must never be committed)
 !examples/sample_linkedin_profile.pdf
 !site/demo/sample_linkedin_profile.pdf
+# The fictional LinkedIn data export sample (scripts/make_export_sample.mjs)
+!examples/linkedin-export-sample/
+!examples/linkedin-export-sample/**/
+!examples/linkedin-export-sample/**/*.csv
 # Fictional fixture PDFs, one per layout quirk (scripts/make_sample_pdf.mjs)
 !tests/fixtures/linkedin-pdf/
 !tests/fixtures/linkedin-pdf/*.pdf
 
 # LinkedIn exports, profile PDFs, offline map exports and intro reports name real people
 Connections*.csv
+!examples/linkedin-export-sample/Connections.csv
 Basic_LinkedInDataExport*/
 *_report.md
 intro_report*.md

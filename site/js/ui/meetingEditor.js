@@ -277,7 +277,7 @@ export async function meetingForm({ model, meeting, person = "", date = "", star
   };
   const connected = calendar.provider && !demo;
   const sendBtn = el("button", connected ? `Send invite · ${calendar.provider === "google" ? "Google Calendar" : "Outlook"}`
-    : "Send invite → Google Calendar", { class: "btn primary send-invite", type: "button", onclick: () => send(connected ? "connected" : "google") });
+    : "Send invite → Google Calendar", { class: "btn primary cta send-invite", type: "button", onclick: () => send(connected ? "connected" : "google") });
   const others = el("div", undefined, { class: "send-others" });
   others.append(el("span", connected ? "Or open it in:" : "Or send with:", { class: "muted small" }));
   for (const key of [...(connected ? ["google"] : []), "outlook", "outlook-office", "gmail", "mailto", "ics"]) {

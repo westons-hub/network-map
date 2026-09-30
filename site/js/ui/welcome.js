@@ -5,6 +5,7 @@
 import { el } from "./dom.js";
 import { ask } from "./dialog.js";
 import { brandSrc } from "./theme.js";
+import { PRIVACY_LINE, exportPickers, filesFromDrop, wrongZipHelp } from "./exportImport.js";
 
 const SEEN_KEY = "orbit:welcome-seen";
 export const welcomeSeen = () => { try { return localStorage.getItem(SEEN_KEY) === "1"; } catch { return false; } };
@@ -33,13 +34,14 @@ export async function showWelcome() {
 const STEPS = [
   ["On LinkedIn, click Me, then Settings & Privacy.", "The Me menu is at the top right, under your photo."],
   ["Open Data privacy, then Get a copy of your data.", "It's in the left-hand list of the settings page."],
-  ["Choose Download larger data archive.", "It includes Connections, Positions and Education. For a faster file, pick just Connections under \"Want something in particular?\""],
-  ["Wait for LinkedIn's email, download the archive and unzip it.", "Connections alone usually takes about 10 minutes; the full archive can take up to 24 hours."],
-  ["Drop Connections.csv here.", "It stays in your browser; nothing is uploaded. You choose who goes on the map."],
+  ["Choose Download larger data archive (the top option), then Request archive.",
+   "⚠️ Don't use \"Want something in particular?\": that list doesn't include your connections. Picking only \"Profile\" gives a zip with just Profile.csv."],
+  ["Wait for LinkedIn's email, then download the zip.", "A first zip with your connections usually arrives in about 10 minutes; the complete one within 24 hours. No need to unzip it."],
+  ["Drop the whole .zip here.", "Or the unzipped folder, or single CSV files. It stays in your browser; nothing is uploaded, and you choose who goes on the map."],
 ];
 
 /**
- * The "Start your own" guide. Resolves with { csv: File } (a Connections.csv was dropped or chosen),
+ * The "Start your own" guide. Resolves with { files: [File] } (the export zip, folder or CSVs),
  * { skip: true } (start with an empty map) or { manual: true } (empty map, then Add person), or null.
  */
 export async function showOnboarding() {
@@ -48,21 +50,22 @@ export async function showOnboarding() {
   let step = 0, result = null;
   const done = value => { result = value; dialog.close("done"); };
 
-  const file = el("input", undefined, { type: "file", accept: ".csv,text/csv", hidden: true,
-    onchange: () => { if (file.files[0]) done({ csv: file.files[0] }); } });
   const drop = el("div", undefined, { class: "drop-zone onboarding-drop" });
-  drop.append(el("strong", "Drop Connections.csv here"), el("span", "or", { class: "muted small" }),
-              el("button", "Choose the file…", { class: "btn small", type: "button", onclick: () => file.click() }));
+  drop.append(el("strong", "Drop your LinkedIn export here"), el("span", "the .zip, the unzipped folder, or CSV files", { class: "muted small" }),
+              exportPickers(files => { if (files.length) done({ files: [...files] }); }));
   for (const t of [drop, body]) {
     t.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
     t.addEventListener("dragleave", () => drop.classList.remove("over"));
-    t.addEventListener("drop", e => {
+    t.addEventListener("drop", async e => {
       e.preventDefault();
+      e.stopPropagation();
       drop.classList.remove("over");
-      const f = [...e.dataTransfer.files].find(x => /\.csv$/i.test(x.name));
-      if (f) done({ csv: f });
+      const files = await filesFromDrop(e.dataTransfer);
+      if (files.length) done({ files });
     });
   }
+  const help = el("details", undefined, { class: "wrong-zip-toggle" });
+  help.append(el("summary", "Wrong zip? (only Profile.csv, no connections)"), wrongZipHelp());
 
   const img = el("img", undefined, { class: "onboarding-img", alt: "", width: 640, height: 360 });
   const title = el("h4", "");
@@ -86,10 +89,13 @@ export async function showOnboarding() {
     back.disabled = step === 0;
     next.hidden = step === STEPS.length - 1;
     drop.hidden = step !== STEPS.length - 1;
+    help.hidden = step < 2;
+    privacy.hidden = step !== STEPS.length - 1;
     img.hidden = step === STEPS.length - 1;
   }
-  body.append(el("p", "Your map starts from your LinkedIn connections. LinkedIn lets you download them in a few steps:", { class: "small" }),
-              img, drop, file, title, hint, nav, alt);
+  const privacy = el("p", `🔒 ${PRIVACY_LINE}`, { class: "muted small privacy-line" });
+  body.append(el("p", "Your map starts from your LinkedIn data. LinkedIn lets you download it in a few steps:", { class: "small" }),
+              img, drop, privacy, title, hint, help, nav, alt);
   go(0);
   const v = await ask("Start your own map", body, [{ label: "Close", value: "" }]);
   return v === "done" ? result : null;

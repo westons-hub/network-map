@@ -1,0 +1,5 @@
+CONVERSATION ID,CONVERSATION TITLE,FROM,SENDER PROFILE URL,TO,RECIPIENT PROFILE URLS,DATE,SUBJECT,CONTENT,FOLDER,ATTACHMENTS
+c1,,Alex Rivera,https://www.linkedin.com/in/alex-rivera-demo,Jordan Lee,https://www.linkedin.com/in/jordan-lee-3f9a21,2026-08-05 17:00:00 UTC,,(fictional message text),INBOX,
+c1,,Jordan Lee,https://www.linkedin.com/in/jordan-lee-3f9a21,Alex Rivera,https://www.linkedin.com/in/alex-rivera-demo,2026-08-06 09:30:00 UTC,,(fictional reply),INBOX,
+c1,,Alex Rivera,https://www.linkedin.com/in/alex-rivera-demo,Jordan Lee,https://www.linkedin.com/in/jordan-lee-3f9a21,2026-09-12 14:00:00 UTC,,(fictional follow-up),INBOX,
+c2,,Priya Shah,https://www.linkedin.com/in/priya-shah-77b0c4,Alex Rivera,https://www.linkedin.com/in/alex-rivera-demo,2026-07-01 08:00:00 UTC,,(fictional),ARCHIVE,

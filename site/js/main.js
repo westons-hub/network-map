@@ -28,6 +28,8 @@ import { buildSuggestions } from "./core/suggest.js";
 import { setSuggestionSource } from "./ui/typeahead.js";
 import { introSeen, playIntro } from "./ui/intro.js";
 import { showOnboarding, showWelcome, welcomeSeen } from "./ui/welcome.js";
+import { exportPickers, filesFromDrop, importSummary, isExportFile, readExportFiles } from "./ui/exportImport.js";
+import { exportOps } from "./core/linkedinExport.js";
 import { isDark, nextThemeMode, onThemeChange, setTheme, themeMode } from "./ui/theme.js";
 import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
@@ -126,7 +128,7 @@ const calendar = createCalendar($("calendar-view"), {
 
 const pool = createPoolView($("pool-view"), {
   getModel: () => state.doc.model,
-  onImport: () => importPool(),
+  onImport: () => chooseExport(),
   onAdd: entry => addPerson({ entry }),
   onAddMany: entries => addMany(entries),
   onOpen: name => openPerson(name),
@@ -211,21 +213,6 @@ function addMany(entries) {
   toast(`Added ${people.length} ${people.length === 1 ? "person" : "people"} to your map.`);
 }
 
-async function importPool(file) {
-  const picked = file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : await files.pickFile();
-  if (!picked) return;
-  if (!/\.csv$/i.test(picked.name)) return toast("Choose the Connections.csv from your LinkedIn data export.");
-  try {
-    const { mergePool } = await import("./core/pool.js");
-    const entries = parseLinkedInCsv(new TextDecoder().decode(picked.bytes), picked.name);
-    const { added, updated } = mergePool(state.doc.model.pool, entries);
-    edit({ type: "mergePool", entries });
-    showView("pool");
-    toast(`Imported ${entries.length} connections: ${added} new, ${updated} updated, no duplicates. They stay off the map until you add them.`, 7000);
-  } catch (e) {
-    toast(e.message, 8000);
-  }
-}
 
 const todo = createTodo($("todo-view"), {
   getModel: () => state.doc.model,
@@ -408,9 +395,10 @@ function renderDataMenu() {
   const item = (action, label) => el("button", label, { role: "menuitem", type: "button", "data-action": action });
   const items = own
     ? [item("save", "Save"), item("open", "Open another file…"), item("export", "Export…"), item("demo", "Switch to demo"), el("hr"),
-       item("importPool", "Import LinkedIn connections (CSV)…"), item("download", "Download a copy (.xlsx)"), item("settings", "Settings…"),
+       item("importPool", "Import your LinkedIn export (zip, folder or CSV)…"), item("download", "Download a copy (.xlsx)"), item("settings", "Settings…"),
        item("backups", "Backups…"), item("new", "Start a new, empty map"), item("template", "Download the blank template")]
-    : [item("start", "Start your own map (step by step)…"), item("open", "Open my workbook or LinkedIn CSV…"),
+    : [item("start", "Start your own map (step by step)…"), item("importPool", "Import your LinkedIn export (zip, folder or CSV)…"),
+       item("open", "Open my workbook…"),
        ...(state.lastHandle ? [item("reopen", `Reopen ${state.lastHandle.name}`)] : []),
        item("new", "Start a new, empty map"), item("template", "Download the blank template"), el("hr"),
        item("download", "Download a copy of the demo (.xlsx)"), item("settings", "Settings…"), item("backups", "Backups…")];
@@ -693,9 +681,52 @@ async function startOwn() {
   }
   const r = await showOnboarding();
   if (!r) return;
-  await newWorkbook({ quiet: !!r.csv });
-  if (r.csv) await importPool(r.csv);
+  await newWorkbook({ quiet: !!r.files });
+  if (r.files) await importExport(r.files);
   else if (r.manual) addPerson();
+}
+
+/**
+ * Your LinkedIn data export (zip, folder or CSVs) -> a summary with checkboxes -> your pool, profile, targets.
+ * In the demo it starts your own map first (the demo stays as it was).
+ */
+async function importExport(fileList) {
+  try {
+    const files = await readExportFiles(fileList);
+    const r = await importSummary(files, state.mode === "demo" ? emptyModel("") : state.doc.model);
+    if (!r) return;
+    if (r.empty) return toast("That doesn't look like a LinkedIn export (no Connections.csv, Profile.csv…). Drop the .zip LinkedIn emailed you.", 8000);
+    if (state.mode === "demo") await newWorkbook({ quiet: true }); // your own map; the demo stays as it was
+    const before = state.doc.model.pool.length;
+    const { ops, pool } = exportOps(state.doc.model, r.found, r);
+    if (ops.length) edit(ops);
+    const added = state.doc.model.pool.length - before;
+    const bits = [r.rows.has("connections") && `${r.found.connections.length} connections into your LinkedIn pool` +
+                    `${added - pool.pending < r.found.connections.length ? ` (${Math.max(0, added - pool.pending)} new)` : ""}`,
+                  pool.pending && `${pool.pending} pending ${pool.pending === 1 ? "invite" : "invites"}`, r.rows.has("profile") && "your profile",
+                  r.targets.length && `${r.targets.length} new target${r.targets.length === 1 ? "" : "s"}`].filter(Boolean);
+    if (r.rows.has("connections") && r.found.connections.length) showView("pool");
+    toast(bits.length ? `Imported ${bits.join(", ")}. Nobody is on the map until you add them.` : "Nothing new to import.", 8000);
+  } catch (e) {
+    console.error(e);
+    toast(`Couldn't read that export: ${e.message}`, 8000);
+  }
+}
+
+/** Menu: import your LinkedIn export (choose the zip, folder or CSVs, or drop them). */
+async function chooseExport() {
+  const body = el("div", undefined, { class: "form" });
+  const drop = el("div", undefined, { class: "drop-zone onboarding-drop small-drop" });
+  let picked = null;
+  const done = files => { picked = files; $("dialog").close("picked"); };
+  drop.append(el("strong", "Drop your LinkedIn export here"), el("span", "the .zip, the unzipped folder, or CSV files", { class: "muted small" }),
+              exportPickers(files => { if (files.length) done([...files]); }));
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("drop", async e => { e.preventDefault(); const files = await filesFromDrop(e.dataTransfer); if (files.length) done(files); });
+  body.append(drop, el("p", "On LinkedIn: Me → Settings & Privacy → Data privacy → Get a copy of your data → Download larger data archive.",
+                       { class: "muted small" }));
+  const v = await ask("Import your LinkedIn export", body, [{ label: "Cancel", value: "" }]);
+  if (v === "picked" && picked) await importExport(picked);
 }
 
 async function welcome() {
@@ -881,7 +912,7 @@ menuBtn.addEventListener("click", e => { e.stopPropagation(); menu.hidden ? open
 document.addEventListener("click", e => { if (!menu.contains(e.target)) closeMenu(); });
 
 const ACTIONS = { open: openFile, reopen, new: () => newWorkbook(), template: downloadTemplate, download: downloadCopy,
-                  backups: showBackups, settings: openSettings, demo: loadDemo, importPool: () => importPool(), save,
+                  backups: showBackups, settings: openSettings, demo: loadDemo, importPool: () => chooseExport(), save,
                   export: () => setTimeout(openExportMenu, 0), start: startOwn };
 // These don't leave the current file (startOwn asks about unsaved changes itself).
 const SAFE_ACTIONS = ["download", "backups", "template", "settings", "importPool", "save", "export", "start"];
@@ -966,13 +997,15 @@ $("show-alumni").addEventListener("change", e => map.set({ showAlumni: e.target.
   wrap.addEventListener("dragenter", e => { if (hasFiles(e)) { depth++; overlay.hidden = false; } });
   wrap.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
   wrap.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; overlay.hidden = true; } });
-  wrap.addEventListener("drop", e => {
+  wrap.addEventListener("drop", async e => {
     e.preventDefault();
     depth = 0;
     overlay.hidden = true;
-    const file = [...e.dataTransfer.files].find(isPdf);
-    if (file) addPerson({ pdf: file });
-    else toast("Drop a PDF of their LinkedIn profile (on their profile: More → Save to PDF).");
+    const files = await filesFromDrop(e.dataTransfer);
+    const pdf = files.find(isPdf);
+    if (pdf && files.length === 1) addPerson({ pdf });
+    else if (files.some(isExportFile)) importExport(files);
+    else toast("Drop someone's LinkedIn profile PDF (More → Save to PDF), or your LinkedIn data export (.zip or folder).");
   });
 }
 $("fit").addEventListener("click", () => map.fit());

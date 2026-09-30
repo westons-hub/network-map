@@ -74,31 +74,28 @@ const steps = {
     text(142, 130, "Download larger data archive", { size: 13, weight: 700 }) +
     text(142, 148, "Includes Connections, Positions, Education and more", { size: 11, fill: C.muted }) + ring(114, 112, 330, 44) +
     `<circle cx="126" cy="182" r="7" fill="none" stroke="${C.muted}" stroke-width="2"/>` +
-    text(142, 187, "Want something in particular?", { size: 13 }) +
-    rect(142, 200, 12, 12, "#fff", 3, `stroke="${C.navy}" stroke-width="2"`) + `<path d="M145 206l3 3 5-6" fill="none" stroke="${C.navy}" stroke-width="2"/>` +
-    text(162, 211, "Connections  (faster)", { size: 12 }) +
-    rect(142, 222, 12, 12, "#fff", 3, `stroke="${C.line}" stroke-width="2"`) + bar(162, 224, 70) +
+    text(142, 187, "Want something in particular?", { size: 13, fill: C.muted }) +
+    // Crossed out: that list has no Connections.
+    `<line x1="138" y1="183" x2="330" y2="183" stroke="${C.rose}" stroke-width="2"/>` +
+    rect(142, 198, 250, 24, "#FFF1F3", 6) + text(152, 214, "✗ No connections in this list", { size: 12, weight: 700, fill: C.rose }) +
     rect(118, 262, 150, 34, C.navy, 17) + text(193, 284, "Request archive", { size: 12, weight: 700, fill: "#fff", anchor: "middle" }) +
-    arrow(470, 110, 446, 128))),
+    ring(118, 262, 150, 34) + arrow(470, 110, 446, 128))),
 
   4: svg(4, rect(80, 50, 250, 180, C.panel, 12, `stroke="${C.line}"`) +
     `<path d="M80 62a12 12 0 0 1 12-12h226a12 12 0 0 1 12 12v8l-125 70-125-70z" fill="${C.soft}"/>` +
     text(205, 170, "Your data archive is ready", { size: 13, weight: 700, anchor: "middle" }) +
-    text(205, 192, "Connections: ~10 minutes", { size: 11, fill: C.muted, anchor: "middle" }) +
-    text(205, 208, "Full archive: up to 24 hours", { size: 11, fill: C.muted, anchor: "middle" }) +
-    arrow(338, 140, 392, 140) +
-    rect(400, 70, 70, 88, C.panel, 8, `stroke="${C.line}"`) + rect(428, 70, 14, 88, C.soft, 0) +
-    [0, 1, 2, 3].map(i => rect(430, 78 + i * 12, 10, 6, C.muted, 2)).join("") + text(435, 176, "archive.zip", { size: 11, anchor: "middle" }) +
-    arrow(478, 150, 520, 230) +
-    rect(470, 236, 120, 72, C.panel, 8, `stroke="${C.orange}" stroke-width="2"`) + text(530, 268, "Connections", { size: 13, weight: 700, anchor: "middle" }) +
-    text(530, 286, ".csv", { size: 12, fill: C.muted, anchor: "middle" }) +
-    text(160, 300, "Download, then unzip (double-click it)", { size: 13, weight: 700, fill: C.navy })),
+    text(205, 192, "With connections: ~10 minutes", { size: 11, fill: C.muted, anchor: "middle" }) +
+    text(205, 208, "Complete archive: up to 24 hours", { size: 11, fill: C.muted, anchor: "middle" }) +
+    arrow(338, 140, 420, 140) +
+    rect(430, 80, 80, 100, C.panel, 8, `stroke="${C.orange}" stroke-width="2"`) + rect(462, 80, 16, 100, C.soft, 0) +
+    [0, 1, 2, 3].map(i => rect(465, 88 + i * 12, 10, 6, C.muted, 2)).join("") + text(470, 200, "LinkedIn export .zip", { size: 12, weight: 700, anchor: "middle" }) +
+    text(320, 290, "Download the zip. No need to unzip it.", { size: 14, weight: 700, fill: C.navy, anchor: "middle" })),
 
   5: svg(5, rect(120, 60, 400, 230, C.panel, 16, `stroke="${C.orange}" stroke-width="3" stroke-dasharray="10 8"`) +
-    rect(280, 100, 80, 96, "#fff", 8, `stroke="${C.line}" stroke-width="2"`) + rect(292, 118, 56, 6, C.line, 3) + rect(292, 132, 44, 6, C.line, 3) +
-    rect(292, 146, 50, 6, C.line, 3) + text(320, 184, "CSV", { size: 13, weight: 700, fill: C.orange, anchor: "middle" }) +
+    rect(280, 100, 80, 96, "#fff", 8, `stroke="${C.line}" stroke-width="2"`) + rect(313, 100, 14, 96, C.soft, 0) +
+    [0, 1, 2, 3].map(i => rect(315, 108 + i * 12, 10, 6, C.muted, 2)).join("") + text(320, 184, "ZIP", { size: 13, weight: 700, fill: C.orange, anchor: "middle" }) +
     `<path d="M320 206v34m-14-14 14 14 14-14" fill="none" stroke="${C.navy}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` +
-    text(320, 272, "Drop Connections.csv on Orbit", { size: 15, weight: 700, anchor: "middle" }) +
+    text(320, 272, "Drop the whole .zip on Orbit", { size: 15, weight: 700, anchor: "middle" }) +
     text(320, 318, "It stays in your browser. Nothing is uploaded.", { size: 12, fill: C.muted, anchor: "middle" })),
 };
 

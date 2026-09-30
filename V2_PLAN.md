@@ -399,8 +399,10 @@ Orbit and two choices: **See the demo** ("Explore an example network") or **Star
 Remembered (localStorage, try/catch); "Welcome screen" in Settings shows it again. (2) Start your own: a step-by-step guide to
 LinkedIn's data export, with an illustration per step (`site/onboarding/step1.svg`…, generic UI mockups with arrows, no
 LinkedIn logo or design, swappable for real screenshots): Me → Settings & Privacy · Data privacy → Get a copy of your data ·
-"Download larger data archive" (Connections, Positions, Education) or just Connections · wait for the email (≈10 min / up to
-24 h), download, unzip · drop Connections.csv on the big drop zone here. Plus "Skip for now" (empty map) and "Add people
+**"Download larger data archive"** (the top option) → Request archive; ⚠️ never "Want something in particular?" (that list has
+no Connections; "Profile" alone gives a zip with only Profile.csv), said clearly, with a "Wrong zip?" helper · wait for the email
+(≈10 min for a first zip with connections, up to 24 h for the complete one), download it, no need to unzip · drop the whole .zip
+(or folder, or single CSVs) on the big drop zone here (see G). Plus "Skip for now" (empty map) and "Add people
 manually instead". (3) A new map starts with "Your Name" in the center and a prompt to fill in My profile (name, photo, school,
 jobs, Zoom link); the center dot and header show the real name once set. (4) "Use my own data" only in demo mode; with your own
 map it becomes the map's name + a menu (Save, Open another file, Export, Switch to demo; then Import LinkedIn connections,
@@ -436,6 +438,33 @@ both themes). (19) Save → close → open is lossless for everything (people an
 Connections, Targets, Companies, Meetings, Tasks, Layout, Settings incl. group threshold/group-by/Zoom link, My profile):
 automatic test, plus by hand in Chrome (save to the same file) and Safari (download), and through a real Excel re-save.
 
+**G. Import the whole LinkedIn export (replaces 2b).** Accept the unzipped **folder** (drag and drop, walking subfolders with
+`webkitGetAsEntry()`, or "Choose folder" with `webkitdirectory`), the **.zip** (unzipped in the browser with vendored fflate),
+a zip nested in a folder, or single CSVs, on the onboarding drop zone and the map. Files match by name ignoring case, spaces and
+underscores; "Notes:" lines above headers are skipped.
+- Connections.csv → LinkedIn pool (not the map). Profile.csv → My profile (name, headline, About, industry, location, websites;
+  **never** Birth Date, Address, Zip Code, Instant Messengers). Profile Summary.csv → About if empty. Positions.csv → my jobs
+  ("Former coworker", alumni). Education.csv → my schools ("Same school"). Skills.csv, Certifications.csv → mine.
+  Volunteering.csv → mine; its organizations count like past companies. Email Addresses.csv → my primary email only (invite
+  organizer). Company Follows.csv → "You follow N companies. Add any as targets?" with checkboxes. Invitations.csv → per
+  connection who reached out first (INCOMING/OUTGOING), when and the note; sent invites not yet accepted go to the pool as
+  "Invite pending" (suggests To Reach Out). ✅ Stored as LinkedIn Pool columns (Reached Out, Invited On, Invite Note, and
+opt-in Messages / Last Contacted), copied to the person (Date Reached Out, Last Contacted, Status) when they're added. messages.csv → **opt-in, off by default**: only per-person message count and last
+  messaged date (Last contacted, relationship strength, Date Reached Out), matched by profile URL; never text, subjects or
+  attachments. Notes.csv → that person's Notes (appended, marked "From LinkedIn").
+- Ignored for now: Learning, Rich_Media, SavedJobAlerts. **Never read:** Ad_Targeting, Registration, PhoneNumbers,
+  Verifications/, guide_messages, learning_coach_messages, learning_role_play_messages.
+- **Summary screen** before saving ("Found: 136 connections · your profile · 2 jobs · …"), a checkbox per row, messages off by
+  default; then import. Re-importing a newer export merges without duplicates and never overwrites my edits. The line "Your files
+  never leave your computer. Messages, phone numbers, ID verification and ad data are ignored."
+- No Connections.csv (e.g. a Profile-only zip): import the profile, then explain "Download larger data archive" with a picture.
+- Tests: a **fictional** sample export in `examples/linkedin-export-sample/` with the same 23 file names and headers; folder, zip,
+  single-file, Profile-only zip, and zip-in-a-folder imports. The real export is checked locally by counts only, never copied.
+
+**H. "+ Add person" orange bar (detail for 18).** The orange is part of the button's own shape (a bottom border or inset shadow
+inside the same radius, no pseudo-element or wrapper), checked in light/dark, hover and focus. ✅ The same orange edge on the big
+calls to action only: + Add person, Build your network map, Send invite, the onboarding's Import; other primaries stay plain.
+
 ## 9. README (portfolio-first)
 
 Lead with the **live demo link** and an animated **GIF**, then "Why I built this", features, privacy, how it works,
@@ -457,7 +486,8 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a571
 3d. ✅ **Fixes + full PDF import (FIXES_AND_PDF.md), one local commit per part** *(dc94e2b … 5af12f2)*:
    1) gray-circle bug (P) · 2) full LinkedIn PDF import + Experience/Education sheets (Q) · 3) Export (R) ·
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
-3e. ✅ **Round 2 (W)** *(2c4b957 A · 3fd45cc B · 9c1af0d C · c668a80 D · 48dbe9d E · 10332c4 F)*; push only when asked.
+3e. ✅ **Round 2 (W)** *(2c4b957 A · 3fd45cc B · 9c1af0d C · c668a80 D · 48dbe9d E · 10332c4 F)*, pushed.
+3f. **Round 2, G + H:** the whole LinkedIn export import (and the corrected onboarding steps), and the primary-button accent.
 4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first

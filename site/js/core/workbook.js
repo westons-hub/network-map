@@ -12,7 +12,7 @@ import { clean } from "./org.js";
 import { CONNECTION_TYPES, makeConnection, reconcile } from "./connections.js";
 import { DERIVED_COLUMNS, OWN_TRACKER_COLUMNS, REFERRAL, RELATIONSHIP_PLANS, TRACKER_HEADERS, trackerCells } from "./tracker.js";
 import { polishXlsx } from "./xlsxPolish.js";
-import { POOL_COLUMNS, STATUSES, makePerson, parseDate, poolEntry } from "./people.js";
+import { POOL_COLUMNS, POOL_EXTRA_COLUMNS, STATUSES, makePerson, parseDate, poolEntry } from "./people.js";
 
 export const SHEETS = { people: "People", targets: "Targets", companies: "Companies", pool: "LinkedIn Pool",
                         meetings: "Meetings", tasks: "Tasks", connections: "Connections", experience: "Experience",
@@ -23,7 +23,10 @@ export const CONNECTION_COLUMNS = [["Person A", "a"], ["Person B", "b"], ["Type"
 // The Me sheet: your own profile, one "Field | Value" row each (Name is kept in sync with Settings → Your name).
 export const PROFILE_ROWS = [["Photo", "photo"], ["Role", "role"], ["Headline", "headline"], ["Company", "company"],
   ["Schools", "school"], ["Past Companies", "pastCompanies"], ["Email", "email"], ["LinkedIn URL", "linkedinUrl"],
-  ["Location", "location"], ["What I'm looking for", "lookingFor"]];
+  ["Location", "location"], ["What I'm looking for", "lookingFor"],
+  // From your LinkedIn export:
+  ["About", "about"], ["Industry", "industry"], ["Websites", "websites"], ["Skills", "skills"], ["Certifications", "certifications"],
+  ["Volunteering", "volunteering"]];
 export const emptyProfile = () => Object.fromEntries(PROFILE_ROWS.map(([, f]) => [f, ""]));
 
 // [column header, model field]. Headers are matched case-insensitively.
@@ -219,7 +222,7 @@ export function readWorkbook(bytes) {
   for (const rec of findSheet(wb, SHEETS.me)?.rows ?? []) {
     const label = lower(rec.Field);
     const row = PROFILE_ROWS.find(([l]) => lower(l) === label);
-    if (row) model.profile[row[1]] = row[1] === "lookingFor" ? String(rec.Value ?? "").trim() : text(rec.Value);
+    if (row) model.profile[row[1]] = row[1] === "lookingFor" || row[1] === "about" ? String(rec.Value ?? "").trim() : text(rec.Value);
     if (label === "name" && text(rec.Value)) model.meFromProfile = text(rec.Value);
   }
 
@@ -333,8 +336,9 @@ export function writeWorkbook(model, base, { tracker = false, only = null } = {}
     [SHEETS.people]: peopleRows(model, tracker),
     [SHEETS.targets]: tableRows(model.targets, TARGET_COLUMNS, t => TARGET_COLUMNS.map(([, f]) => t[f] ?? "")),
     [SHEETS.companies]: tableRows(model.companies, COMPANY_COLUMNS, c => [c.company, c.website, c.logo ?? ""]),
-    [SHEETS.pool]: [POOL_COLUMNS, ...model.pool.map(e =>
-      [e.firstName, e.lastName, e.url ? { text: e.url, url: e.url } : "", e.email, e.company, e.position, dateCell(e.connectedOn)])],
+    [SHEETS.pool]: [[...POOL_COLUMNS, ...POOL_EXTRA_COLUMNS.map(([h]) => h)], ...model.pool.map(e =>
+      [e.firstName, e.lastName, e.url ? { text: e.url, url: e.url } : "", e.email, e.company, e.position, dateCell(e.connectedOn),
+       ...POOL_EXTRA_COLUMNS.map(([, f]) => (f === "invitedOn" || f === "lastContacted" ? dateCell(e[f]) : e[f] ?? ""))])],
     [SHEETS.meetings]: tableRows(model.meetings ?? [], MEETING_COLUMNS, m => MEETING_COLUMNS.map(([, f]) =>
       f === "date" ? dateCell(m.date) : m[f] ?? "")),
     [SHEETS.tasks]: tableRows(model.tasks ?? [], TASK_COLUMNS, t => TASK_COLUMNS.map(([, f]) =>

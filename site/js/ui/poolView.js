@@ -21,7 +21,7 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
     const head = el("div", undefined, { class: "view-head" });
     head.append(el("h2", "LinkedIn pool"),
       el("span", pool.length ? `${pool.length} connections · only the ones you add go on the map` : "", { class: "muted small" }),
-      el("button", pool.length ? "Re-import Connections.csv…" : "Import Connections.csv…", { class: `btn small${pool.length ? "" : " primary"}`,
+      el("button", pool.length ? "Import a newer LinkedIn export…" : "Import your LinkedIn export…", { class: `btn small${pool.length ? "" : " primary"}`,
         type: "button", onclick: onImport, style: "margin-left:auto" }));
     if (!pool.length) {
       const empty = el("div", undefined, { class: "empty-pool" });
