@@ -97,7 +97,7 @@ const details = createDetails({
     removePerson,
     scheduleMeeting: opts => editMeeting(null, opts),
     editMeeting: m => editMeeting(m),
-    inviteMeeting: m => meetingActions(m),
+    inviteMeeting: m => editMeeting(m), // the editor has the send options
     addTask: opts => editTask(null, opts),
     toggleTask,
     editTarget,
@@ -117,7 +117,7 @@ const calendar = createCalendar($("calendar-view"), {
   onItem: item => {
     if (item.kind === "meeting") {
       const m = state.doc.model.meetings.find(x => x.id === item.id);
-      if (m) meetingActions(m);
+      if (m) editMeeting(m);
     } else {
       const t = state.doc.model.tasks.find(x => x.id === item.id);
       if (t) editTask(t);
@@ -173,11 +173,6 @@ async function syncToCalendar(meeting) {
     toast(`Couldn't update your calendar: ${e.message}`, 8000);
     return false;
   }
-}
-
-/** A meeting's "Invite" / click: the same editor, with the send options. */
-function meetingActions(m) {
-  return editMeeting(m);
 }
 
 function moveMeeting(id, date, start, end) {
@@ -1062,7 +1057,7 @@ const demoReady = new Promise(r => { markDemoReady = r; });
 }
 
 (async () => {
-  const layout = pref(PREFS.layout, "free") === "ring" ? "ring" : "free";
+  const layout = pref(PREFS.layout, "ring") === "free" ? "free" : "ring"; // Ring unless you picked Free
   layoutButtons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
   map.set({ layout });
   try {

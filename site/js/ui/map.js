@@ -55,7 +55,7 @@ export function createMap(container, { images, onSelect, onDeselect, pathFor, on
   const nodes = new vis.DataSet();
   const edges = new vis.DataSet();
   let graph = { nodes: [], edges: [] };
-  let options = { showSecond: true, showAlumni: true, layout: "free" };
+  let options = { showSecond: true, showAlumni: true, layout: "ring" };
   const pinned = new Set(); // dots you've dragged (or that have a saved spot): the automatic layout leaves them alone
   let selected = null;   // clicked node id
   let hovered = null;    // hovered node id (preview only when nothing is selected)

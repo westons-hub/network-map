@@ -2,7 +2,7 @@
 // sidebar with a back arrow. Every field is click-to-edit. On phones the sidebar is the bottom sheet.
 
 import { CONNECTION_TYPES, INTRODUCED, connectionsOf } from "../core/connections.js";
-import { entryNames, historyOf, sharedWithMe } from "../core/history.js";
+import { historyOf, sharedWithMe } from "../core/history.js";
 import { normalizeName, normalizeOrg } from "../core/org.js";
 import { STATUSES, personKey, poolName } from "../core/people.js";
 import { meetingDate, meetingsFor, tasksFor, todayIso, toDate } from "../core/schedule.js";
@@ -15,7 +15,6 @@ import { statusColor } from "./map.js";
 const isWebUrl = u => /^https?:\/\//i.test(u ?? "");
 const isEmail = e => /^[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]+$/.test(e ?? "");
 const personId = name => `p:${normalizeName(name)}`;
-const unique = list => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 /** "2022-03" -> "Mar 2022", "2019" -> "2019", "Present" stays. */
 function prettyMonth(v) {

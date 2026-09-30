@@ -6,7 +6,7 @@
 // Every path ends in the same prefilled review card, with the fields only you know highlighted.
 
 import { CONNECTION_TYPES, INTRODUCED } from "../core/connections.js";
-import { entryNames, rowKey } from "../core/history.js";
+import { rowKey } from "../core/history.js";
 import { normalizeName } from "../core/org.js";
 import { profileToPerson } from "../core/linkedinPdf.js";
 import { PDF_FIELDS, STATUSES, fillPerson, personFromPool, poolName } from "../core/people.js";

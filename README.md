@@ -30,7 +30,7 @@ I'm recruiting for strategy and product internships, and my contacts lived in a 
 - **2nd-degree connections:** fill in "Connected Through" and the person attaches to whoever connects you.
 - **Target companies:** add them with "+ Add target" (type-ahead over your companies, plus Priority and Stage). Every target is its own red-ringed node. Click one to see **your best way in** (for example Me → Liam → Zoe) drawn in red on the map, preferring the contacts you're warmest with.
 - **Highlight on click:** a person, group or target lights up with its connections while everything else fades. Hovering previews the same thing.
-- **Free or Ring layout:** physics with well-separated clusters, or a tidy ring with groups around you and no-connection targets on the outer edge.
+- **Ring or Free layout:** a tidy ring with groups around you and no-connection targets on the outer edge (the default), or physics with well-separated clusters.
 - **One "+ Add person" box** (or press **N**): type a name (type-ahead over your LinkedIn connections), paste their LinkedIn link, or drop the PDF LinkedIn makes from their profile (**More → Save to PDF**) to fill in their whole work history and schools. A short review card highlights the things only you know. The app never contacts LinkedIn; the PDF is read on your computer.
 - **LinkedIn pool:** import `Connections.csv` once. Everyone is searchable and filterable, and nobody lands on the map until you add them (one at a time, selected, or "everyone at Apple"). Re-importing never creates duplicates.
 - **Work history:** multiple schools with years, past companies, and faint dotted "alumni" links, which also count as a way into a target.

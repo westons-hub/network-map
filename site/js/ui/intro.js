@@ -87,7 +87,7 @@ export function playIntro({ reducedMotion = matchMedia("(prefers-reduced-motion:
                               "stroke-linejoin": "round", opacity: "0" }, mark);
   const sat = svg("circle", { cx: "78", cy: "28.82", r: "0", fill: "#F97316" }, mark);
   const core = svg("circle", { cx: "60", cy: "60", r: "0", fill: INK_HEX }, mark);
-  const word = svg("path", { d: WORDMARK, fill: INK_HEX, "clip-path": "url(#intro-wordclip)" }, mark);
+  svg("path", { d: WORDMARK, fill: INK_HEX, "clip-path": "url(#intro-wordclip)" }, mark);
 
   const skip = document.createElement("button");
   skip.className = "orbit-intro-skip";

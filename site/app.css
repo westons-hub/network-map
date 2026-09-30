@@ -106,8 +106,6 @@ h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .05e
 /* ---- details ---- */
 #details h3 { font-size: 16px; margin: 0; }
 #details .sub { color: var(--muted); }
-.detail-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-.detail-head img { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); flex: none; object-fit: cover; }
 #details > .badges { margin: -4px 0 8px; }
 #details dl { margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 6px 8px; font-size: 13px; }
 #details dt { color: var(--muted); }
@@ -122,7 +120,6 @@ h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .05e
               padding: 2px 9px; font-weight: 600; font-size: 12px; cursor: pointer; }
 .path .step.me { border-color: var(--me); color: var(--me); cursor: default; }
 .path .arrow { color: var(--target); font-weight: 700; }
-.actions-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
 .stats div { background: var(--bg); border-radius: 8px; padding: 6px 8px; }
 .stats b { display: block; font-size: 18px; }
@@ -323,17 +320,12 @@ dialog .actions .left { margin-right: auto; }
 .todo-group .empty { margin: 0; }
 
 /* ---- forms in dialogs ---- */
-dialog:has(.invite-grid), dialog:has(.form-section) { width: min(560px, 94vw); }
-.row3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
+dialog:has(.form-section) { width: min(560px, 94vw); }
 .warn { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-text); border-radius: 8px; padding: 7px 9px; font-size: 12.5px;
         display: grid; gap: 6px; }
 .warn input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
 .form-section { margin: 12px 0 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .check { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; }
-.invite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.invite-option { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
-                 padding: 9px 11px; cursor: pointer; }
-.invite-option:hover { border-color: var(--accent); background: var(--soft-bg); }
 .coming-up { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 
 /* ---- phones: map on top, sidebar as a bottom sheet; the card becomes a sheet too ---- */
@@ -348,7 +340,6 @@ dialog:has(.invite-grid), dialog:has(.form-section) { width: min(560px, 94vw); }
   .pane { padding: 10px; }
   .cal-day { min-height: 64px; }
   .event .time { display: none; }
-  .row3, .invite-grid { grid-template-columns: 1fr; }
 }
 
 /* ---- add person ---- */
@@ -417,7 +408,6 @@ dialog:has(.add-person), dialog:has(.review) { width: min(580px, 94vw); }
 .now-line { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--overdue); z-index: 2; pointer-events: none; }
 .now-line::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--overdue); }
 .event.external { background: var(--neutral-bg); border-color: var(--neutral-line); color: var(--neutral-text); cursor: default; }
-.meeting-summary { font-weight: 600; margin: 0 0 4px; }
 
 /* ---- LinkedIn pool ---- */
 .tab-count { font-size: 11px; color: var(--muted); font-weight: 600; }

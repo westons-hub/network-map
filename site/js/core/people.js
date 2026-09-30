@@ -33,11 +33,6 @@ export function splitTags(value) {
   return clean(value).replaceAll(";", ",").split(",").map(t => t.trim()).filter(Boolean);
 }
 
-/** 'Delta, Google; Bain' (or one per line) -> ['Delta', 'Google', 'Bain']. */
-export function parseList(text) {
-  return String(text ?? "").replace(/[;\n]/g, ",").split(",").map(t => t.trim()).filter(Boolean);
-}
-
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
 const iso = (y, m, d) => `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 

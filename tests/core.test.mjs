@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { buildGraph } from "../site/js/core/graph.js";
 import { introReport, whoCanIntro } from "../site/js/core/intro.js";
 import { normalizeOrg } from "../site/js/core/org.js";
-import { makePerson, mergePeople, parseCsv, parseDate, parseLinkedInCsv, parseList } from "../site/js/core/people.js";
+import { makePerson, mergePeople, parseCsv, parseDate, parseLinkedInCsv } from "../site/js/core/people.js";
 import { readWorkbook } from "../site/js/core/workbook.js";
 
 const P = (name, fields = {}) => makePerson({ name, ...fields });
@@ -23,10 +23,6 @@ test("normalizeOrg handles suffixes, punctuation and aliases", () => {
   assert.equal(normalizeOrg("BYU"), normalizeOrg("Brigham Young University"));
   assert.equal(normalizeOrg("Ernst & Young"), normalizeOrg("EY"));
   assert.equal(normalizeOrg("Société Générale"), "société générale");
-});
-
-test("parseList splits on commas, semicolons and newlines", () => {
-  assert.deepEqual(parseList("Delta, Bain;\nGoogle,,"), ["Delta", "Bain", "Google"]);
 });
 
 // ---- LinkedIn export -----------------------------------------------------------
@@ -211,11 +207,10 @@ test("intro report lists who to ask and the gaps", () => {
 // ---- schools & past companies ------------------------------------------------------
 
 test("Schools can hold several entries with years, and everyone sharing one joins its group", async () => {
-  const { parseEntries, formatEntries, addEntry } = await import("../site/js/core/history.js");
+  const { parseEntries, formatEntries } = await import("../site/js/core/history.js");
   assert.deepEqual(parseEntries("BYU (2022 - 2026); Lakeview High\nStanford (2027)"),
     [{ name: "BYU", years: "2022–2026" }, { name: "Lakeview High", years: "" }, { name: "Stanford", years: "2027" }]);
   assert.equal(formatEntries(parseEntries("A (2019–2021);B")), "A (2019–2021); B");
-  assert.equal(addEntry("A (2019–2021)", { name: "a", years: "" }), "A (2019–2021)");
   const g = buildGraph([P("A", { school: "BYU (2020–2024); Lakeview High" }), P("B", { school: "Brigham Young University" }),
                         P("C", { school: "Lakeview High; BYU" }), P("D", { school: "Lakeview High" })]);
   assert.deepEqual([...ids(g, "school")].sort(), ["school:brigham young university", "school:lakeview high"]);

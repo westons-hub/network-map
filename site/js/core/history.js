@@ -17,13 +17,6 @@ export const formatEntries = list => list.filter(e => e?.name).map(e => (e.years
 
 export const entryNames = text => parseEntries(text).map(e => e.name);
 
-/** Add an entry unless the same name is already there (case-insensitive). */
-export function addEntry(text, entry) {
-  const list = parseEntries(text);
-  if (!entry?.name || list.some(e => e.name.toLowerCase() === entry.name.toLowerCase())) return formatEntries(list);
-  return formatEntries([...list, entry]);
-}
-
 /**
  * What you have in common with someone, from your profile: schools you both went to, and companies where you
  * both worked (your past/current employers vs theirs). Drives the "Same school" / "Former coworker" badges.
