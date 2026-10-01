@@ -690,3 +690,8 @@ dialog:has(.onboarding) { width: min(700px, 96vw); }
 .people-table td { vertical-align: middle; }
 .people-table .due.late, .people-table .late { color: var(--overdue); font-weight: 600; }
 .person-cell { white-space: nowrap; } .people-table td:nth-child(5) { min-width: 120px; }
+/* Narrow windows: the table scrolls sideways instead of squeezing a word per line. */
+.people-table { min-width: 1080px; }
+.people-table td:nth-child(2) { min-width: 120px; }
+.people-table td:nth-child(3) { min-width: 170px; }
+.people-table td:nth-child(n+6) { white-space: nowrap; }

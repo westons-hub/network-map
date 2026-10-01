@@ -1,7 +1,7 @@
 # Connecting Google Calendar or Outlook (optional)
 
-Orbit works without this: every meeting already has **Add to Google Calendar**, **Add to Outlook** and
-**Download .ics**, which open a prefilled event you save yourself. Connecting a calendar lets the app create,
+Orbit works without this: **Send invite → Google Calendar** opens a prefilled event (with your Zoom link and the
+guests) that you save yourself, and Outlook, a Gmail draft, your email app and a `.ics` file are one click away. Connecting a calendar lets the app create,
 update and cancel events for you (sending the invite to the other person), and shows your own events, muted, in the
 Calendar tab so you can see when you're free.
 
@@ -61,3 +61,16 @@ events to show them muted.
 - In the demo, the connect buttons say "Connect your own calendar" and don't sign in; the add-to-calendar links work.
 - **Zoom:** auto-creating Zoom meetings needs Zoom's API with a secret key, which requires a server, so it isn't
   built. Put your personal Zoom link in Settings and it's added to every invite.
+
+## Checking it works (after you've pasted the IDs and pushed)
+
+On the live site, with your own workbook open (the demo never signs in):
+
+1. **Settings… → Connect Google Calendar** (or Outlook). The popup signs you in; Settings then shows your account.
+2. **Calendar tab:** your own events for the next 60 days appear, muted.
+3. **Schedule meeting** with someone who has an email → **Send invite · Google Calendar**. The event is on your calendar
+   with them as a guest, and they get the invite. With **Google Meet** (or **Teams** on Outlook) as the video call, a link
+   is created.
+4. **Drag** the meeting to another time in the week view, then **Delete** it: the calendar event moves, then is canceled
+   (they get the update and the cancellation).
+5. **Disconnect** in Settings, or close the tab: the sign-in is forgotten.

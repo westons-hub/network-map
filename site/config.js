@@ -1,8 +1,8 @@
-// Public settings for your deployment of Network Map.
+// Public settings for your deployment of Orbit.
 //
 // ⚠️ This file is served to everyone who opens the site. Only put PUBLISHABLE values here — never secrets.
 // Everything is optional: with the defaults, the app works fully (Google favicons for logos, and
-// "Add to Google Calendar / Outlook / .ics" links instead of a calendar connection).
+// "Send invite → Google Calendar" (plus Outlook, Gmail and .ics) instead of a calendar connection).
 
 export const CONFIG = {
   logos: {
