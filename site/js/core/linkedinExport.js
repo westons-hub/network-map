@@ -11,6 +11,7 @@
 import { formatEntries, parseEntries } from "./history.js";
 import { clean, normalizeName, normalizeOrg } from "./org.js";
 import { INVITE_PENDING, csvRecords, parseCsv, parseDate, poolEntry, poolName } from "./people.js";
+import { mergePool } from "./pool.js";
 
 /** File name -> what it is. Names match ignoring case, spaces and underscores ("Company_Follows.csv"). */
 const KINDS = {
@@ -284,6 +285,16 @@ export function exportOps(model, found, { rows, targets = [] }) {
   if (Object.keys(prof.fields).length) ops.push({ type: "setProfile", fields: prof.fields });
   if (prof.name) ops.push({ type: "setMe", name: prof.name });
   if (use("email") && found.email && !model.settings.email) ops.push({ type: "setSettings", settings: { email: found.email } });
+  // Someone on your map changed jobs since your last import: their old company and role move to Past Companies.
+  const moved = new Map(mergePool(model.pool, pool.entries).changedCompany.map(c => [normalizeName(c.name), c]));
+  for (const p of model.people) {
+    const c = moved.get(normalizeName(p.name));
+    if (!c || normalizeOrg(p.company) !== normalizeOrg(c.from)) continue; // only if their row still says the old company
+    const entry = pool.entries.find(e => normalizeName(poolName(e)) === normalizeName(p.name));
+    const past = parseEntries(p.pastCompanies);
+    if (!past.some(x => normalizeOrg(x.name) === normalizeOrg(c.from))) past.push({ name: c.from, years: "" });
+    ops.push({ type: "patchPerson", key: normalizeName(p.name), fields: { company: c.to, role: entry?.position || p.role, pastCompanies: formatEntries(past) } });
+  }
   // People already on your map: fill their empty "Date Reached Out" / "Last Contacted" and add LinkedIn notes.
   for (const e of pool.entries) {
     const p = model.people.find(x => normalizeName(x.name) === normalizeName(poolName(e)) || (e.url && urlKey(x.linkedinUrl) === urlKey(e.url)));

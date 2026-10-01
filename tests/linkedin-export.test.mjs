@@ -141,3 +141,14 @@ test("message stats read only participants and dates", () => {
   assert.deepEqual([...stats.values()].map(s => s.count).sort(), [1, 3]);
   assert.equal(urlKey("https://www.linkedin.com/in/Jane-Doe/?x=1"), "linkedin.com/in/jane-doe");
 });
+
+test("re-importing: someone who changed jobs keeps the old company in Past Companies", () => {
+  const found = readExport(asTexts(folder()));
+  const rows = new Set(["connections"]);
+  let m = replay(emptyModel("Alex Rivera"), exportOps(emptyModel("Alex Rivera"), found, { rows }).ops);
+  m = replay(m, [{ type: "upsertPerson", person: personFromPool(m.pool[0]) }]);
+  const before = m.people[0];
+  const newer = { ...found, connections: found.connections.map((e, i) => (i === 0 ? { ...e, company: "Initech", position: "Director" } : e)) };
+  m = replay(m, exportOps(m, newer, { rows }).ops);
+  assert.deepEqual([m.people[0].company, m.people[0].role, m.people[0].pastCompanies], ["Initech", "Director", before.company]);
+});

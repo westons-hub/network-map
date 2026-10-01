@@ -1,7 +1,7 @@
 // Turn "who can intro me?" answers into things the map can draw: the nodes and
 // edges along your best path to a target, and a node's neighborhood for highlighting.
 
-import { parseEntries } from "./history.js";
+import { parseEntries, sharedWithMe } from "./history.js";
 import { normalizeName, normalizeOrg } from "./org.js";
 
 export const edgeId = e => `${e.from}>${e.to}>${e.kind}`;
@@ -14,13 +14,18 @@ const warmth = status => WARMTH[String(status ?? "").trim().toLowerCase()] ?? 4;
  * Your best (shortest) way into a target company: a breadth-first search from you over everyone you know directly,
  * "Introduced me" links (introducer → the person they introduced) and person-to-person connections (Coworker,
  * Classmate, Friend, Mentor, Other; both ways). Among equally short paths, the one that starts with the contact you're
- * warmest with wins. People who currently work there come first; if none is reachable, someone who used to (alumni).
+ * warmest with wins; sharing a school or an employer with you (from your profile) makes a contact warmer. People who
+ * currently work there come first; if none is reachable, someone who used to (alumni).
  * Returns { names: [me, ..., person], ask, person, nodes: [ids], edges: [edge ids], alumni } or null.
  */
-export function bestPath(graph, people, target, me) {
+export function bestPath(graph, people, target, me, profile = {}) {
   const key = normalizeOrg(target.label ?? target.company ?? target);
   const byId = new Map(graph.nodes.map(n => [n.id, n]));
-  const status = new Map(people.map(p => [`p:${normalizeName(p.name)}`, p.status]));
+  const status = new Map(people.map(p => {
+    const s = sharedWithMe(profile, p, normalizeOrg);
+    // Half a step warmer for a shared school or former employer: a "Met" contact still beats a stranger classmate.
+    return [`p:${normalizeName(p.name)}`, warmth(p.status) - (s.schools.length || s.companies.length ? 0.5 : 0)];
+  }));
 
   // Adjacency between you and people.
   const adj = new Map();
@@ -31,7 +36,8 @@ export function bestPath(graph, people, target, me) {
     if (e.kind === "link") { link(e.from, e.to); link(e.to, e.from); }
   }
   // Warmest first, so breadth-first search prefers them among equally short paths.
-  for (const list of adj.values()) list.sort((a, b) => warmth(status.get(a)) - warmth(status.get(b)) || a.localeCompare(b));
+  const warm = id => status.get(id) ?? 4;
+  for (const list of adj.values()) list.sort((a, b) => warm(a) - warm(b) || a.localeCompare(b));
 
   const parent = new Map([["me", null]]);
   const queue = ["me"];
@@ -42,7 +48,7 @@ export function bestPath(graph, people, target, me) {
   const route = id => { const out = []; for (let x = id; x && x !== "me"; x = parent.get(x)) out.unshift(x); return out; };
 
   const pick = ids => ids.filter(id => parent.has(id)).map(id => ({ id, route: route(id) }))
-    .sort((a, b) => a.route.length - b.route.length || warmth(status.get(a.route[0])) - warmth(status.get(b.route[0])))[0];
+    .sort((a, b) => a.route.length - b.route.length || warm(a.route[0]) - warm(b.route[0]))[0];
   const current = people.filter(p => p.company && normalizeOrg(p.company) === key).map(p => `p:${normalizeName(p.name)}`);
   const former = people.filter(p => parseEntries(p.pastCompanies).some(e => normalizeOrg(e.name) === key))
     .map(p => `p:${normalizeName(p.name)}`);

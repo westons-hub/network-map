@@ -239,7 +239,7 @@ function render() {
     // After the edit's own message ("Added …"), so both show.
     setTimeout(() => { const t = $("toast"); toast(t.hidden ? note : `${t.textContent} ${note}`, 7000); }, 0);
   }
-  state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me)]));
+  state.paths = new Map(state.graph.targets.map(t => [t.key, bestPath(state.graph, model.people, t, me, model.profile)]));
   if (state.selected && !state.graph.nodes.some(n => n.id === state.selected)) { state.selected = null; details.close(); }
   images.configure({ companies: model.companies, guessDomains: state.mode !== "demo", avatarStyle: model.avatarStyle });
   map.render(state.graph, model.layout);
@@ -925,6 +925,15 @@ menu.addEventListener("click", async e => {
 
 $("save").addEventListener("click", save);
 $("add-target").addEventListener("click", () => addTarget());
+// Who can introduce you at each target, as a Markdown file you can keep or share.
+$("intro-report").addEventListener("click", async () => {
+  const model = state.doc.model;
+  if (!model.targets.length) return toast("Add a target company first.");
+  const { introReport } = await import("./core/intro.js");
+  const text = introReport(model.people, model.targets.map(t => t.company), model.me || "You");
+  files.download(new TextEncoder().encode(text), `Orbit-intro-report-${todayIso()}.md`, "text/markdown");
+  toast(`Saved your intro report for ${model.targets.length} target${model.targets.length === 1 ? "" : "s"}.`);
+});
 $("add-person").addEventListener("click", () => addPerson());
 const typing = t => t.closest?.("input, textarea, select, [contenteditable]");
 document.addEventListener("keydown", e => {

@@ -175,3 +175,14 @@ test("domainFrom and logo URLs", () => {
   assert.equal(isRealLogo(16), false);
   assert.equal(isRealLogo(64), true);
 });
+
+test("a shared school or former employer makes a contact warmer for the best path (status still matters more)", async () => {
+  const { makePerson } = await import("../site/js/core/people.js");
+  const ppl = [makePerson({ name: "Ann", company: "Acme", status: "Contacted" }), makePerson({ name: "Bob", company: "Acme", status: "Contacted", school: "BYU" })];
+  const g = buildGraph(ppl, { me: "Me", targets: ["Acme"] });
+  const t = g.targets[0];
+  assert.equal(bestPath(g, ppl, t, "Me").ask, "Ann"); // no profile: alphabetical
+  assert.equal(bestPath(g, ppl, t, "Me", { school: "Brigham Young University" }).ask, "Bob"); // same school wins the tie
+  ppl[0].status = "Met";
+  assert.equal(bestPath(g, ppl, t, "Me", { school: "BYU" }).ask, "Ann"); // but Met still beats Contacted
+});

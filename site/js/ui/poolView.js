@@ -19,6 +19,9 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
     const model = getModel();
     const pool = model.pool;
     const head = el("div", undefined, { class: "view-head" });
+    // Classmates aren't in the export by school; LinkedIn's own search finds them.
+    const tip = model.profile?.school ? el("p", "Tip: find classmates on LinkedIn: People search → School filter → 1st connections. " +
+      "Then re-import your export and they're here.", { class: "muted small pool-tip" }) : null;
     head.append(el("h2", "LinkedIn pool"),
       el("span", pool.length ? `${pool.length} connections · only the ones you add go on the map` : "", { class: "muted small" }),
       el("button", pool.length ? "Import a newer LinkedIn export…" : "Import your LinkedIn export…", { class: `btn small${pool.length ? "" : " primary"}`,
@@ -27,11 +30,12 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
       const empty = el("div", undefined, { class: "empty-pool" });
       empty.append(el("p", "Import your LinkedIn connections to search them here and add the ones that matter."),
         el("ol", undefined));
-      for (const step of ["On LinkedIn: Settings → Data privacy → Get a copy of your data.", "Choose “Connections” and request the archive (it arrives by email, usually within minutes).",
-                          "Import the Connections.csv here. It stays in your browser and your workbook."]) {
+      for (const step of ["On LinkedIn: Me → Settings & Privacy → Data privacy → Get a copy of your data.",
+                          "Choose “Download larger data archive” (the top option; “Want something in particular?” has no connections) and request it.",
+                          "Drop the zip LinkedIn emails you here (no need to unzip). It stays in your browser and your workbook."]) {
         empty.lastChild.append(el("li", step));
       }
-      root.replaceChildren(head, empty, brandFooter());
+      root.replaceChildren(...[head, tip, empty, brandFooter()].filter(Boolean));
       return;
     }
 
@@ -54,7 +58,7 @@ export function createPoolView(root, { getModel, onImport, onAdd, onAddMany, onO
 
     const actions = el("div", undefined, { class: "pool-actions" });
     const table = el("table", undefined, { class: "pool-table" });
-    root.replaceChildren(head, bar, actions, el("div", undefined, { class: "table-wrap" }), brandFooter());
+    root.replaceChildren(...[head, tip, bar, actions, el("div", undefined, { class: "table-wrap" }), brandFooter()].filter(Boolean));
     root.querySelector(".table-wrap").append(table);
 
     function renderRows() {

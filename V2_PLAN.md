@@ -153,7 +153,7 @@ instantly**, with nothing to install and no sign-up.
   with height = duration, an "All day / Due" row for tasks, a red "now" line, click an empty slot to schedule, drag a
   meeting to move it. Every meeting has "Add to Google Calendar", "Add to Outlook" and "Download .ics".
 
-## D. Work history and schools (1, 2, 6 ✅; 3–5 pending)
+## D. Work history and schools ✅
 
 LinkedIn's `Connections.csv` only has the **current** company and title and **no school**. The full archive's
 `Positions.csv` and `Education.csv` are **my own** history only.
@@ -488,7 +488,7 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a571
    4) Google-Calendar-style invites (S) · 5) light/dark mode (T) · 6) Orbit footers (U) · 7) auto company/school dots (V)
 3e. ✅ **Round 2 (W)** *(2c4b957 A · 3fd45cc B · 9c1af0d C · c668a80 D · 48dbe9d E · 10332c4 F)*, pushed.
 3f. **Round 2, G + H:** the whole LinkedIn export import (and the corrected onboarding steps), and the primary-button accent.
-4. **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
+4. ✅ **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
 5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
 6. **Calendar connections, verified for real** (create the Google/Azure client IDs per docs/CALENDAR_SETUP.md and test)
