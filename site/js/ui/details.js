@@ -258,6 +258,19 @@ export function createDetails({ sidebar, getCtx, handlers }) {
       card.append(section("About", placeholder ? el("div", p.about, { class: "pre" })
         : inlineField({ value: p.about, multiline: true, label: "about", onSave: save("about") })));
     }
+    // Outreach: your networking-tracker columns (kept as the person's own columns in the workbook).
+    if (!placeholder) {
+      const ex = h => p.extra?.[Object.keys(p.extra ?? {}).find(k => k.toLowerCase() === h.toLowerCase()) ?? h] ?? "";
+      const editEx = (h, opts = {}) => inlineField({ value: ex(h), label: h.toLowerCase(), onSave: v => handlers.patchExtra(key, h, v), ...opts });
+      const date = { type: "date", placeholder: "Add date", display: v => prettyDate(v, false) || v };
+      const out = el("div", undefined, { class: "card-info" });
+      out.append(row("Reached out", editEx("Date Reached Out", date)),
+                 row("Last contacted", editEx("Last Contacted", date)),
+                 row("Referral?", editEx("Referral?", { kind: "referral", placeholder: "Yes / No" })),
+                 row("Opportunities", editEx("Relevant Opportunities", { placeholder: "Roles or teams to ask about" })),
+                 row("Relationship", editEx("Relationship Plan", { kind: "relationshipPlan", placeholder: "Keep In Contact…" })));
+      card.append(section("Outreach", out));
+    }
     const jobs = historyOf(model.experience, p.name, normalizeName), schools = historyOf(model.education, p.name, normalizeName);
     if (jobs.length || schools.length) card.append(section("Timeline", timeline(jobs, schools)));
 

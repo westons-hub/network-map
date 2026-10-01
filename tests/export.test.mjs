@@ -6,7 +6,7 @@ import * as XLSX from "../site/vendor/xlsx.mjs";
 import { makeConnection } from "../site/js/core/connections.js";
 import { exportFileName, exportWorkbook, modelForPeople } from "../site/js/core/export.js";
 import { makePerson } from "../site/js/core/people.js";
-import { emptyModel, readWorkbook } from "../site/js/core/workbook.js";
+import { emptyModel, readWorkbook, writeWorkbook } from "../site/js/core/workbook.js";
 
 const future = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
 function model() {
@@ -104,4 +104,31 @@ test("this view: a filtered LinkedIn pool, or just the tasks", () => {
   assert.deepEqual(pool.SheetNames, ["LinkedIn Pool"]);
   const tasks = readWorkbook(exportWorkbook(m, { kind: "tasks", tasks: m.tasks }).bytes);
   assert.equal(tasks.tasks.length, 1);
+});
+
+test("opening a tracker you already keep: meetings, follow-ups and how you're connected come in", () => {
+  const rows = [["Name", "Company", "Role / Background", "How We're Connected", "LinkedIn", "Meeting Type", "Method", "Status",
+                 "Date Reached Out", "Meeting Date", "Follow-Up Date", "Referral?", "Relevant Opportunities", "Next Steps", "Relationship Plan"],
+    ["Jamie Ortega", "Northwind / Contoso", "Strategy Analyst at Northwind", "BYU; 11 mutual connections (Casey, Morgan)", "Profile", "Coffee Chat", "Phone",
+     "met", "", new Date(2026, 8, 3), new Date(2026, 9, 5), "No", "Contoso APM; Northwind", "Send thank-you within 24 hrs; ask for resume review", "Keep In contact"],
+    ["Casey Park", "Acme", "", "", "", "", "", "contacted", "", "", "", "", "", "", ""]];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws.E2.l = { Target: "https://www.linkedin.com/in/jamie-ortega" };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Networking");
+  const m = readWorkbook(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" })));
+  const d = m.people[0];
+  assert.deepEqual([d.name, d.role, d.status, d.linkedinUrl, m.people[1].status], ["Jamie Ortega", "Strategy Analyst at Northwind", "Met",
+    "https://www.linkedin.com/in/jamie-ortega", "Contacted"]);
+  assert.deepEqual(m.meetings.map(x => [x.person, x.date, x.type, x.method]), [["Jamie Ortega", "2026-09-03", "Coffee Chat", "Phone"]]);
+  assert.deepEqual(m.tasks.map(t => [t.task, t.due]), [["Send thank-you within 24 hrs; ask for resume review", "2026-10-05"]]);
+  assert.equal(d.connectedThrough, "Casey Park"); // "Casey" is the only Casey on the map
+  assert.equal(d.extra["Connection Notes"], "BYU; 11 mutual connections (Casey, Morgan)");
+  assert.deepEqual([d.extra["Referral?"], d.extra["Relevant Opportunities"], d.extra["Relationship Plan"]], ["No", "Contoso APM; Northwind", "Keep In contact"]);
+  assert.ok(!("Meeting Date" in d.extra) && !("How We're Connected" in d.extra));
+  assert.match(m.notices.join(" "), /1 meeting and 1 follow-up/);
+  // Saving it writes the tracker layout again, with nothing duplicated.
+  const back = readWorkbook(writeWorkbook(m));
+  assert.deepEqual(back.people.map(p => p.extra), m.people.map(p => p.extra));
+  assert.equal(back.meetings.length, 1);
 });

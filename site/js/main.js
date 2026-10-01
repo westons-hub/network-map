@@ -8,7 +8,7 @@ import { exportWorkbook } from "./core/export.js";
 import { searchMap } from "./core/search.js";
 import { bestPath, neighborhood } from "./core/paths.js";
 import { parseCsv, parseLinkedInCsv, personKey } from "./core/people.js";
-import { demoEditsForToday, meetingOps, meetingTasks, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
+import { checkInOps, demoEditsForToday, meetingOps, meetingTasks, shiftDemoDates, taskBadge, todayIso } from "./core/schedule.js";
 import { saveDoc } from "./core/sync.js";
 import { emptyModel, readPeopleCsvRows, readWorkbook, writeWorkbook } from "./core/workbook.js";
 import * as files from "./store/files.js";
@@ -35,6 +35,7 @@ import * as calendars from "./store/calendars.js";
 import { addPersonFlow, peopleFromPool } from "./ui/addPerson.js";
 import { isPdf } from "./ui/pdf.js";
 import { createPoolView } from "./ui/poolView.js";
+import { createPeopleView } from "./ui/peopleView.js";
 
 const $ = id => document.getElementById(id);
 const DEMO_URL = "demo/demo_network.xlsx";
@@ -75,6 +76,8 @@ const details = createDetails({
     close: clearSelection,
     focus,
     patchPerson: (key, fields) => { edit({ type: "patchPerson", key, fields }); followRename(key, fields); details.saved(); },
+    // One of the person's own columns (Date Reached Out, Referral?, Relationship Plan…); empty removes it.
+    patchExtra: (key, header, value) => { patchExtra(key, header, value); details.saved(); },
     setProfile: fields => { edit({ type: "setProfile", fields }); details.saved(); },
     setZoomLink: link => { edit({ type: "setSettings", settings: { zoomLink: link } }); details.saved(); },
     addConnection: connection => {
@@ -209,6 +212,24 @@ function addMany(entries) {
 }
 
 
+const peopleView = createPeopleView($("people-view"), {
+  getModel: () => state.doc.model,
+  images,
+  onOpen: name => openPerson(name),
+  onPatch: (key, fields) => edit({ type: "patchPerson", key, fields }),
+  onPatchExtra: patchExtra,
+  onAdd: () => addPerson(),
+});
+
+/** Set or clear one of a person's own columns (Date Reached Out, Relationship Plan…). */
+function patchExtra(key, header, value) {
+  const p = state.doc.model.people.find(x => personKey(x) === key);
+  if (!p) return;
+  const extra = Object.fromEntries(Object.entries(p.extra ?? {}).filter(([k]) => k.toLowerCase() !== header.toLowerCase()));
+  if (value) extra[header] = value;
+  edit({ type: "patchPerson", key, fields: { extra } });
+}
+
 const todo = createTodo($("todo-view"), {
   getModel: () => state.doc.model,
   onAdd: task => { edit({ type: "upsertTask", task }); toast("Task added."); },
@@ -293,12 +314,13 @@ function renderViews() {
   if (state.view === "calendar") calendar.render();
   if (state.view === "todo") todo.render();
   if (state.view === "pool") pool.render();
+  if (state.view === "people") peopleView.render();
 }
 
 // Map | Calendar | To-Do tabs (the choice is remembered in this browser).
 const tabs = [...document.querySelectorAll(".view-tabs [data-view]")];
 function showView(view) {
-  state.view = ["map", "calendar", "todo", "pool"].includes(view) ? view : "map";
+  state.view = ["map", "people", "calendar", "todo", "pool"].includes(view) ? view : "map";
   setPref(PREFS.view, state.view);
   tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === state.view)));
   for (const v of document.querySelectorAll("#main-pane > .view")) v.hidden = v.dataset.view !== state.view;
@@ -404,10 +426,14 @@ function renderDataMenu() {
 
 /** Apply one edit (or several at once, e.g. a meeting plus its status change and task). */
 function edit(opOrOps) {
-  const ops = Array.isArray(opOrOps) ? opOrOps : [opOrOps];
+  let ops = Array.isArray(opOrOps) ? opOrOps : [opOrOps];
   if (!ops.length) return;
   const doc = state.doc;
-  state.doc = { ...doc, model: replay(doc.model, ops), pending: [...doc.pending, ...ops] };
+  let model = replay(doc.model, ops);
+  // "Keep In Contact" people always have their next check-in on the To-Do list.
+  const checkIns = checkInOps(model);
+  if (checkIns.length) { model = replay(model, checkIns); ops = [...ops, ...checkIns]; }
+  state.doc = { ...doc, model, pending: [...doc.pending, ...ops] };
   persistDraft();
   state.announceGroups = true; // only edits announce new company/school dots (not opening a file)
   try { render(); } finally { state.announceGroups = false; }
@@ -590,6 +616,13 @@ async function loadDemo() {
   Object.assign(state, { mode: "demo", fileName: "", handle: null, neverSaved: false, selected: null,
                          doc: { model, base, lastModified: null, pending } });
   render();
+  addDueCheckIns();
+}
+
+/** Opening a map: add any check-in that's now due for "Keep In Contact" people. */
+function addDueCheckIns() {
+  const ops = checkInOps(state.doc.model);
+  if (ops.length) edit(ops);
 }
 
 async function resetDemo() {
@@ -639,6 +672,7 @@ async function openPicked(picked) {
                          doc: { model, base: bytes, lastModified, pending } });
   if (handle) { state.lastHandle = handle; kvSet("last-handle", handle); }
   render();
+  addDueCheckIns();
   map.fit();
   const notes = model.notices.length ? ` ${model.notices.join(" ")} Save to update the file.` : "";
   toast(`Opened ${name}: ${model.people.length} people, ${model.targets.length} targets.${notes}`, notes ? 8000 : 4000);
@@ -817,6 +851,10 @@ function viewScope() {
     const ids = neighborhood(state.graph, state.selected).nodes;
     const names = model.people.filter(p => ids.has(`p:${personKey(p)}`)).map(p => p.name);
     return names.length ? { label: `The ${names.length} highlighted ${names.length === 1 ? "person" : "people"}`, scope: { kind: "people", names } } : null;
+  }
+  if (state.view === "people") {
+    const names = peopleView.visible();
+    return { label: `The ${names.length} people in this table`, scope: { kind: "people", names } };
   }
   if (state.view === "pool") {
     const entries = pool.visible();

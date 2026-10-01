@@ -238,6 +238,7 @@ export async function settingsForm({ model, demo, calendar, onProfile, onReplayI
   const email = el("input", undefined, { type: "email", value: s.email, autocomplete: "email" });
   const length = el("input", undefined, { type: "number", min: 5, max: 240, step: 5, value: s.meetingLength });
   const zoom = el("input", undefined, { type: "url", value: s.zoomLink, placeholder: "https://zoom.us/my/your-name" });
+  const checkIn = el("input", undefined, { type: "number", min: 7, max: 365, step: 1, value: s.checkInDays ?? 60 });
   const template = el("textarea", undefined, { rows: 3, value: s.inviteTemplate });
   const avatars = el("input", undefined, { type: "checkbox", checked: model.avatarStyle === "notionists" });
   const avatarLabel = el("label", undefined, { class: "check" });
@@ -258,6 +259,7 @@ export async function settingsForm({ model, demo, calendar, onProfile, onReplayI
   body.append(two(field("Your name", me), field("Your email", email, "Used as the organizer in .ics invites.")),
               two(field("Default meeting length (min)", length), field("Zoom link", zoom, "Your personal room or scheduling link.")),
               field("Invite message", template, "Placeholders: {first name}, {name}, {date}, {time}, {link}, {my name}"),
+              field("Check in every (days)", checkIn, "People whose Relationship Plan is Keep In Contact get a check-in task this often."),
               avatarLabel);
 
   // Calendar connection (optional): sync meetings and show your events.
@@ -302,6 +304,6 @@ export async function settingsForm({ model, demo, calendar, onProfile, onReplayI
   const choice = await ask("Settings", body, [{ label: "Cancel", value: "" }, { label: "Save", value: "save", primary: true }]);
   if (choice !== "save") return null;
   return { me: me.value.trim(), avatarStyle: avatars.checked ? "notionists" : "initials",
-           settings: { email: email.value.trim(), meetingLength: Number(length.value) || 30, zoomLink: zoom.value.trim(),
+           settings: { email: email.value.trim(), meetingLength: Number(length.value) || 30, zoomLink: zoom.value.trim(), checkInDays: Math.min(365, Math.max(7, Math.round(Number(checkIn.value)) || 60)),
                        inviteTemplate: template.value.trim() || s.inviteTemplate } };
 }

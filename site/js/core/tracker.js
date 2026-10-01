@@ -32,6 +32,8 @@ export function howConnected(model, p) {
     else if (c.dir === "introduced") parts.push(`Introduced you to ${c.other}`);
     else parts.push(`${c.type === INTRODUCED ? "Introduced" : c.type}: ${c.other}`);
   }
+  const notes = extraValue(p, "Connection Notes"); // what your own tracker said, kept as you wrote it
+  if (notes && !parts.includes(notes)) parts.push(notes);
   return parts.join("; ");
 }
 

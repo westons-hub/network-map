@@ -676,3 +676,17 @@ dialog:has(.onboarding) { width: min(700px, 96vw); }
 .wrong-zip-toggle summary { cursor: pointer; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 .small-drop { min-height: 150px; }
 .section-actions { display: inline-flex; gap: 6px; } .pool-tip { margin: -4px 0 10px; }
+
+/* ---- People tab ---- */
+.people-table th { padding: 0; }
+.people-table th .sort { border: 0; background: none; padding: 8px 10px; font: inherit; color: inherit; text-transform: inherit;
+  letter-spacing: inherit; cursor: pointer; width: 100%; text-align: left; white-space: nowrap; }
+.people-table th .sort:hover { color: var(--text); }
+.person-cell { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-weight: 600;
+  color: var(--link-text); cursor: pointer; text-align: left; }
+.person-cell img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: #fff; flex: none; }
+.cell-select { border: 1px solid transparent; background: transparent; color: inherit; font: inherit; padding: 2px 4px; border-radius: 6px; max-width: 150px; }
+.cell-select:hover, .cell-select:focus { border-color: var(--line); background: var(--panel); }
+.people-table td { vertical-align: middle; }
+.people-table .due.late, .people-table .late { color: var(--overdue); font-weight: 600; }
+.person-cell { white-space: nowrap; } .people-table td:nth-child(5) { min-width: 120px; }

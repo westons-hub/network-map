@@ -61,6 +61,30 @@ export function meetingDate(model, name, now = new Date()) {
   return next ? { meeting: next, upcoming: true } : list.length ? { meeting: list.at(-1), upcoming: false } : null;
 }
 
+/**
+ * "Keep In Contact" people get a check-in task every N days (Settings: Check-in every), counted from your last
+ * contact: their latest past meeting, Last Contacted, Date Reached Out, or the last check-in you finished. One open
+ * check-in per person at a time. Returns the upsertTask ops to add (none if everything's already there).
+ */
+export function checkInOps(model, today = todayIso()) {
+  const days = Number(model.settings?.checkInDays) || 60;
+  const ops = [];
+  for (const p of model.people) {
+    const plan = Object.entries(p.extra ?? {}).find(([k]) => k.toLowerCase() === "relationship plan")?.[1];
+    if (String(plan ?? "").trim().toLowerCase() !== "keep in contact") continue;
+    const source = `checkin:${personKey(p)}`;
+    const mine = (model.tasks ?? []).filter(t => t.source === source);
+    if (mine.some(t => !t.done)) continue;
+    const extra = k => Object.entries(p.extra ?? {}).find(([h]) => h.toLowerCase() === k)?.[1] ?? "";
+    const dates = [...meetingsFor(model, p.name).map(m => m.date).filter(d => isDate(d) && d <= today),
+                   extra("last contacted"), extra("date reached out"), ...mine.map(t => t.due)].filter(isDate).sort();
+    const last = dates.at(-1) ?? today;
+    ops.push({ type: "upsertTask", task: { id: `t-checkin-${personKey(p).replace(/\W+/g, "-")}-${last}`, task: `Check in with ${firstName(p.name)}`,
+      person: p.name, company: p.company, due: addDays(last, days), done: false, created: today, source, extra: {} } });
+  }
+  return ops;
+}
+
 /** The automatic tasks' wording (a task still worded like this hasn't been edited). */
 export const thankYouText = person => `Send thank-you to ${person} within 24 hrs`;
 export const prepText = meeting => `Prepare questions for ${(meeting.type || "meeting").toLowerCase()} with ${firstName(meeting.person)}`;
@@ -285,7 +309,7 @@ export function icsFile(meeting, ctx, now = new Date()) {
 
 /**
  * Keep the demo current: every date in it is stored relative to its "Demo base date", so shift them all by
- * (today - base date) — meetings, tasks, and Connected On for people and the LinkedIn pool.
+ * (today - base date) — meetings, tasks, Connected On and other dates for people and the LinkedIn pool.
  */
 export function shiftDemoDates(model, today = todayIso()) {
   const base = model.settings?.demoBaseDate;
@@ -296,8 +320,11 @@ export function shiftDemoDates(model, today = todayIso()) {
   return {
     ...model,
     settings: { ...model.settings, demoBaseDate: today },
-    people: model.people.map(p => ({ ...p, connectedOn: shift(p.connectedOn) })),
-    pool: model.pool.map(e => ({ ...e, connectedOn: shift(e.connectedOn) })),
+    // Dates in people's own columns (Date Reached Out, Last Contacted…) move too.
+    people: model.people.map(p => ({ ...p, connectedOn: shift(p.connectedOn),
+      extra: Object.fromEntries(Object.entries(p.extra ?? {}).map(([k, v]) => [k, shift(v)])) })),
+    pool: model.pool.map(e => Object.fromEntries(Object.entries(e).map(([k, v]) =>
+      [k, k === "connectedOn" || k === "invitedOn" || k === "lastContacted" ? shift(v) : v]))),
     meetings: model.meetings.map(m => ({ ...m, date: shift(m.date) })),
     tasks: model.tasks.map(t => ({ ...t, due: shift(t.due), created: shift(t.created) })),
   };

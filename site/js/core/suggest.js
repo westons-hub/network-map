@@ -65,7 +65,7 @@ export function buildSuggestions(model) {
     skill: skill.list(), language: language.list(), certification: certification.list(),
     person: model.people.map(p => ({ value: p.name, key: normalizeName(p.name), count: 0, pool: 0, detail: [p.role, p.company].filter(Boolean).join(" @ ") })),
     status: fixed(STATUSES), meetingType: fixed(MEETING_TYPES), method: fixed(METHODS),
-    relationshipPlan: fixed(RELATIONSHIP_PLANS), connectionType: fixed(CONNECTION_TYPES),
+    relationshipPlan: fixed(RELATIONSHIP_PLANS), connectionType: fixed(CONNECTION_TYPES), referral: fixed(["Yes", "No"]),
   };
 }
 

@@ -140,6 +140,8 @@ export function readWorkbook(bytes) {
     if (isExport) for (const h of DERIVED_COLUMNS) delete rec[h];
     const { known, extra } = pick(rec, PEOPLE_COLUMNS, PEOPLE_ALIASES);
     if (!clean(known.name)) continue;
+    // Statuses match whatever the capitalization ("met" -> "Met").
+    if (known.status) known.status = STATUSES.find(st => st.toLowerCase() === clean(known.status).toLowerCase()) ?? known.status;
     model.people.push(makePerson({ ...known, extra, source: "excel" }));
   }
 
@@ -202,6 +204,7 @@ export function readWorkbook(bytes) {
     const { known, extra } = pick(rec, CONNECTION_COLUMNS);
     if (text(known.a) && text(known.b)) model.connections.push(makeConnection({ ...known, extra }));
   }
+  if (!isExport) fromTracker(model);
   reconcile(model);
 
   // ---- Experience & Education ----
@@ -242,6 +245,47 @@ export function readWorkbook(bytes) {
   if (model.meFromProfile) model.me = model.meFromProfile;
   delete model.meFromProfile;
   return model;
+}
+
+/**
+ * Opening a tracker you already keep (a People sheet in the tracker layout, without Orbit's Meetings sheet): its
+ * Meeting Date / Type / Method become a meeting, Follow-Up Date + Next Steps a task, and How We're Connected is
+ * kept as Connection Notes; a name in it that matches exactly one person on the map becomes "Introduced me".
+ */
+function fromTracker(model) {
+  const get = (p, h) => { const k = Object.keys(p.extra).find(x => x.toLowerCase() === h.toLowerCase()); return k === undefined ? "" : p.extra[k]; };
+  const drop = (p, h) => { for (const k of Object.keys(p.extra)) if (k.toLowerCase() === h.toLowerCase()) delete p.extra[k]; };
+  let meetings = 0, tasks = 0;
+  model.people.forEach((p, i) => {
+    if (!DERIVED_COLUMNS.some(h => get(p, h) !== "")) { DERIVED_COLUMNS.forEach(h => drop(p, h)); return; }
+    const date = parseDate(get(p, "Meeting Date")), next = clean(get(p, "Next Steps"));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      model.meetings.push({ id: `m-tracker-${i + 1}`, person: p.name, date, start: "", end: "", type: clean(get(p, "Meeting Type")),
+        method: clean(get(p, "Method")), notes: "", nextStep: next, eventId: "", link: "", extra: {} });
+      meetings++;
+    }
+    const due = parseDate(get(p, "Follow-Up Date"));
+    if (next || /^\d{4}-\d{2}-\d{2}$/.test(due)) {
+      model.tasks.push({ id: `t-tracker-${i + 1}`, task: next || `Follow up with ${p.name}`, person: p.name, company: p.company,
+        due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : "", done: false, created: "", source: "", extra: {} });
+      tasks++;
+    }
+    const how = clean(get(p, "How We're Connected"));
+    if (how) {
+      p.extra["Connection Notes"] = how;
+      if (!p.connectedThrough) {
+        const others = model.people.filter(o => o !== p);
+        const firsts = new Map();
+        for (const o of others) { const f = o.name.split(/\s+/)[0].toLowerCase(); firsts.set(f, firsts.has(f) ? null : o); }
+        const text = how.toLowerCase();
+        const hits = new Set(others.filter(o => text.includes(o.name.toLowerCase())));
+        for (const w of text.split(/[^a-z\u00c0-\u024f'-]+/)) { const o = firsts.get(w); if (o) hits.add(o); }
+        if (hits.size === 1) p.connectedThrough = [...hits][0].name;
+      }
+    }
+    DERIVED_COLUMNS.forEach(h => drop(p, h));
+  });
+  if (meetings || tasks) model.notices.push(`Opened your tracker: ${meetings} meeting${meetings === 1 ? "" : "s"} and ${tasks} follow-up${tasks === 1 ? "" : "s"} were added to the Calendar and To-Do.`);
 }
 
 /** Items -> sheet rows: header row + one row per item, extra columns appended. */
@@ -305,7 +349,7 @@ function peopleRows(model, tracker) {
   return tableRows(model.people, [...TRACKER_HEADERS.map(h => [h]), ...rest], p => {
     const t = trackerCells(model, p);
     return [...TRACKER_HEADERS.map(h => (/Date/.test(h) ? dateCell(t[h]) : t[h])), ...rest.map(([, f]) => cell(p, f))];
-  }, OWN_TRACKER_COLUMNS);
+  }, [...OWN_TRACKER_COLUMNS, ...DERIVED_COLUMNS]);
 }
 
 // Dropdowns and wrapped columns per sheet (see xlsxPolish.js).
@@ -329,7 +373,7 @@ const POLISH = {
  * sheets we don't manage (like "How to use") and their order.
  * Options: tracker (People in the networking-tracker layout, for Export), only (just these sheet keys).
  */
-export function writeWorkbook(model, base, { tracker = false, only = null } = {}) {
+export function writeWorkbook(model, base, { tracker = true, only = null } = {}) {
   // cellNF/cellStyles keep number formats and styles on sheets we pass through untouched.
   const wb = base ? XLSX.read(base, { type: "array", cellNF: true, cellStyles: true }) : XLSX.utils.book_new();
   const rows = {

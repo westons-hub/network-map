@@ -90,25 +90,26 @@ const plus = (t, min) => { const [h, m] = t.split(":").map(Number); const x = h 
 
 const HOW_TO = [
   ["Sheet / column", "What to put there"],
-  ["People", "Everyone on your map. Only Name is required."],
-  ["  Name", "Full name, spelled the same way everywhere."],
-  ["  Company / School", "3+ direct connections at one company or school become a group bubble. 'Stanford' and 'Stanford University' count as the same."],
-  ["  Email", "Shown in the details panel with a copy button."],
-  ["  LinkedIn URL", "Their profile link. Double-click them on the map to open it."],
-  ["  Photo", "An image link, or use 'Add photo' in the app (it stores a small picture here). LinkedIn exports don't include photos."],
-  ["  Connected Through", "Leave BLANK if you know them directly. Otherwise put the name of the person who connects you; they appear as a 2nd-degree connection."],
-  ["  Connected On", "The date you connected (filled in from LinkedIn)."],
-  ["  Status", "Met / Contacted / To Reach Out / Follow Up / Referral."],
-  ["  Tags, Notes", "Anything you want to remember. Tags are comma-separated."],
+  ["People", "Everyone on your map, in your networking-tracker layout. Only Name is required."],
+  ["  Name, Company, Role / Background", "Who they are. 'Stanford' and 'Stanford University' (or 'Acme' and 'Acme, Inc.') count as the same."],
+  ["  How We're Connected", "Filled in by Orbit from schools and connections (plus your own notes in Connection Notes)."],
+  ["  LinkedIn", "Their profile link (shown as 'Profile'). Double-click them on the map to open it."],
+  ["  Meeting Type, Method, Meeting Date", "Filled in by Orbit from the Meetings sheet (the next meeting, or the latest one)."],
+  ["  Status", "To Reach Out / Contacted / Scheduled / Met / Follow Up / Referral (a dropdown; any capitalization works)."],
+  ["  Date Reached Out, Referral?, Relevant Opportunities, Relationship Plan", "Yours to fill in (also editable in Orbit under Outreach). Keep In Contact adds a check-in task every 60 days."],
+  ["  Follow-Up Date, Next Steps", "Filled in by Orbit from your next open task."],
+  ["  Email, Photo, Past Companies, Schools, Tags, Connected On, Connected Through, Notes…", "The rest of their details. Several schools or past companies: 'BYU (2022–2026); Lakeview High'. Connected Through = who introduced you (blank if you know them directly)."],
+  ["Groups", "When enough people share a company (now or in the past) or a school, it gets its own dot: 3 by default (Legend & view → Groups form at)."],
   ["Targets", "Companies you want to work at. Priority (1 = highest) and Stage (Researching / Networking / Applied / Interviewing / Offer) are optional."],
-  ["Companies", "Optional. Set a company's Website (e.g. byu.edu) if its logo comes out wrong, or put an image link in Logo."],
-  ["LinkedIn Pool", "Filled by 'Import LinkedIn' from your Connections.csv. These people are NOT on the map until you add them."],
-  ["Connections", "Who knows whom: Person A, Person B, Type (Introduced me, Coworker, Classmate, Friend, Mentor, or anything else), Notes. 'Introduced me' means A introduced you to B; it's kept in sync with People → Connected Through."],
+  ["Companies", "Optional: a company or school's Website (for its logo) or a Logo image link."],
+  ["LinkedIn Pool", "Your LinkedIn connections from your data export. They're NOT on the map until you add them."],
+  ["Connections", "Who knows whom: Person A, Person B, Type (Introduced me, Coworker, Classmate, Friend, Mentor, or anything else), Notes."],
+  ["Experience, Education", "Jobs and schools read from LinkedIn profile PDFs (a timeline in each person's details)."],
   ["Me", "Your own profile: photo, role, schools, past companies, what you're looking for."],
-  ["Meetings", "One row per meeting: Person, Date, Start, End, Type, Method, Notes, Next Step. The app fills this when you schedule or log a meeting."],
-  ["Tasks", "Your to-dos: Task, Person, Company, Due, Done. Scheduling a meeting adds a 'Send thank-you' task automatically."],
-  ["Settings", "Your name and email, default meeting length, your Zoom link (used in invites), the invite message, and Avatar style (initials or notionists)."],
-  ["Layout", "Managed by the app (saved node positions)."],
+  ["Meetings", "One row per meeting. The app fills this when you schedule or log a meeting."],
+  ["Tasks", "Your to-dos: Task, Person, Company, Due, Done. Meetings add a 'Send thank-you' task automatically."],
+  ["Settings", "Your name and email, meeting length, Zoom link, invite message, check-in interval, group size and group by."],
+  ["Layout", "Managed by the app (where you dragged things on the map)."],
   ["Privacy", "Orbit runs entirely in your browser. This file is never uploaded anywhere."],
 ];
 
@@ -160,6 +161,15 @@ const demo = { ...emptyModel("Alex Rivera"), avatarStyle: "notionists", profile:
   settings: { ...emptyModel().settings, email: "alex.rivera@example.com", zoomLink: "https://zoom.us/j/0000000000",
               demoBaseDate: BASE },
   pool };
+// Tracker columns for a few people (Outreach in their details; Liam and Sofia get automatic check-ins).
+for (const [name, extra] of [
+  ["Liam Walsh", { "Relationship Plan": "Keep In Contact", "Date Reached Out": "2026-06-01" }],
+  ["Sofia Alvarez", { "Relationship Plan": "Keep In Contact", "Referral?": "No", "Relevant Opportunities": "Microsoft PM internship",
+                      "Date Reached Out": "2026-08-10" }],
+  ["Jordan Lee", { "Relationship Plan": "Follow Up Later", "Referral?": "Yes", "Relevant Opportunities": "Deloitte strategy summer associate" }],
+  ["Hana Kim", { "Relationship Plan": "One-Time" }],
+]) Object.assign(demo.people.find(p => p.name === name).extra, extra);
+
 // Full work history for a few people (what a LinkedIn profile PDF import gives you): shown as a timeline in
 // their details, with the profile fields filled in. All fictional.
 const HISTORY = {

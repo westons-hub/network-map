@@ -169,7 +169,7 @@ LinkedIn's `Connections.csv` only has the **current** company and title and **no
 5. In-app tip: "Find classmates on LinkedIn: People search → School filter → 1st connections."
 6. Demo people get past companies and multiple schools.
 
-## E. Networking tracker format + Excel import/export
+## E. Networking tracker format + Excel import/export ✅
 
 My tracker's columns, in order (✅ confirmed):
 
@@ -490,7 +490,8 @@ and a Roadmap (Zoom API). The Python CLI is gone; it stays in git history (4a571
 3f. **Round 2, G + H:** the whole LinkedIn export import (and the corrected onboarding steps), and the primary-button accent.
 4. ✅ **Work history, the rest (D.3–D.5):** LinkedIn re-import moves a changed company into Past Companies; import my own
    `Positions.csv` / `Education.csv` ("Former coworker" / "Same school" badges, warm paths); classmates tip; intro report download
-5. **Tracker format + Excel import/export + People table (E)** — confirm the tracker headers first
+5. ✅ **Tracker format + Excel import/export + People table (E)**: tracker layout in saved files, opening an existing
+   tracker (meetings and follow-ups come in), Outreach fields, People tab, Keep In Contact check-ins
 6. **Calendar connections, verified for real** (create the Google/Azure client IDs per docs/CALENDAR_SETUP.md and test)
 7. ✅ **Polish + deploy** *(ca9a4aa, 4256843; done before Phase 4)*: saved drag positions + Re-arrange/Lock (7), offline export, GitHub Pages workflow, README with
    live link + GIF, demo polish (I)

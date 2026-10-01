@@ -56,7 +56,8 @@ test("dates survive a round-trip in any time zone", () => {
 
 test("Connected On is a real Excel date, and Layout is hidden", () => {
   const wb = XLSX.read(writeWorkbook(fullModel()), { type: "array", cellNF: true });
-  const cell = wb.Sheets.People.I2;
+  const headers = XLSX.utils.sheet_to_json(wb.Sheets.People, { header: 1 })[0];
+  const cell = wb.Sheets.People[XLSX.utils.encode_cell({ r: 1, c: headers.indexOf("Connected On") })];
   assert.equal(cell.t, "n");
   assert.equal(cell.z, "yyyy-mm-dd");
   assert.deepEqual(wb.Workbook.Sheets.map(s => [s.name, s.Hidden]).find(([n]) => n === "Layout"), ["Layout", 1]);
@@ -73,7 +74,8 @@ test("an old-format file (Contacts sheet, Targets with Company/Notes) is migrate
 
   // Saving turns Contacts into People and keeps the "How to use" sheet.
   const saved = XLSX.read(writeWorkbook(m, OLD), { type: "array" });
-  assert.deepEqual(saved.SheetNames.slice(0, 2), ["People", "Targets"]);
+  assert.equal(saved.SheetNames[0], "People");
+  assert.ok(saved.SheetNames.includes("Targets"));
   assert.ok(saved.SheetNames.includes("How to use"));
   assert.ok(!saved.SheetNames.includes("Contacts"));
   assert.equal(readWorkbook(writeWorkbook(m, OLD)).people.length, 22);

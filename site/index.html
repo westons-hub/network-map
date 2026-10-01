@@ -136,6 +136,7 @@
     <div class="topbar">
       <nav class="view-tabs" role="tablist" aria-label="Views">
         <button role="tab" data-view="map" aria-selected="true">Map</button>
+        <button role="tab" data-view="people" aria-selected="false">People</button>
         <button role="tab" data-view="calendar" aria-selected="false">Calendar</button>
         <button role="tab" data-view="todo" aria-selected="false">To-Do <span id="todo-badge" class="tab-badge" hidden></span></button>
         <button role="tab" data-view="pool" aria-selected="false">LinkedIn pool <span id="pool-count" class="tab-count"></span></button>
@@ -161,6 +162,7 @@
       </div>
       <div id="drop-overlay" class="drop-overlay" hidden>Drop a LinkedIn profile PDF to add them, or your LinkedIn data export</div>
     </div>
+    <section id="people-view" class="view pane" data-view="people" hidden aria-label="People"></section>
     <section id="calendar-view" class="view pane" data-view="calendar" hidden aria-label="Calendar"></section>
     <section id="todo-view" class="view pane" data-view="todo" hidden aria-label="To-Do"></section>
     <section id="pool-view" class="view pane" data-view="pool" hidden aria-label="LinkedIn pool"></section>

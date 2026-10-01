@@ -221,3 +221,19 @@ test("the demo's automatic tasks are linked to their meetings", async () => {
   const daniel = d.meetings.find(x => x.person === "Daniel Ortiz");
   assert.deepEqual(meetingTasks(d, daniel).untouched.map(t => t.task), ["Send thank-you to Daniel Ortiz within 24 hrs"]);
 });
+
+test("Keep In Contact people get a check-in every N days from your last contact, one open at a time", async () => {
+  const { checkInOps } = await import("../site/js/core/schedule.js");
+  const { makePerson } = await import("../site/js/core/people.js");
+  const { replay } = await import("../site/js/core/ops.js");
+  let m = { ...model(), settings: { ...model().settings, checkInDays: 60 },
+            people: [makePerson({ name: "Priya Shah", company: "Deloitte", extra: { "Relationship Plan": "Keep In Contact", "Last Contacted": "2026-08-01" } }),
+                     makePerson({ name: "Bo Chen", extra: { "Relationship Plan": "One-Time" } })],
+            meetings: [meeting({ person: "Priya Shah", date: "2026-08-20" })], tasks: [] };
+  const ops = checkInOps(m, "2026-09-28");
+  assert.deepEqual(ops.map(o => [o.task.task, o.task.due, o.task.source]), [["Check in with Priya", "2026-10-19", "checkin:priya shah"]]);
+  m = replay(m, ops);
+  assert.deepEqual(checkInOps(m, "2026-09-28"), [], "one open check-in at a time");
+  m.tasks[0].done = true; // done: the next one is 60 days after it
+  assert.deepEqual(checkInOps(m, "2026-10-20").map(o => o.task.due), ["2026-12-18"]);
+});
